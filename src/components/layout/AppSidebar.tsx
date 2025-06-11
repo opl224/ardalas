@@ -12,7 +12,6 @@ import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { useToast } from "@/hooks/use-toast";
 import {
-  SidebarProvider,
   Sidebar,
   SidebarHeader,
   SidebarContent,
@@ -25,10 +24,9 @@ import {
   SidebarMenuSubButton,
   SidebarTrigger,
   SidebarRail
-} from "@/components/ui/sidebar"; // Assuming this is the correct path for the new Sidebar
+} from "@/components/ui/sidebar"; 
 
 function AppLogo() {
-  // Replace with actual logo if available
   return (
     <Link href="/dashboard" className="flex items-center gap-2 px-2 font-headline text-lg font-semibold tracking-tight text-primary">
        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7 text-primary">
@@ -58,7 +56,7 @@ const renderNavItems = (items: NavItem[], currentPath: string, userRole: string 
               "justify-start w-full",
               isActive && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
             )}
-            tooltip={item.title} // Tooltip for collapsed state
+            tooltip={item.title} 
           >
             <Link href={item.href}>
               <item.icon className="h-5 w-5 shrink-0" />
@@ -95,7 +93,6 @@ export function AppSidebar() {
   };
   
   return (
-    <SidebarProvider defaultOpen>
       <Sidebar 
         className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md" 
         collapsible="icon"
@@ -104,7 +101,7 @@ export function AppSidebar() {
         <SidebarHeader className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between">
              <AppLogo />
-             <SidebarTrigger className="md:hidden" /> {/* Only show trigger on mobile if sidebar is collapsible */}
+             <SidebarTrigger className="md:hidden" /> 
           </div>
         </SidebarHeader>
         <SidebarContent className="flex-1 p-2">
@@ -133,6 +130,5 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-    </SidebarProvider>
   );
 }

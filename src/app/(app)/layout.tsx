@@ -1,4 +1,4 @@
-"use client"; // This layout can be a client component to use useAuth for redirects
+"use client"; 
 
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -6,7 +6,8 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -36,7 +37,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    // This will be briefly shown before redirect or if redirect fails
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p>Redirecting to login...</p>
@@ -44,8 +44,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     );
   }
   
-  // The SidebarProvider is inside AppSidebar now
   return (
+    <SidebarProvider defaultOpen>
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <div className="flex flex-1 flex-col">
@@ -57,5 +57,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </main>
         </div>
       </div>
+    </SidebarProvider>
     );
 }
