@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users } from "lucide-react"; // Can use a different icon if desired, e.g. GraduationCap
 import type { Metadata } from 'next';
@@ -27,3 +28,9 @@ export default function StudentsPage() {
           </p>
           <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
             Area untuk menampilkan daftar murid
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
