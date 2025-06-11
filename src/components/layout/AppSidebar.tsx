@@ -57,10 +57,16 @@ export function AppSidebar() {
       .filter(item => !item.roles || (userRole && item.roles.includes(userRole as any)))
       .map((item) => {
         const hasChildren = item.children && item.children.length > 0;
-        const isSubmenuOpen = hasChildren && openSubmenu === item.title;
+        // Check if the current item's submenu should be open
+        const isCurrentSubmenuOpen = hasChildren && openSubmenu === item.title;
         
-        const isActive = hasChildren
-          ? (isSubmenuOpen || item.children?.some(child => currentPath === child.href || (child.href !== "/dashboard" && child.href !== "#" && currentPath.startsWith(child.href))) ?? false)
+        // Determine if the item or any of its children is active
+        const isParentOrChildActive = hasChildren
+          ? item.children?.some(child => currentPath === child.href || (child.href !== "/dashboard" && child.href !== "#" && currentPath.startsWith(child.href))) ?? false
+          : false;
+        
+        const isActive = hasChildren 
+          ? (isCurrentSubmenuOpen || isParentOrChildActive) 
           : currentPath === item.href || (item.href !== "/dashboard" && item.href !== "#" && currentPath.startsWith(item.href));
 
 
@@ -83,12 +89,12 @@ export function AppSidebar() {
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                 </div>
-                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-500", isSubmenuOpen && "rotate-90")} />
+                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-500", isCurrentSubmenuOpen && "rotate-90")} />
               </ButtonComponent>
               <SidebarMenuSub
                 className={cn(
                   "overflow-hidden transition-all duration-500 ease-in-out",
-                  isSubmenuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+                  isCurrentSubmenuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
                 )}
               >
                 {renderNavItemsRecursive(item.children, currentPath, userRole, true)}
@@ -149,14 +155,7 @@ export function AppSidebar() {
         </SidebarContent>
         <SidebarFooter className="p-2 border-t border-border/50">
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild className="justify-start w-full" tooltip="Pengaturan">
-                <Link href="/settings">
-                  <Settings className="h-5 w-5 shrink-0" />
-                  <span className="truncate">Pengaturan</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {/* Pengaturan tidak lagi di-hardcode di sini, akan dirender oleh renderNavItemsRecursive */}
             {user && (
               <SidebarMenuItem>
                 <SidebarMenuButton 
@@ -174,4 +173,3 @@ export function AppSidebar() {
       </Sidebar>
   );
 }
-

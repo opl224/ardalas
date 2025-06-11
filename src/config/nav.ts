@@ -15,7 +15,7 @@ import {
   CalendarDays,
   MessageSquare,
   Settings,
-  UserCog, // Diperbaiki dari UsersCog menjadi UserCog
+  UserCog,
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -34,7 +34,7 @@ export const navItems: NavItem[] = [
   { 
     title: "Administrasi Pengguna",
     href: "/admin/user-administration", 
-    icon: UserCog, // Diperbaiki dari UsersCog menjadi UserCog
+    icon: UserCog,
     roles: ["admin"], 
   },
   {
@@ -80,11 +80,10 @@ export const navItems: NavItem[] = [
       { title: "Pesan", href: "/messages", icon: MessageSquare }, 
     ],
   },
+  { title: "Pengaturan", href: "/settings", icon: Settings }, // Pengaturan dipindahkan ke sini
 ];
 
-// bottomNavItems remains unchanged as it's handled separately for settings/logout
+// bottomNavItems sekarang hanya untuk referensi, Pengaturan sudah dipindah
 export const bottomNavItems: NavItem[] = [
-    { title: "Pengaturan", href: "/settings", icon: Settings },
-    // Logout will be handled by a button, not a nav item directly in the list
+    // Logout akan ditangani oleh tombol, bukan item nav langsung di daftar ini
 ];
-
