@@ -15,7 +15,7 @@ import {
   CalendarDays,
   MessageSquare,
   Settings,
-  UsersCog, // Ditambahkan ikon untuk administrasi pengguna
+  UserCog, // Diperbaiki dari UsersCog menjadi UserCog
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -31,10 +31,10 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
   { title: "Pengumuman", href: "/announcements", icon: Megaphone },
-  { // Menu baru untuk Administrasi Pengguna
+  { 
     title: "Administrasi Pengguna",
     href: "/admin/user-administration", 
-    icon: UsersCog,
+    icon: UserCog, // Diperbaiki dari UsersCog menjadi UserCog
     roles: ["admin"], 
   },
   {
@@ -52,7 +52,7 @@ export const navItems: NavItem[] = [
     title: "Akademik",
     href: "#", // Parent item
     icon: BookOpen,
-    roles: ["admin", "guru", "siswa", "orangtua"], // Visible if any child is visible
+    roles: ["admin", "guru", "siswa", "orangtua"],
     children: [
       { title: "Subjek", href: "/subjects", icon: BookOpen, roles: ["admin", "guru"] },
       { title: "Kelas", href: "/classes", icon: School, roles: ["admin", "guru"] },
@@ -63,7 +63,7 @@ export const navItems: NavItem[] = [
     title: "Tugas & Penilaian",
     href: "#", // Parent item
     icon: ClipboardCheck,
-    roles: ["admin", "guru", "siswa", "orangtua"], // Visible if any child is visible
+    roles: ["admin", "guru", "siswa", "orangtua"],
     children: [
       { title: "Ujian", href: "/exams", icon: FileText, roles: ["admin", "guru", "siswa", "orangtua"] },
       { title: "Tugas", href: "/assignments", icon: ClipboardCheck, roles: ["admin", "guru", "siswa", "orangtua"] },
@@ -74,12 +74,10 @@ export const navItems: NavItem[] = [
     title: "Kehidupan Sekolah",
     href: "#", // Parent item
     icon: CalendarDays,
-    // No roles defined for parent, so visible to all authenticated users if children are.
-    // Individual children have their own role restrictions.
     children: [
       { title: "Kehadiran", href: "/attendance", icon: CalendarCheck, roles: ["admin", "guru", "siswa"] },
-      { title: "Acara Sekolah", href: "/events", icon: CalendarDays }, // All authenticated users
-      { title: "Pesan", href: "/messages", icon: MessageSquare }, // All authenticated users
+      { title: "Acara Sekolah", href: "/events", icon: CalendarDays }, 
+      { title: "Pesan", href: "/messages", icon: MessageSquare }, 
     ],
   },
 ];
@@ -89,3 +87,4 @@ export const bottomNavItems: NavItem[] = [
     { title: "Pengaturan", href: "/settings", icon: Settings },
     // Logout will be handled by a button, not a nav item directly in the list
 ];
+
