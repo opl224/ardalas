@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Megaphone, CalendarDays, BookOpen, ArrowRight } from "lucide-react";
@@ -73,7 +74,8 @@ export default function DashboardPage() {
               <CardContent>
                 <p className="text-sm text-muted-foreground truncate">{announcement.excerpt}</p>
                  <Button variant="outline" size="sm" asChild className="mt-2 border-primary text-primary hover:bg-primary/10">
-                  <Link href={`/announcements/${announcement.id}`}>
+                  {/* In a real app, this would link to a dynamic announcement page e.g., /announcements/[id] */}
+                  <Link href={`/announcements`}> 
                     Baca Selengkapnya
                   </Link>
                 </Button>
@@ -110,3 +112,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+    </div>
+  );
+}
