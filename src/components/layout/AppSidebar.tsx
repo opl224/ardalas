@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Settings, ChevronRight } from "lucide-react"; // Added ChevronRight
+import { LogOut, Settings, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { navItems } from "@/config/nav";
 import type { NavItem } from "@/config/nav";
@@ -26,7 +26,7 @@ import {
   SidebarTrigger,
   SidebarRail
 } from "@/components/ui/sidebar";
-import { useState } from "react"; // Added useState
+import { useState } from "react";
 
 function AppLogo() {
   return (
@@ -46,49 +46,54 @@ export function AppSidebar() {
   const { user, role } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const [openSubmenus, setOpenSubmenus] = useState<Record<string, boolean>>({});
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
   const toggleSubmenu = (title: string) => {
-    setOpenSubmenus(prev => ({ ...prev, [title]: !prev[title] }));
+    setOpenSubmenu(prevOpenTitle => (prevOpenTitle === title ? null : title));
   };
 
   const renderNavItemsRecursive = (items: NavItem[], currentPath: string, userRole: string | null, isSubMenuParam = false) => {
     return items
       .filter(item => !item.roles || (userRole && item.roles.includes(userRole as any)))
       .map((item) => {
-        const isActive = currentPath === item.href || (item.href !== "/dashboard" && item.href !== "#" && currentPath.startsWith(item.href));
+        const isActive = item.href === "#" // Parent items with href="#" are active if a child is active
+          ? item.children?.some(child => currentPath === child.href || (child.href !== "/dashboard" && child.href !== "#" && currentPath.startsWith(child.href))) ?? false
+          : currentPath === item.href || (item.href !== "/dashboard" && item.href !== "#" && currentPath.startsWith(item.href));
+
         const ButtonComponent = isSubMenuParam ? SidebarMenuSubButton : SidebarMenuButton;
         const ItemComponent = isSubMenuParam ? SidebarMenuSubItem : SidebarMenuItem;
         const hasChildren = item.children && item.children.length > 0;
-        const isSubmenuOpen = hasChildren && openSubmenus[item.title];
+        const isSubmenuOpen = hasChildren && openSubmenu === item.title;
 
         if (hasChildren) {
           return (
             <ItemComponent key={item.title}>
               <ButtonComponent
                 onClick={() => toggleSubmenu(item.title)}
-                isActive={isActive} // Parent active state based on its own href or children (more complex logic can be added if needed)
+                isActive={isActive || isSubmenuOpen} // Parent active if itself or children active or if it's the open submenu
                 className={cn(
-                  "w-full justify-between", // Ensure chevron is pushed to the right
-                  isActive && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
+                  "w-full justify-between",
+                  (isActive || isSubmenuOpen) && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
                 )}
                 tooltip={item.title}
               >
-                <div className="flex items-center gap-2 overflow-hidden"> {/* Group icon and title */}
+                <div className="flex items-center gap-2 overflow-hidden">
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                 </div>
-                <ChevronRight className={cn("h-4 w-4 transition-transform shrink-0", isSubmenuOpen && "rotate-90")} />
+                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-300", isSubmenuOpen && "rotate-90")} />
               </ButtonComponent>
-              {isSubmenuOpen && (
-                <SidebarMenuSub>
-                  {renderNavItemsRecursive(item.children, currentPath, userRole, true)}
-                </SidebarMenuSub>
-              )}
+              <SidebarMenuSub
+                className={cn(
+                  "overflow-hidden transition-all duration-300 ease-in-out",
+                  isSubmenuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+                )}
+              >
+                {renderNavItemsRecursive(item.children, currentPath, userRole, true)}
+              </SidebarMenuSub>
             </ItemComponent>
           );
         } else {
-          // Leaf item (no children or an item within a submenu)
           return (
             <ItemComponent key={item.title}>
               <ButtonComponent
@@ -143,7 +148,7 @@ export function AppSidebar() {
         <SidebarFooter className="p-2 border-t border-border/50">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="justify-start w-full">
+              <SidebarMenuButton asChild className="justify-start w-full" tooltip="Pengaturan">
                 <Link href="/settings">
                   <Settings className="h-5 w-5 shrink-0" />
                   <span className="truncate">Pengaturan</span>
@@ -152,7 +157,11 @@ export function AppSidebar() {
             </SidebarMenuItem>
             {user && (
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={handleLogout} className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <SidebarMenuButton 
+                  onClick={handleLogout} 
+                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  tooltip="Logout"
+                >
                   <LogOut className="h-5 w-5 shrink-0" />
                   <span className="truncate">Logout</span>
                 </SidebarMenuButton>
