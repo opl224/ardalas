@@ -1,11 +1,12 @@
+
 "use client";
 
 import type { User as FirebaseUser } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 import type { Role } from "@/config/roles";
 import { doc, getDoc } from "firebase/firestore";
-import type { ReactNode} from 'react';
-import { createContext, useContext, useEffect, useState } from "react";
+// Import React and other hooks/types explicitly
+import React, { useEffect, useContext, createContext, useState, type ReactNode } from "react";
 
 interface UserProfile extends FirebaseUser {
   role?: Role;
