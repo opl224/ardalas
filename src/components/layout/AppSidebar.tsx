@@ -56,24 +56,26 @@ export function AppSidebar() {
     return items
       .filter(item => !item.roles || (userRole && item.roles.includes(userRole as any)))
       .map((item) => {
-        const isActive = item.href === "#" // Parent items with href="#" are active if a child is active
-          ? item.children?.some(child => currentPath === child.href || (child.href !== "/dashboard" && child.href !== "#" && currentPath.startsWith(child.href))) ?? false
+        const hasChildren = item.children && item.children.length > 0;
+        const isSubmenuOpen = hasChildren && openSubmenu === item.title;
+        
+        const isActive = hasChildren
+          ? (isSubmenuOpen || item.children?.some(child => currentPath === child.href || (child.href !== "/dashboard" && child.href !== "#" && currentPath.startsWith(child.href))) ?? false)
           : currentPath === item.href || (item.href !== "/dashboard" && item.href !== "#" && currentPath.startsWith(item.href));
+
 
         const ButtonComponent = isSubMenuParam ? SidebarMenuSubButton : SidebarMenuButton;
         const ItemComponent = isSubMenuParam ? SidebarMenuSubItem : SidebarMenuItem;
-        const hasChildren = item.children && item.children.length > 0;
-        const isSubmenuOpen = hasChildren && openSubmenu === item.title;
 
         if (hasChildren) {
           return (
             <ItemComponent key={item.title}>
               <ButtonComponent
                 onClick={() => toggleSubmenu(item.title)}
-                isActive={isActive || isSubmenuOpen} // Parent active if itself or children active or if it's the open submenu
+                isActive={isActive} 
                 className={cn(
                   "w-full justify-between",
-                  (isActive || isSubmenuOpen) && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
+                  (isActive) && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
                 )}
                 tooltip={item.title}
               >
@@ -81,11 +83,11 @@ export function AppSidebar() {
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                 </div>
-                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-300", isSubmenuOpen && "rotate-90")} />
+                <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-500", isSubmenuOpen && "rotate-90")} />
               </ButtonComponent>
               <SidebarMenuSub
                 className={cn(
-                  "overflow-hidden transition-all duration-300 ease-in-out",
+                  "overflow-hidden transition-all duration-500 ease-in-out",
                   isSubmenuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
                 )}
               >
@@ -172,3 +174,4 @@ export function AppSidebar() {
       </Sidebar>
   );
 }
+
