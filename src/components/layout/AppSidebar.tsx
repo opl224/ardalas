@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Settings, ChevronRight } from "lucide-react";
+import { LogOut, Settings, ChevronRight, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { navItems } from "@/config/nav";
 import type { NavItem } from "@/config/nav";
@@ -24,7 +24,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarTrigger,
-  SidebarRail
+  // SidebarRail, // Import SidebarRail dihapus karena tidak lagi digunakan
 } from "@/components/ui/sidebar";
 import { useState } from "react";
 
@@ -57,10 +57,8 @@ export function AppSidebar() {
       .filter(item => !item.roles || (userRole && item.roles.includes(userRole as any)))
       .map((item) => {
         const hasChildren = item.children && item.children.length > 0;
-        // Check if the current item's submenu should be open
         const isCurrentSubmenuOpen = hasChildren && openSubmenu === item.title;
         
-        // Determine if the item or any of its children is active
         const isParentOrChildActive = hasChildren
           ? item.children?.some(child => currentPath === child.href || (child.href !== "/dashboard" && child.href !== "#" && currentPath.startsWith(child.href))) ?? false
           : false;
@@ -141,7 +139,7 @@ export function AppSidebar() {
         className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md"
         collapsible="icon"
       >
-        <SidebarRail />
+        {/* <SidebarRail /> Dihapus untuk menghilangkan tuas toggle sidebar */}
         <SidebarHeader className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between">
              <AppLogo />
@@ -155,7 +153,6 @@ export function AppSidebar() {
         </SidebarContent>
         <SidebarFooter className="p-2 border-t border-border/50">
           <SidebarMenu>
-            {/* Pengaturan tidak lagi di-hardcode di sini, akan dirender oleh renderNavItemsRecursive */}
             {user && (
               <SidebarMenuItem>
                 <SidebarMenuButton 
