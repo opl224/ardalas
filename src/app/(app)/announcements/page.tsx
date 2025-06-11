@@ -1,6 +1,7 @@
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Filter, Search } from "lucide-react";
+import { PlusCircle, Filter, Search, Megaphone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ROLES, roleDisplayNames } from "@/config/roles";
@@ -72,7 +73,7 @@ export default function AnnouncementsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Peran</SelectItem>
-                {ROLES.map(r => <SelectItem key={r} value={r}>{roleDisplayNames[r]}</SelectItem>)}
+                {ROLES.map(r => <SelectItem key={r} value={r}>{roleDisplayNames[r as keyof typeof roleDisplayNames]}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -111,4 +112,7 @@ export default function AnnouncementsPage() {
             </CardContent>
           </Card>
         )}
-      
+      </div>
+    </div>
+  );
+}
