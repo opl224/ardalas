@@ -1,6 +1,22 @@
 
 import type { LucideIcon } from "lucide-react";
-import { LayoutDashboard, Megaphone, Users, UserCircle, BookOpen, School, BookCopy, FileText, ClipboardCheck, BarChart3, CalendarCheck, CalendarDays, MessageSquare, Settings } from "lucide-react";
+import {
+  LayoutDashboard,
+  Megaphone,
+  Users,
+  UserCircle,
+  BookOpen,
+  School,
+  BookCopy,
+  FileText,
+  ClipboardCheck,
+  BarChart3,
+  CalendarCheck,
+  CalendarDays,
+  MessageSquare,
+  Settings,
+  UsersCog, // Ditambahkan ikon untuk administrasi pengguna
+} from "lucide-react";
 import type { Role } from "./roles";
 
 export interface NavItem {
@@ -15,6 +31,12 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
   { title: "Pengumuman", href: "/announcements", icon: Megaphone },
+  { // Menu baru untuk Administrasi Pengguna
+    title: "Administrasi Pengguna",
+    href: "/admin/user-administration", 
+    icon: UsersCog,
+    roles: ["admin"], 
+  },
   {
     title: "Pengguna",
     href: "#", // Parent item, no direct link
