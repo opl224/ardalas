@@ -23,11 +23,9 @@ export default function UserAdministrationPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
-            Fitur untuk menambah, mengedit, dan menghapus pengguna, serta mengelola peran dan hak akses akan diimplementasikan di sini.
-          </p>
+          {/* Paragraf sebelumnya dihapus untuk menghindari redundansi */}
           <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-            Area untuk menampilkan daftar pengguna dan fungsionalitas CRUD.
+            Fitur untuk menambah, mengedit, dan menghapus pengguna, serta mengelola peran dan hak akses akan diimplementasikan di sini.
           </div>
         </CardContent>
       </Card>
