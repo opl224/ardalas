@@ -56,6 +56,7 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Subjek", href: "/subjects", icon: BookOpen, roles: ["admin", "guru"] },
       { title: "Kelas", href: "/classes", icon: School, roles: ["admin", "guru"] },
+      { title: "Kelas Saya", href: "/my-class", icon: School, roles: ["siswa"] },
       { title: "Pelajaran", href: "/lessons", icon: BookCopy, roles: ["admin", "guru", "siswa", "orangtua"] },
     ],
   },
@@ -87,3 +88,4 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     // Logout akan ditangani oleh tombol, bukan item nav langsung di daftar ini
 ];
+
