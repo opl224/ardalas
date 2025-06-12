@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { navItems } from "@/config/nav";
 import { useAuth } from "@/context/AuthContext";
-import { auth, db } from "@/lib/firebase/config"; // Added db
+import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
 import { Bell, LogOut, Search, Settings, UserCircle } from "lucide-react";
@@ -41,9 +41,10 @@ interface NotificationDoc {
   title: string;
   description: string;
   read: boolean;
-  createdAt: Timestamp; // Firestore Timestamp
+  createdAt: Timestamp | null; // Allow null for robustness
   href?: string;
   type?: string;
+  userId?: string; // Ensure this field exists for querying
 }
 
 function NotificationBell() {
@@ -53,7 +54,7 @@ function NotificationBell() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.uid) { // Add check for user.uid
       setNotifications([]);
       setUnreadCount(0);
       return;
@@ -71,18 +72,20 @@ function NotificationBell() {
       q,
       (snapshot) => {
         const fetchedNotifications: NotificationDoc[] = [];
-        snapshot.forEach((doc) => {
-          // Ensure createdAt is a Timestamp before pushing
-          const data = doc.data();
-          if (data.createdAt instanceof Timestamp) {
-            fetchedNotifications.push({ id: doc.id, ...data } as NotificationDoc);
-          } else {
-            // Handle cases where createdAt might not be a Timestamp or is missing
-            // For example, log an error or provide a default date
-            console.warn(`Notification with ID ${doc.id} has invalid createdAt field.`);
-            // Optionally push with a placeholder date or skip
-            // fetchedNotifications.push({ id: doc.id, ...data, createdAt: Timestamp.now() } as NotificationDoc); 
-          }
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          // Ensure createdAt exists and is a Firestore Timestamp before pushing
+          // Also ensure other critical fields exist
+          fetchedNotifications.push({ 
+            id: docSnap.id, 
+            title: data.title || "Tanpa Judul",
+            description: data.description || "",
+            read: data.read === true, // Ensure boolean
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt : null,
+            href: data.href,
+            type: data.type,
+            userId: data.userId,
+          });
         });
         setNotifications(fetchedNotifications);
         setUnreadCount(fetchedNotifications.filter(n => !n.read).length);
@@ -105,10 +108,7 @@ function NotificationBell() {
     const notificationRef = doc(db, "notifications", id);
     try {
       await updateDoc(notificationRef, { read: true });
-      setNotifications(prev => 
-        prev.map(n => n.id === id ? { ...n, read: true } : n)
-      );
-      setUnreadCount(prev => prev > 0 ? prev - 1 : 0);
+      // Optimistic update handled by onSnapshot
     } catch (error) {
       console.error("Error marking notification as read:", error);
       toast({
@@ -130,8 +130,7 @@ function NotificationBell() {
     });
     try {
       await batch.commit();
-       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-       setUnreadCount(0);
+      // Optimistic update handled by onSnapshot
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       toast({
@@ -183,7 +182,7 @@ function NotificationBell() {
                     <p className="font-semibold text-sm">{notification.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/70">
-                      {notification.createdAt && typeof notification.createdAt.toDate === 'function' 
+                      {notification.createdAt && notification.createdAt instanceof Timestamp
                         ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                         : "Tanggal tidak valid"}
                     </p>
@@ -193,7 +192,7 @@ function NotificationBell() {
                   <p className="font-semibold text-sm">{notification.title}</p>
                   <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                    <p className="text-xs text-muted-foreground/70">
-                     {notification.createdAt && typeof notification.createdAt.toDate === 'function'
+                     {notification.createdAt && notification.createdAt instanceof Timestamp
                        ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                        : "Tanggal tidak valid"}
                     </p>

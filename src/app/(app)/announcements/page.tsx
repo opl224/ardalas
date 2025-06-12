@@ -52,6 +52,7 @@ import {
   orderBy,
   where,
   documentId,
+  writeBatch, // Added for batch writing notifications
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -64,7 +65,7 @@ interface AnnouncementData {
   content: string;
   date: Timestamp; 
   targetAudience: Role[];
-  targetClassIds?: string[]; // ID kelas yang dituju, opsional
+  targetClassIds?: string[]; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   createdById?: string;
@@ -78,17 +79,13 @@ const baseAnnouncementSchema = z.object({
   targetClassIds: z.array(z.string()).optional(),
 });
 
-// Custom refinement for teacher role
 const announcementFormSchema = baseAnnouncementSchema.refine(
   (data) => {
-    // This validation is context-dependent (based on role)
-    // It's better handled in the submit handler or by dynamic schema adjustments
-    // For now, we assume role is available in the component context when submitting
     return true; 
   },
   {
     message: "Guru harus memilih minimal satu kelas jika menargetkan Siswa atau Orang Tua.",
-    path: ["targetClassIds"], // This path might not be ideal for a general refinement
+    path: ["targetClassIds"], 
   }
 );
 type AnnouncementFormValues = z.infer<typeof announcementFormSchema>;
@@ -128,7 +125,7 @@ export default function AnnouncementsPage() {
 
   const editAnnouncementForm = useForm<EditAnnouncementFormValues>({
     resolver: zodResolver(editAnnouncementFormSchema),
-    defaultValues: { // Default values for edit form are set in useEffect
+    defaultValues: {
       title: "",
       content: "",
       targetAudience: [],
@@ -159,13 +156,11 @@ export default function AnnouncementsPage() {
     if (!authLoading) fetchAnnouncements();
   }, [authLoading]);
 
-  // Fetch teacher's classes when add/edit dialog is opened by a teacher
   useEffect(() => {
     if (role === 'guru' && user && (isAddDialogOpen || (isEditDialogOpen && selectedAnnouncement))) {
       const fetchTeacherClasses = async () => {
         setIsLoadingTeacherClasses(true);
         try {
-          // Assuming lessons link teachers to classes
           const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", user.uid));
           const lessonsSnapshot = await getDocs(lessonsQuery);
           const classIds = new Set<string>();
@@ -221,9 +216,8 @@ export default function AnnouncementsPage() {
         finalTargetClassIds = [];
     }
 
-
     try {
-      const newAnnouncementRef = await addDoc(collection(db, "announcements"), {
+      const announcementData = {
         ...data,
         targetClassIds: finalTargetClassIds,
         date: Timestamp.now(),
@@ -231,19 +225,60 @@ export default function AnnouncementsPage() {
         createdByName: user.displayName || user.email,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+      const newAnnouncementRef = await addDoc(collection(db, "announcements"), announcementData);
       toast({ title: "Pengumuman Ditambahkan", description: `"${data.title}" berhasil dipublikasikan.` });
       
-      // Create a notification for the user who created the announcement
-      await addDoc(collection(db, "notifications"), {
-        userId: user.uid, // Target the creator for now
-        title: "Pengumuman Baru Dipublikasikan",
-        description: `Pengumuman "${data.title}" telah berhasil Anda publikasikan.`,
-        href: `/announcements`, // Link to general announcements page
+      // Create notifications
+      const batch = writeBatch(db);
+      const notificationBase = {
+        title: `Pengumuman Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
+        description: data.content.substring(0, 50) + (data.content.length > 50 ? "..." : ""),
+        href: `/announcements`, // Consider linking to specific announcement: `/announcements/${newAnnouncementRef.id}`
         read: false,
         createdAt: serverTimestamp(),
         type: "new_announcement",
-      });
+      };
+
+      // 1. Notify the creator
+      const creatorNotificationRef = doc(collection(db, "notifications"));
+      batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid });
+
+      // 2. If admin, notify target roles
+      if (role === 'admin' && data.targetAudience && data.targetAudience.length > 0) {
+        const usersRef = collection(db, "users");
+        for (const targetRole of data.targetAudience) {
+          // Admins might target themselves, creator notification already covers this.
+          // Or admins might not want to be spammed by their own global announcements.
+          // For now, if targetRole is 'admin' and creator is admin, skip to avoid duplicate for creator.
+          if (targetRole === 'admin' && user.uid) { //  No need to notify self again if creator is admin
+             // Continue to next role if target is admin and creator is admin
+             // Or handle based on specific logic whether admin should get general role notification
+          } else {
+            const qUsers = query(usersRef, where("role", "==", targetRole));
+            try {
+              const querySnapshot = await getDocs(qUsers);
+              querySnapshot.forEach((userDoc) => {
+                // Avoid double-notifying the creator if they happen to be in the targetRole list
+                // (though admin check above might handle some of this)
+                if (userDoc.id !== user.uid) { 
+                  const userNotificationRef = doc(collection(db, "notifications"));
+                  batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
+                }
+              });
+            } catch (e) {
+              console.error(`Error querying users for role ${targetRole} for notification:`, e);
+            }
+          }
+        }
+      }
+      // TODO: Implement notification logic for guru's class-specific announcements
+      // This would involve:
+      // 1. Getting student UIDs from `targetClassIds` (e.g., query `students` collection where `classId` is in `targetClassIds`)
+      // 2. If 'orangtua' is targeted, getting parent UIDs linked to those students.
+      // 3. Creating notifications for those UIDs.
+
+      await batch.commit();
 
       setIsAddDialogOpen(false);
       addAnnouncementForm.reset({ title: "", content: "", targetAudience: [], targetClassIds: [] });
@@ -265,28 +300,32 @@ export default function AnnouncementsPage() {
     }
 
     let finalTargetClassIds = data.targetClassIds;
-    if (role !== 'guru' && selectedAnnouncement.createdById === user.uid) { 
+    // Logic to preserve targetClassIds if non-guru (admin) is editing, or clear if admin changes target audience away from specific classes
+    if (role !== 'guru') { 
+      // If admin clears all role targets or specifically targets roles that don't imply classes, clear classIds
+      if (data.targetAudience.length === 0 || !data.targetAudience.some(r => ['siswa', 'orangtua'].includes(r))) {
+        finalTargetClassIds = [];
+      } else {
+        // Admin might be editing an announcement originally made by a teacher, keep existing classIds if appropriate
         finalTargetClassIds = selectedAnnouncement.targetClassIds || []; 
-        if (selectedAnnouncement.createdById !== user.uid && role === 'admin') { 
-            // Admin is editing someone else's (potentially a teacher's) announcement
-        } else if (role === 'admin') { 
-            finalTargetClassIds = []; 
-        }
+      }
     }
 
 
     try {
       const announcementDocRef = doc(db, "announcements", data.id);
       await updateDoc(announcementDocRef, {
-        ...data,
+        ...data, // title, content, targetAudience
         targetClassIds: finalTargetClassIds,
         updatedAt: serverTimestamp(),
+        // Potentially re-evaluate who made the edit if that's important
+        // lastEditedById: user.uid,
+        // lastEditedByName: user.displayName || user.email,
       });
       toast({ title: "Pengumuman Diperbarui", description: `"${data.title}" berhasil diperbarui.` });
       
-      // Optionally, create a notification for update as well
-      // For simplicity, I'm skipping notification creation on edit for now
-      // but you can add similar logic as in handleAddAnnouncementSubmit if needed.
+      // Optionally, create notifications for significant updates,
+      // or if target audience changes. For simplicity, skipping for edit now.
 
       setIsEditDialogOpen(false);
       setSelectedAnnouncement(null);
@@ -419,9 +458,9 @@ export default function AnnouncementsPage() {
             {(formInstance.formState.errors as any).targetAudience && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetAudience.message}</p>}
           </div>
         </>
-      ) : ( // Admin or other roles with general targeting
+      ) : ( 
         <div>
-          <Label>Target Audiens</Label>
+          <Label>Target Audiens (Untuk Admin)</Label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {ROLES.map((roleKey) => (
               <FormField
@@ -529,16 +568,22 @@ export default function AnnouncementsPage() {
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
                     <span>Untuk: {announcement.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ")}</span>
-                    {announcement.targetClassIds && announcement.targetClassIds.length > 0 && (
+                    {announcement.targetClassIds && announcement.targetClassIds.length > 0 && teacherClasses.length > 0 && (
                         <>
                          <span>&bull;</span>
                          <span>Kelas: {teacherClasses.filter(tc => announcement.targetClassIds?.includes(tc.id)).map(tc => tc.name).join(", ") || announcement.targetClassIds.join(", ")}</span>
                         </>
                     )}
+                     {announcement.targetClassIds && announcement.targetClassIds.length > 0 && teacherClasses.length === 0 && (
+                        <>
+                         <span>&bull;</span>
+                         <span>Kelas: {announcement.targetClassIds.join(", ")} (ID Kelas)</span>
+                        </>
+                     )}
                     {announcement.createdByName && <span>&bull; Oleh: {announcement.createdByName}</span>}
                   </div>
                 </div>
-                {canManageAnnouncements && (
+                {canManageAnnouncements && (user?.uid === announcement.createdById || role === 'admin') && (
                   <div className="flex space-x-2">
                     <Button variant="outline" size="icon" onClick={() => openEditDialog(announcement)} aria-label={`Edit ${announcement.title}`}>
                       <Edit className="h-4 w-4" />
@@ -566,7 +611,6 @@ export default function AnnouncementsPage() {
             <CardContent>
               <p className="text-sm text-foreground whitespace-pre-line line-clamp-3">{announcement.content}</p>
               <Button variant="link" asChild className="p-0 h-auto mt-2 text-primary">
-                {/* TODO: Link to a full announcement page, currently not implemented */}
                 <Link href={`/announcements`}>Baca Selengkapnya</Link>
               </Button>
             </CardContent>
@@ -606,6 +650,3 @@ export default function AnnouncementsPage() {
     </div>
   );
 }
-
-
-    
