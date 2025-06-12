@@ -295,7 +295,7 @@ export function AppHeader() {
   const pageTitle = currentNavItem?.title || "SDN";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 px-4 backdrop-blur-md sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background px-4 sm:px-6">
       {isMobile && (
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
@@ -324,3 +324,4 @@ export function AppHeader() {
     </header>
   );
 }
+

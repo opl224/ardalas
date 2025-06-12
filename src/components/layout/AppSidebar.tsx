@@ -23,7 +23,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  SidebarTrigger as DesktopSidebarTrigger, // Alias for clarity
+  SidebarTrigger as DesktopSidebarTrigger, 
   useSidebar, 
 } from "@/components/ui/sidebar";
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -142,9 +142,8 @@ export function AppSidebar() {
   const sidebarSharedContent = (
     <>
       <SidebarHeader className="p-5 border-b border-border/50">
-        <div className="flex items-center justify-between">
+        <div id="mobile-sidebar-title-component" className="flex items-center justify-between">
           <AppLogo />
-          {/* Tombol DesktopSidebarTrigger dihilangkan dari sini */}
         </div>
       </SidebarHeader>
       <SidebarContent className="flex-1 p-2 overflow-y-auto">
@@ -180,10 +179,10 @@ export function AppSidebar() {
         aria-labelledby="mobile-sidebar-title-component" 
       >
         <SheetHeader className="p-4 border-b border-border/50">
-          <div className="flex items-center justify-between">
+          <div id="mobile-sidebar-title-component" className="flex items-center justify-between">
              <AppLogo />
           </div>
-          <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
+          <SheetTitle id="mobile-sidebar-title-component-sr" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
         <SidebarContent className="flex-1 p-2 overflow-y-auto">
           <SidebarMenu>
@@ -211,10 +210,11 @@ export function AppSidebar() {
 
   return (
       <Sidebar
-        className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md hidden md:flex" 
+        className="border-r border-border/50 bg-sidebar hidden md:flex" 
         collapsible="icon"
       >
         {sidebarSharedContent}
       </Sidebar>
   );
 }
+
