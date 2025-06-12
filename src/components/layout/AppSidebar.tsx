@@ -14,7 +14,6 @@ import { auth } from "@/lib/firebase/config";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sidebar,
-  // SidebarHeader, // No longer used directly here for desktop trigger
   SidebarContent,
   SidebarFooter,
   SidebarMenu,
@@ -25,7 +24,8 @@ import {
   SidebarMenuSubButton,
   useSidebar, 
 } from "@/components/ui/sidebar";
-import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"; 
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 
 function AppLogo() {
@@ -140,13 +140,15 @@ export function AppSidebar() {
 
   const sidebarDesktopContent = (
     <>
-      <div className="flex h-16 items-center border-b border-border px-4"> {/* Adjusted for header height and border */}
+      <div className="flex h-16 items-center border-b border-border px-4">
          <AppLogo />
       </div>
-      <SidebarContent className="flex-1 p-2 overflow-y-auto">
-        <SidebarMenu>
-          {renderNavItemsRecursive(navItems, pathname, role)}
-        </SidebarMenu>
+      <SidebarContent className="flex-1"> {/* Removed p-2 and overflow-y-auto */}
+        <ScrollArea className="h-full w-full p-2"> {/* Added ScrollArea and p-2 here */}
+          <SidebarMenu>
+            {renderNavItemsRecursive(navItems, pathname, role)}
+          </SidebarMenu>
+        </ScrollArea>
       </SidebarContent>
       <SidebarFooter className="p-2 border-t border-border">
         <SidebarMenu>
@@ -181,10 +183,12 @@ export function AppSidebar() {
           </div>
           <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
-        <SidebarContent className="flex-1 p-2 overflow-y-auto">
-          <SidebarMenu>
-            {renderNavItemsRecursive(navItems, pathname, role)}
-          </SidebarMenu>
+        <SidebarContent className="flex-1"> {/* Removed p-2 and overflow-y-auto */}
+          <ScrollArea className="h-full w-full p-2"> {/* Added ScrollArea and p-2 here */}
+            <SidebarMenu>
+              {renderNavItemsRecursive(navItems, pathname, role)}
+            </SidebarMenu>
+          </ScrollArea>
         </SidebarContent>
         <SidebarFooter className="p-2 border-t border-border">
           <SidebarMenu>
@@ -214,3 +218,4 @@ export function AppSidebar() {
       </Sidebar>
   );
 }
+
