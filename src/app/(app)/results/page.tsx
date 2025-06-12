@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
 import type { Metadata } from 'next';
@@ -26,4 +27,10 @@ export default function ResultsPage() {
             Fitur manajemen hasil belajar (input nilai, cetak rapor) akan diimplementasikan di sini.
           </p>
           <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-            
+            Area untuk menampilkan data hasil belajar dan fungsionalitas CRUD.
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
