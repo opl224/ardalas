@@ -41,10 +41,10 @@ export const navItems: NavItem[] = [
     title: "Pengguna",
     href: "#", // Parent item, no direct link
     icon: Users,
-    roles: ["admin", "guru"], // Visible to admin and guru
+    roles: ["admin", "guru", "siswa"], // Visible to admin, guru, and siswa
     children: [
       { title: "Guru", href: "/teachers", icon: Users, roles: ["admin"] },
-      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru"] },
+      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru", "siswa"] }, // Siswa can now access
       { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin"] },
     ],
   },
@@ -81,11 +81,10 @@ export const navItems: NavItem[] = [
       { title: "Pesan", href: "/messages", icon: MessageSquare }, 
     ],
   },
-  { title: "Pengaturan", href: "/settings", icon: Settings }, // Pengaturan dipindahkan ke sini
+  { title: "Pengaturan", href: "/settings", icon: Settings }, 
 ];
 
 // bottomNavItems sekarang hanya untuk referensi, Pengaturan sudah dipindah
 export const bottomNavItems: NavItem[] = [
     // Logout akan ditangani oleh tombol, bukan item nav langsung di daftar ini
 ];
-
