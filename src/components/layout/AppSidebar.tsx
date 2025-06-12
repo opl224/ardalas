@@ -24,7 +24,9 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarTrigger,
-  // SidebarRail, // Import SidebarRail dihapus karena tidak lagi digunakan
+  useSidebar, // Import useSidebar
+  Sheet,      // Import Sheet
+  SheetContent // Import SheetContent
 } from "@/components/ui/sidebar";
 import { useState } from "react";
 
@@ -47,6 +49,10 @@ export function AppSidebar() {
   const { toast } = useToast();
   const router = useRouter();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+
+  // Get sidebar context for mobile sheet
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+
 
   const toggleSubmenu = (title: string) => {
     setOpenSubmenu(prevOpenTitle => (prevOpenTitle === title ? null : title));
@@ -134,39 +140,60 @@ export function AppSidebar() {
     }
   };
 
+  const sidebarContent = (
+    <>
+      <SidebarHeader className="p-4 border-b border-border/50">
+        <div className="flex items-center justify-between">
+          <AppLogo />
+          <SidebarTrigger className="md:hidden" />
+        </div>
+      </SidebarHeader>
+      <SidebarContent className="flex-1 p-2">
+        <SidebarMenu>
+          {renderNavItemsRecursive(navItems, pathname, role)}
+        </SidebarMenu>
+      </SidebarContent>
+      <SidebarFooter className="p-2 border-t border-border/50">
+        <SidebarMenu>
+          {user && (
+            <SidebarMenuItem>
+              <SidebarMenuButton 
+                onClick={handleLogout} 
+                className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                tooltip="Logout"
+              >
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span className="truncate">Logout</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+        </SidebarMenu>
+      </SidebarFooter>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+        <SheetContent
+          side="left" // Or appropriate side
+          className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden" // Use theme variable or fixed width
+          aria-label="Main navigation" // Add aria-label for accessibility
+        >
+          <div className="flex h-full w-full flex-col">
+            {sidebarContent}
+          </div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
       <Sidebar
-        className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md"
+        className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md hidden md:flex" // Keep md:flex, hidden by default on small screens
         collapsible="icon"
       >
-        {/* <SidebarRail /> Dihapus untuk menghilangkan tuas toggle sidebar */}
-        <SidebarHeader className="p-4 border-b border-border/50">
-          <div className="flex items-center justify-between">
-             <AppLogo />
-             <SidebarTrigger className="md:hidden" />
-          </div>
-        </SidebarHeader>
-        <SidebarContent className="flex-1 p-2">
-          <SidebarMenu>
-            {renderNavItemsRecursive(navItems, pathname, role)}
-          </SidebarMenu>
-        </SidebarContent>
-        <SidebarFooter className="p-2 border-t border-border/50">
-          <SidebarMenu>
-            {user && (
-              <SidebarMenuItem>
-                <SidebarMenuButton 
-                  onClick={handleLogout} 
-                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  tooltip="Logout"
-                >
-                  <LogOut className="h-5 w-5 shrink-0" />
-                  <span className="truncate">Logout</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-          </SidebarMenu>
-        </SidebarFooter>
+        {sidebarContent}
       </Sidebar>
   );
 }
