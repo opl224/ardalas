@@ -98,7 +98,7 @@ interface ResultData {
   recordedByName?: string;
 }
 
-const resultFormSchema = z.object({
+const baseResultFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
   studentId: z.string({ required_error: "Pilih siswa." }),
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
@@ -109,13 +109,20 @@ const resultFormSchema = z.object({
   grade: z.string().max(5, "Grade maksimal 5 karakter.").optional(),
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
   feedback: z.string().optional(),
-}).refine(data => !data.maxScore || data.score <= data.maxScore, {
+});
+
+const resultValidationRefinement = (data: { score: number; maxScore?: number | undefined }) => !data.maxScore || data.score <= data.maxScore;
+
+const resultFormSchema = baseResultFormSchema.refine(resultValidationRefinement, {
   message: "Nilai tidak boleh melebihi nilai maksimal.",
   path: ["score"],
 });
 type ResultFormValues = z.infer<typeof resultFormSchema>;
 
-const editResultFormSchema = resultFormSchema.extend({ id: z.string() });
+const editResultFormSchema = baseResultFormSchema.extend({ id: z.string() }).refine(resultValidationRefinement, {
+  message: "Nilai tidak boleh melebihi nilai maksimal.",
+  path: ["score"],
+});
 type EditResultFormValues = z.infer<typeof editResultFormSchema>;
 
 
@@ -673,5 +680,7 @@ export default function ResultsPage() {
     </div>
   );
 }
+
+    
 
     
