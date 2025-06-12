@@ -212,15 +212,17 @@ export default function AssignmentsPage() {
     setIsLoading(true);
     try {
       if (isTeacherOrAdminRole) {
-        await fetchDropdownData();
+        await fetchDropdownData(); // Ensure dropdowns are loaded for teacher/admin if they open the add/edit dialog
       }
       
       let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
       
+      // This 'user' is from useAuth() hook, which should have classId if role is siswa
       if (isStudentRole && user?.classId && user.classId.trim() !== "") {
         assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
       } else if (isStudentRole && (!user?.classId || user.classId.trim() === "")) {
         // Student not associated with a class, or classId is empty, show no assignments
+        // This condition is also handled in the useEffect that calls fetchAssignments
         setAssignments([]);
         setIsLoading(false);
         return;
@@ -300,12 +302,37 @@ export default function AssignmentsPage() {
   };
 
   useEffect(() => {
-    if (!authLoading && user) {
-      fetchAssignments();
-    } else if (!authLoading && !user) {
-      setIsLoading(false); // Not logged in, no data to load
+    if (authLoading) {
+      setIsLoading(true); 
+      return;
     }
-  }, [authLoading, user, role]);
+
+    if (!user) { 
+      setIsLoading(false);
+      setAssignments([]);
+      return;
+    }
+
+    if (isStudentRole) {
+      if (user.classId && user.classId.trim() !== "") {
+        fetchAssignments();
+      } else {
+        toast({
+          title: "Tidak Terdaftar di Kelas",
+          description: "Anda belum terdaftar di kelas manapun atau ID kelas tidak valid. Tugas tidak dapat ditampilkan.",
+          variant: "destructive",
+        });
+        setAssignments([]);
+        setIsLoading(false);
+      }
+    } else if (isTeacherOrAdminRole) {
+      fetchAssignments(); 
+    } else {
+      setAssignments([]);
+      setIsLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user, role, user?.classId]);
 
 
   useEffect(() => {
@@ -714,7 +741,3 @@ export default function AssignmentsPage() {
     </div>
   );
 }
-
-    
-    
-
