@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2 } from "lucide-react";
+import { School, PlusCircle, Edit, Trash2, Eye } from "lucide-react"; // Added Eye icon
 import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,26 +58,34 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  where // Added where for student query
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 
-interface TeacherMin { // Minimal teacher interface for dropdown
+interface TeacherMin { 
   id: string;
   name: string;
 }
 
 interface ClassData {
   id: string; 
-  name: string; // e.g., "Kelas 10A", "XI IPA 1"
-  teacherId?: string; // ID of the homeroom teacher
-  teacherName?: string; // Denormalized name for display
+  name: string; 
+  teacherId?: string; 
+  teacherName?: string; 
   createdAt?: Timestamp; 
+}
+
+// Interface for students listed in the class view dialog
+interface StudentInClass {
+  id: string;
+  name: string;
+  nis: string;
 }
 
 const classFormSchema = z.object({
   name: z.string().min(3, { message: "Nama kelas minimal 3 karakter." }),
-  teacherId: z.string().optional(), // Wali kelas is optional
+  teacherId: z.string().optional(), 
 });
 type ClassFormValues = z.infer<typeof classFormSchema>;
 
@@ -90,11 +98,17 @@ const NO_TEACHER_VALUE = "_NONE_";
 
 export default function ClassesPage() {
   const [classes, setClasses] = useState<ClassData[]>([]);
-  const [teachers, setTeachers] = useState<TeacherMin[]>([]); // For teacher dropdown
+  const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
+
+  // State for viewing students in a class
+  const [isViewStudentsDialogOpen, setIsViewStudentsDialogOpen] = useState(false);
+  const [selectedClassForViewingStudents, setSelectedClassForViewingStudents] = useState<ClassData | null>(null);
+  const [studentsInClass, setStudentsInClass] = useState<StudentInClass[]>([]);
+  const [isLoadingStudentsInClass, setIsLoadingStudentsInClass] = useState(false);
 
   const { toast } = useToast();
 
@@ -166,7 +180,7 @@ export default function ClassesPage() {
       editClassForm.reset({
         id: selectedClass.id,
         name: selectedClass.name,
-        teacherId: selectedClass.teacherId || undefined, // Ensure undefined for no teacher
+        teacherId: selectedClass.teacherId || undefined, 
       });
     }
   }, [selectedClass, isEditDialogOpen, editClassForm]);
@@ -179,7 +193,7 @@ export default function ClassesPage() {
       const classesCollectionRef = collection(db, "classes");
       await addDoc(classesCollectionRef, {
         name: data.name,
-        teacherId: data.teacherId || null, 
+        teacherId: data.teacherId === NO_TEACHER_VALUE ? null : data.teacherId || null, 
         teacherName: selectedTeacher?.name || null, 
         createdAt: serverTimestamp(),
       });
@@ -207,7 +221,7 @@ export default function ClassesPage() {
       const classDocRef = doc(db, "classes", data.id);
       await updateDoc(classDocRef, {
         name: data.name,
-        teacherId: data.teacherId || null,
+        teacherId: data.teacherId === NO_TEACHER_VALUE ? null : data.teacherId || null,
         teacherName: selectedTeacher?.name || null,
       });
       
@@ -249,6 +263,42 @@ export default function ClassesPage() {
   const openDeleteDialog = (classItem: ClassData) => {
     setSelectedClass(classItem); 
   };
+
+  const fetchStudentsForClass = async (classId: string) => {
+    if (!classId) return;
+    setIsLoadingStudentsInClass(true);
+    setStudentsInClass([]); 
+    try {
+      const studentsQuery = query(
+        collection(db, "students"),
+        where("classId", "==", classId),
+        orderBy("name", "asc")
+      );
+      const querySnapshot = await getDocs(studentsQuery);
+      const fetchedStudents: StudentInClass[] = querySnapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        name: docSnap.data().name,
+        nis: docSnap.data().nis, // Assuming students have an NIS field
+      }));
+      setStudentsInClass(fetchedStudents);
+    } catch (error) {
+      console.error("Error fetching students for class: ", error);
+      toast({
+        title: "Gagal Memuat Siswa Kelas",
+        description: "Terjadi kesalahan saat mengambil data siswa untuk kelas ini.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingStudentsInClass(false);
+    }
+  };
+
+  const openViewStudentsDialog = (classItem: ClassData) => {
+    setSelectedClassForViewingStudents(classItem);
+    setIsViewStudentsDialogOpen(true);
+    fetchStudentsForClass(classItem.id);
+  };
+
 
   return (
     <div className="space-y-6">
@@ -347,6 +397,9 @@ export default function ClassesPage() {
                       <TableCell className="font-medium">{classItem.name}</TableCell>
                       <TableCell>{classItem.teacherName || "-"}</TableCell>
                       <TableCell className="text-right space-x-2">
+                        <Button variant="outline" size="icon" onClick={() => openViewStudentsDialog(classItem)} aria-label={`Lihat siswa di ${classItem.name}`}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="outline" size="icon" onClick={() => openEditDialog(classItem)} aria-label={`Edit ${classItem.name}`}>
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -387,6 +440,7 @@ export default function ClassesPage() {
         </CardContent>
       </Card>
 
+      {/* Edit Class Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
           setIsEditDialogOpen(isOpen);
           if (!isOpen) {
@@ -445,6 +499,58 @@ export default function ClassesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* View Students in Class Dialog */}
+      <Dialog open={isViewStudentsDialogOpen} onOpenChange={(isOpen) => {
+        setIsViewStudentsDialogOpen(isOpen);
+        if (!isOpen) {
+          setSelectedClassForViewingStudents(null);
+          setStudentsInClass([]); // Clear students when dialog closes
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg"> {/* Increased width for student list */}
+          <DialogHeader>
+            <DialogTitle>Daftar Siswa di Kelas: {selectedClassForViewingStudents?.name || "Memuat..."}</DialogTitle>
+            <DialogDescription>
+              Berikut adalah daftar siswa yang terdaftar di kelas ini.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 max-h-[60vh] overflow-y-auto pr-2">
+            {isLoadingStudentsInClass ? (
+              <div className="space-y-3 my-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-5/6" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            ) : studentsInClass.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nama Siswa</TableHead>
+                    <TableHead>NIS</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {studentsInClass.map(student => (
+                    <TableRow key={student.id}>
+                      <TableCell className="font-medium">{student.name}</TableCell>
+                      <TableCell>{student.nis}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-center text-muted-foreground py-6">Tidak ada siswa di kelas ini.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Tutup</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
