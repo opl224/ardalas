@@ -3,8 +3,8 @@ import { Settings as SettingsIcon } from "lucide-react"; // Renamed to avoid con
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Pengaturan Akun - EduCentral',
-  description: 'Kelola pengaturan akun Anda di EduCentral.',
+  title: 'Pengaturan Akun - SDN',
+  description: 'Kelola pengaturan akun Anda di SDN.',
 };
 
 export default function SettingsPage() {

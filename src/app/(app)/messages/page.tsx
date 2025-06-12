@@ -3,8 +3,8 @@ import { MessageSquare } from "lucide-react";
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Pesan - EduCentral',
-  description: 'Fitur perpesanan antar pengguna di EduCentral.',
+  title: 'Pesan - SDN',
+  description: 'Fitur perpesanan antar pengguna di SDN.',
 };
 
 export default function MessagesPage() {

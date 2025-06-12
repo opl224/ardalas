@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'EduCentral - Sistem Informasi Sekolah',
+  title: 'SDN - Sistem Informasi Sekolah',
   description: 'Aplikasi web manajemen sistem informasi sekolah terintegrasi.',
 };
 

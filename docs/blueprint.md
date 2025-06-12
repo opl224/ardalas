@@ -1,4 +1,4 @@
-# **App Name**: EduCentral
+# **App Name**: SDN
 
 ## Core Features:
 

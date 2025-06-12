@@ -37,7 +37,7 @@ function AppLogo() {
         <path d="M2 17l10 5 10-5"/>
         <path d="M2 12l10 5 10-5"/>
       </svg>
-      <span>EduCentral</span>
+      <span>SDN</span>
     </Link>
   );
 }
@@ -141,7 +141,7 @@ export function AppSidebar() {
 
   const sidebarSharedContent = (
     <>
-      <SidebarHeader className="p-4 border-b border-border/50">
+      <SidebarHeader className="p-5 border-b border-border/50">
         <div className="flex items-center justify-between">
           <AppLogo />
           {/* Tombol DesktopSidebarTrigger dihilangkan dari sini */}

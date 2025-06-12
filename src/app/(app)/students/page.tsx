@@ -57,8 +57,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Metadata } from 'next';
 
 // export const metadata: Metadata = { // Metadata should be defined in Server Components or layout files, not client.
-//   title: 'Manajemen Murid - EduCentral',
-//   description: 'Kelola data murid di EduCentral.',
+//   title: 'Manajemen Murid - SDN',
+//   description: 'Kelola data murid di SDN.',
 // };
 
 interface Student {

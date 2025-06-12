@@ -6,8 +6,8 @@ import Link from "next/link";
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Beranda - EduCentral',
-  description: 'Halaman utama dashboard EduCentral.',
+  title: 'Beranda - SDN',
+  description: 'Halaman utama dashboard SDN.',
 };
 
 
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Selamat Datang di EduCentral</h1>
+        <h1 className="text-3xl font-bold font-headline">Selamat Datang di SDN</h1>
         <p className="text-muted-foreground">Platform manajemen informasi sekolah Anda.</p>
       </div>
 
@@ -91,7 +91,7 @@ export default function DashboardPage() {
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardContent className="pt-6">
             <p className="text-muted-foreground">
-              Selamat datang di sistem informasi EduCentral. Di sini Anda dapat mengelola semua aspek kegiatan belajar mengajar,
+              Selamat datang di sistem informasi SDN. Di sini Anda dapat mengelola semua aspek kegiatan belajar mengajar,
               mulai dari data siswa dan guru, jadwal pelajaran, hingga pengumuman penting.
               Gunakan menu navigasi di samping untuk mengakses fitur-fitur yang tersedia.
             </p>

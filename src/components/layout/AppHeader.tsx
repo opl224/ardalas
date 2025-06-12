@@ -75,12 +75,15 @@ function NotificationBell() {
         const fetchedNotifications: NotificationDoc[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
+          // Ensure createdAt is a Firestore Timestamp or null
+          const createdAtTimestamp = data.createdAt instanceof Timestamp ? data.createdAt : null;
+
           fetchedNotifications.push({ 
             id: docSnap.id, 
             title: data.title || "Tanpa Judul",
             description: data.description || "",
             read: data.read === true, 
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt : null,
+            createdAt: createdAtTimestamp,
             href: data.href,
             type: data.type,
             userId: data.userId,
@@ -179,7 +182,7 @@ function NotificationBell() {
                     <p className="font-semibold text-sm">{notification.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/70">
-                      {notification.createdAt && notification.createdAt instanceof Timestamp
+                      {notification.createdAt && typeof notification.createdAt.toDate === 'function'
                         ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                         : "Tanggal tidak valid"}
                     </p>
@@ -189,7 +192,7 @@ function NotificationBell() {
                   <p className="font-semibold text-sm">{notification.title}</p>
                   <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                    <p className="text-xs text-muted-foreground/70">
-                     {notification.createdAt && notification.createdAt instanceof Timestamp
+                     {notification.createdAt && typeof notification.createdAt.toDate === 'function'
                        ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                        : "Tanggal tidak valid"}
                     </p>
@@ -289,10 +292,10 @@ export function AppHeader() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar(); 
   const currentNavItem = navItems.find(item => item.href === pathname || (item.href !== "/dashboard" && pathname.startsWith(item.href)));
-  const pageTitle = currentNavItem?.title || "EduCentral";
+  const pageTitle = currentNavItem?.title || "SDN";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 px-4 shadow-sm backdrop-blur-md sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 px-4 backdrop-blur-md sm:px-6">
       {isMobile && (
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
