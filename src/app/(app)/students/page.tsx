@@ -34,9 +34,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Users, PlusCircle, Edit, Trash2 } from "lucide-react"; // Can use a different icon if desired, e.g. GraduationCap
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select
+import { Users, PlusCircle, Edit, Trash2 } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form"; // Import Controller
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -54,27 +61,27 @@ import {
   orderBy
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Metadata } from 'next';
 
-// export const metadata: Metadata = { // Metadata should be defined in Server Components or layout files, not client.
-//   title: 'Manajemen Murid - SDN',
-//   description: 'Kelola data murid di SDN.',
-// };
+interface ClassMin {
+  id: string;
+  name: string;
+}
 
 interface Student {
   id: string; 
   name: string;
-  nis: string; // Nomor Induk Siswa
-  email: string;
-  kelas: string; // Kelas, e.g., "10A", "11B"
+  nis: string; 
+  email?: string; // Email is optional
+  classId: string; // Changed from kelas to classId
+  className?: string; // Denormalized class name for display
   createdAt?: Timestamp; 
 }
 
 const studentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
-  email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")), // Email is optional
-  kelas: z.string().min(1, { message: "Kelas tidak boleh kosong." }),
+  email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
+  classId: z.string({ required_error: "Pilih kelas." }), // Changed from kelas, now required
 });
 type StudentFormValues = z.infer<typeof studentFormSchema>;
 
@@ -85,7 +92,9 @@ type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
+  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -98,7 +107,7 @@ export default function StudentsPage() {
       name: "",
       nis: "",
       email: "",
-      kelas: "",
+      classId: undefined,
     },
   });
 
@@ -106,9 +115,35 @@ export default function StudentsPage() {
     resolver: zodResolver(editStudentFormSchema),
   });
 
+  const fetchClassesForDropdown = async () => {
+    setIsLoadingClasses(true);
+    try {
+      const classesCollectionRef = collection(db, "classes");
+      const q = query(classesCollectionRef, orderBy("name", "asc"));
+      const querySnapshot = await getDocs(q);
+      const fetchedClasses: ClassMin[] = querySnapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        name: docSnap.data().name,
+      }));
+      setAllClasses(fetchedClasses);
+    } catch (error) {
+      console.error("Error fetching classes for dropdown: ", error);
+      toast({
+        title: "Gagal Memuat Daftar Kelas",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingClasses(false);
+    }
+  };
+
   const fetchStudents = async () => {
     setIsLoadingStudents(true);
     try {
+      // Fetch classes first or concurrently if not already fetched
+      if (allClasses.length === 0 && isLoadingClasses) { // Check isLoadingClasses to avoid race condition
+          await fetchClassesForDropdown();
+      }
       const studentsCollectionRef = collection(db, "students");
       const q = query(studentsCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
@@ -117,7 +152,8 @@ export default function StudentsPage() {
         name: docSnap.data().name,
         nis: docSnap.data().nis,
         email: docSnap.data().email,
-        kelas: docSnap.data().kelas,
+        classId: docSnap.data().classId,
+        className: docSnap.data().className, // Fetch className
         createdAt: docSnap.data().createdAt,
       }));
       setStudents(fetchedStudents);
@@ -125,7 +161,6 @@ export default function StudentsPage() {
       console.error("Error fetching students: ", error);
       toast({
         title: "Gagal Memuat Data Murid",
-        description: "Terjadi kesalahan saat mengambil data murid.",
         variant: "destructive",
       });
     } finally {
@@ -134,6 +169,7 @@ export default function StudentsPage() {
   };
 
   useEffect(() => {
+    fetchClassesForDropdown(); // Fetch classes on initial load
     fetchStudents();
   }, []);
 
@@ -144,23 +180,29 @@ export default function StudentsPage() {
         name: selectedStudent.name,
         nis: selectedStudent.nis,
         email: selectedStudent.email || "",
-        kelas: selectedStudent.kelas,
+        classId: selectedStudent.classId,
       });
     }
   }, [selectedStudent, isEditStudentDialogOpen, editStudentForm]);
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
     addStudentForm.clearErrors();
+    const selectedClass = allClasses.find(c => c.id === data.classId);
+    if (!selectedClass) {
+        toast({ title: "Kelas tidak valid", variant: "destructive" });
+        return;
+    }
     try {
       const studentsCollectionRef = collection(db, "students");
       await addDoc(studentsCollectionRef, {
         ...data,
+        className: selectedClass.name, // Store denormalized class name
         createdAt: serverTimestamp(),
       });
       
       toast({ title: "Murid Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddStudentDialogOpen(false);
-      addStudentForm.reset();
+      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
       fetchStudents(); 
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -179,13 +221,19 @@ export default function StudentsPage() {
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
     editStudentForm.clearErrors();
+    const selectedClass = allClasses.find(c => c.id === data.classId);
+    if (!selectedClass) {
+        toast({ title: "Kelas tidak valid", variant: "destructive" });
+        return;
+    }
     try {
       const studentDocRef = doc(db, "students", data.id);
       await updateDoc(studentDocRef, {
         name: data.name,
         nis: data.nis,
         email: data.email,
-        kelas: data.kelas,
+        classId: data.classId,
+        className: selectedClass.name, // Update denormalized class name
       });
       
       toast({ title: "Data Murid Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -196,7 +244,6 @@ export default function StudentsPage() {
       console.error("Error editing student:", error);
       toast({
         title: "Gagal Memperbarui Data Murid",
-        description: "Terjadi kesalahan saat memperbarui data murid.",
         variant: "destructive",
       });
     }
@@ -212,13 +259,15 @@ export default function StudentsPage() {
       console.error("Error deleting student:", error);
       toast({
         title: "Gagal Menghapus Murid",
-        description: "Terjadi kesalahan saat menghapus data murid.",
         variant: "destructive",
       });
     }
   };
 
   const openEditDialog = (student: Student) => {
+    if (allClasses.length === 0 && !isLoadingClasses) {
+      fetchClassesForDropdown(); // Ensure classes are loaded for edit dialog
+    }
     setSelectedStudent(student);
     setIsEditStudentDialogOpen(true);
   };
@@ -226,6 +275,67 @@ export default function StudentsPage() {
   const openDeleteDialog = (student: Student) => {
     setSelectedStudent(student); 
   };
+  
+  const renderStudentFormFields = (formInstance: typeof addStudentForm | typeof editStudentForm, formType: 'add' | 'edit') => (
+    <>
+      <div>
+        <Label htmlFor={`${formType}-student-name`}>Nama Lengkap</Label>
+        <Input id={`${formType}-student-name`} {...formInstance.register("name")} className="mt-1" />
+        {formInstance.formState.errors.name && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-nis`}>NIS</Label>
+        <Input id={`${formType}-student-nis`} {...formInstance.register("nis")} className="mt-1" />
+        {formInstance.formState.errors.nis && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nis.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-email`}>Email (Opsional)</Label>
+        <Input id={`${formType}-student-email`} type="email" {...formInstance.register("email")} className="mt-1" />
+        {formInstance.formState.errors.email && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-classId`}>Kelas</Label>
+        <Controller
+          name="classId"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select 
+              onValueChange={field.onChange} 
+              value={field.value}
+              disabled={isLoadingClasses}
+            >
+              <SelectTrigger id={`${formType}-student-classId`} className="mt-1">
+                <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : "Pilih kelas"} />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingClasses ? (
+                  <SelectItem value="loading" disabled>Memuat kelas...</SelectItem>
+                ) : allClasses.length === 0 ? (
+                  <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>
+                ) : (
+                  allClasses.map((classItem) => (
+                    <SelectItem key={classItem.id} value={classItem.id}>
+                      {classItem.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {formInstance.formState.errors.classId && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.classId.message}</p>
+        )}
+      </div>
+    </>
+  );
+
 
   return (
     <div className="space-y-6">
@@ -242,8 +352,10 @@ export default function StudentsPage() {
           <Dialog open={isAddStudentDialogOpen} onOpenChange={(isOpen) => {
             setIsAddStudentDialogOpen(isOpen);
             if (!isOpen) {
-              addStudentForm.reset();
+              addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
               addStudentForm.clearErrors();
+            } else {
+              if(allClasses.length === 0 && !isLoadingClasses) fetchClassesForDropdown();
             }
           }}>
             <DialogTrigger asChild>
@@ -259,40 +371,13 @@ export default function StudentsPage() {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="add-student-name">Nama Lengkap</Label>
-                  <Input id="add-student-name" {...addStudentForm.register("name")} className="mt-1" />
-                  {addStudentForm.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">{addStudentForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-student-nis">NIS</Label>
-                  <Input id="add-student-nis" {...addStudentForm.register("nis")} className="mt-1" />
-                  {addStudentForm.formState.errors.nis && (
-                    <p className="text-sm text-destructive mt-1">{addStudentForm.formState.errors.nis.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-student-email">Email (Opsional)</Label>
-                  <Input id="add-student-email" type="email" {...addStudentForm.register("email")} className="mt-1" />
-                  {addStudentForm.formState.errors.email && (
-                    <p className="text-sm text-destructive mt-1">{addStudentForm.formState.errors.email.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-student-kelas">Kelas</Label>
-                  <Input id="add-student-kelas" {...addStudentForm.register("kelas")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1"/>
-                  {addStudentForm.formState.errors.kelas && (
-                    <p className="text-sm text-destructive mt-1">{addStudentForm.formState.errors.kelas.message}</p>
-                  )}
-                </div>
+                {renderStudentFormFields(addStudentForm, 'add')}
                 <DialogFooter>
                   <DialogClose asChild>
                      <Button type="button" variant="outline">Batal</Button>
                   </DialogClose>
-                  <Button type="submit" disabled={addStudentForm.formState.isSubmitting}>
-                    {addStudentForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Murid"}
+                  <Button type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses}>
+                    {(addStudentForm.formState.isSubmitting || isLoadingClasses) ? "Menyimpan..." : "Simpan Murid"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -300,7 +385,7 @@ export default function StudentsPage() {
           </Dialog>
         </CardHeader>
         <CardContent>
-          {isLoadingStudents ? (
+          {isLoadingStudents || isLoadingClasses ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -324,7 +409,7 @@ export default function StudentsPage() {
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell>{student.nis}</TableCell>
                       <TableCell>{student.email || "-"}</TableCell>
-                      <TableCell>{student.kelas}</TableCell>
+                      <TableCell>{student.className || student.classId}</TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="icon" onClick={() => openEditDialog(student)} aria-label={`Edit ${student.name}`}>
                           <Edit className="h-4 w-4" />
@@ -382,41 +467,13 @@ export default function StudentsPage() {
           </DialogHeader>
           {selectedStudent && (
             <form onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)} className="space-y-4 py-4">
-              <Input type="hidden" {...editStudentForm.register("id")} />
-              <div>
-                <Label htmlFor="edit-student-name">Nama Lengkap</Label>
-                <Input id="edit-student-name" {...editStudentForm.register("name")} className="mt-1" />
-                {editStudentForm.formState.errors.name && (
-                  <p className="text-sm text-destructive mt-1">{editStudentForm.formState.errors.name.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-student-nis">NIS</Label>
-                <Input id="edit-student-nis" {...editStudentForm.register("nis")} className="mt-1" />
-                {editStudentForm.formState.errors.nis && (
-                  <p className="text-sm text-destructive mt-1">{editStudentForm.formState.errors.nis.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-student-email">Email (Opsional)</Label>
-                <Input id="edit-student-email" type="email" {...editStudentForm.register("email")} className="mt-1" />
-                {editStudentForm.formState.errors.email && (
-                  <p className="text-sm text-destructive mt-1">{editStudentForm.formState.errors.email.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-student-kelas">Kelas</Label>
-                <Input id="edit-student-kelas" {...editStudentForm.register("kelas")} className="mt-1" />
-                {editStudentForm.formState.errors.kelas && (
-                  <p className="text-sm text-destructive mt-1">{editStudentForm.formState.errors.kelas.message}</p>
-                )}
-              </div>
+              {renderStudentFormFields(editStudentForm, 'edit')}
               <DialogFooter>
                  <DialogClose asChild>
                     <Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button>
                  </DialogClose>
-                <Button type="submit" disabled={editStudentForm.formState.isSubmitting}>
-                  {editStudentForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                <Button type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses}>
+                  {(editStudentForm.formState.isSubmitting || isLoadingClasses) ? "Menyimpan..." : "Simpan Perubahan"}
                 </Button>
               </DialogFooter>
             </form>
@@ -426,5 +483,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-
-    
