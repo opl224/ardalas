@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Settings, ChevronRight, UserCog, PanelLeft } from "lucide-react"; // Added PanelLeft
+import { LogOut, Settings, ChevronRight, UserCog, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { navItems } from "@/config/nav";
 import type { NavItem } from "@/config/nav";
@@ -23,10 +23,10 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  SidebarTrigger as DesktopSidebarTrigger, // Renamed to avoid conflict
+  SidebarTrigger as DesktopSidebarTrigger,
   useSidebar, 
 } from "@/components/ui/sidebar";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger as MobileSheetTrigger } from "@/components/ui/sheet"; // Corrected import
+import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"; // Sheet is no longer needed here, just SheetContent & related
 import { useState } from "react";
 
 function AppLogo() {
@@ -49,7 +49,7 @@ export function AppSidebar() {
   const router = useRouter();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
-  const { isMobile, openMobile, setOpenMobile, toggleSidebar: contextToggleSidebar } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
 
 
   const toggleSubmenu = (title: string) => {
@@ -139,15 +139,15 @@ export function AppSidebar() {
     }
   };
 
-  const sidebarStaticContent = (
+  const sidebarSharedContent = (
     <>
       <SidebarHeader className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
           <AppLogo />
-           <DesktopSidebarTrigger className="hidden md:flex" /> 
+           {!isMobile && <DesktopSidebarTrigger className="hidden md:flex" /> }
         </div>
       </SidebarHeader>
-      <SidebarContent className="flex-1 p-2">
+      <SidebarContent className="flex-1 p-2 overflow-y-auto">
         <SidebarMenu>
           {renderNavItemsRecursive(navItems, pathname, role)}
         </SidebarMenu>
@@ -174,42 +174,39 @@ export function AppSidebar() {
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-        {/* The MobileSheetTrigger is now placed in AppHeader.tsx */}
-        <SheetContent
-          side="left" 
-          className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground flex flex-col" // Added flex flex-col
-          aria-labelledby="mobile-sidebar-title-component" // Use aria-labelledby
-        >
-          <SheetHeader className="p-4 border-b border-border/50"> {/* Added SheetHeader */}
-            <div className="flex items-center justify-between">
-              <AppLogo />
-              {/* SheetClose is handled by the X button in SheetContent by default */}
-            </div>
-            <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle> {/* Added sr-only SheetTitle */}
-          </SheetHeader>
-          <SidebarContent className="flex-1 p-2 overflow-y-auto"> {/* Ensure scrollability */}
-            <SidebarMenu>
-              {renderNavItemsRecursive(navItems, pathname, role)}
-            </SidebarMenu>
-          </SidebarContent>
-          <SidebarFooter className="p-2 border-t border-border/50">
-            <SidebarMenu>
-              {user && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    onClick={handleLogout} 
-                    className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    <LogOut className="h-5 w-5 shrink-0" />
-                    <span className="truncate">Logout</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-            </SidebarMenu>
-          </SidebarFooter>
-        </SheetContent>
-      </Sheet>
+      // The <Sheet> component is now in AppLayout. AppSidebar only renders SheetContent for mobile.
+      <SheetContent
+        side="left" 
+        className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground flex flex-col"
+        aria-labelledby="mobile-sidebar-title-component" 
+      >
+        <SheetHeader className="p-4 border-b border-border/50">
+          <div className="flex items-center justify-between">
+             <AppLogo />
+          </div>
+          <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
+        </SheetHeader>
+        <SidebarContent className="flex-1 p-2 overflow-y-auto">
+          <SidebarMenu>
+            {renderNavItemsRecursive(navItems, pathname, role)}
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter className="p-2 border-t border-border/50">
+          <SidebarMenu>
+            {user && (
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  onClick={handleLogout} 
+                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <LogOut className="h-5 w-5 shrink-0" />
+                  <span className="truncate">Logout</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+          </SidebarMenu>
+        </SidebarFooter>
+      </SheetContent>
     );
   }
 
@@ -218,7 +215,7 @@ export function AppSidebar() {
         className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md hidden md:flex" 
         collapsible="icon"
       >
-        {sidebarStaticContent}
+        {sidebarSharedContent}
       </Sidebar>
   );
 }

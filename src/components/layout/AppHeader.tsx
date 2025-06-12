@@ -17,12 +17,12 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft } from "lucide-react"; // Added PanelLeft
+import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { useSidebar } from "@/components/ui/sidebar"; // Import useSidebar
-import { SheetTrigger } from "@/components/ui/sheet"; // Import SheetTrigger
+import { useSidebar } from "@/components/ui/sidebar"; 
+import { SheetTrigger } from "@/components/ui/sheet"; 
 import { useState, useEffect, type ReactNode } from "react";
 import {
   collection,
@@ -287,7 +287,7 @@ function UserNav() {
 
 export function AppHeader() {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar(); // Get isMobile and setOpenMobile
+  const { isMobile, setOpenMobile } = useSidebar(); 
   const currentNavItem = navItems.find(item => item.href === pathname || (item.href !== "/dashboard" && pathname.startsWith(item.href)));
   const pageTitle = currentNavItem?.title || "EduCentral";
 

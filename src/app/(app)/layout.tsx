@@ -7,7 +7,29 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { Sheet } from "@/components/ui/sheet"; // Import Sheet
+
+// Internal component to consume sidebar context
+function AppLayoutInternal({ children }: { children: ReactNode }) {
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+
+  return (
+    <Sheet open={isMobile && openMobile} onOpenChange={setOpenMobile}>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar /> {/* Renders SheetContent for mobile */}
+        <div className="flex flex-1 flex-col">
+          <AppHeader /> {/* Renders SheetTrigger for mobile */}
+          <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
+            <div className="mx-auto w-full max-w-screen-2xl">
+             {children}
+            </div>
+          </main>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -46,17 +68,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   
   return (
     <SidebarProvider defaultOpen>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-1 flex-col">
-          <AppHeader />
-          <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto w-full max-w-screen-2xl">
-             {children}
-            </div>
-          </main>
-        </div>
-      </div>
+      <AppLayoutInternal>{children}</AppLayoutInternal>
     </SidebarProvider>
     );
 }
