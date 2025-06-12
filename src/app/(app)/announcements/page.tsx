@@ -217,13 +217,13 @@ export default function AnnouncementsPage() {
     }
     
     let finalTargetClassIds = data.targetClassIds;
-    if (role !== 'guru') { // Admin announcements don't target specific classes this way
+    if (role !== 'guru') { 
         finalTargetClassIds = [];
     }
 
 
     try {
-      await addDoc(collection(db, "announcements"), {
+      const newAnnouncementRef = await addDoc(collection(db, "announcements"), {
         ...data,
         targetClassIds: finalTargetClassIds,
         date: Timestamp.now(),
@@ -233,11 +233,23 @@ export default function AnnouncementsPage() {
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Pengumuman Ditambahkan", description: `"${data.title}" berhasil dipublikasikan.` });
+      
+      // Create a notification for the user who created the announcement
+      await addDoc(collection(db, "notifications"), {
+        userId: user.uid, // Target the creator for now
+        title: "Pengumuman Baru Dipublikasikan",
+        description: `Pengumuman "${data.title}" telah berhasil Anda publikasikan.`,
+        href: `/announcements`, // Link to general announcements page
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "new_announcement",
+      });
+
       setIsAddDialogOpen(false);
       addAnnouncementForm.reset({ title: "", content: "", targetAudience: [], targetClassIds: [] });
       fetchAnnouncements();
     } catch (error) {
-      console.error("Error adding announcement:", error);
+      console.error("Error adding announcement or notification:", error);
       toast({ title: "Gagal Menambahkan Pengumuman", variant: "destructive" });
     }
   };
@@ -253,22 +265,12 @@ export default function AnnouncementsPage() {
     }
 
     let finalTargetClassIds = data.targetClassIds;
-    if (role !== 'guru' && selectedAnnouncement.createdById === user.uid) { // Admin editing, clear class IDs if they were set by a teacher
-        // Or, preserve if admin wants to keep class targeting. For now, let's assume admin uses general roles.
-        // If an admin edits a teacher's announcement, what should happen to targetClassIds?
-        // For simplicity now: if admin edits, targetClassIds are preserved if already there, but admin form does not show class selection.
-        // If current editor is not a guru, and the original creator was not a guru, or if it's a new admin announcement, class IDs are not primary.
-        // Let's keep it simple: if the current user is an admin, they don't manage targetClassIds directly through this form.
-        // This logic can be complex. If admin edits, and wants to change scope, they'd likely change targetAudience.
-        // We will ensure that if an admin is editing, `finalTargetClassIds` is what's already there or what their form implies.
-        // Since admin form doesn't have `targetClassIds` input, we should ensure it doesn't accidentally clear it if it was set.
-        // Best to pass `data.targetClassIds` as is, or ensure it's empty if admin is creating.
-        finalTargetClassIds = selectedAnnouncement.targetClassIds || []; // Preserve if admin is editing.
+    if (role !== 'guru' && selectedAnnouncement.createdById === user.uid) { 
+        finalTargetClassIds = selectedAnnouncement.targetClassIds || []; 
         if (selectedAnnouncement.createdById !== user.uid && role === 'admin') { 
             // Admin is editing someone else's (potentially a teacher's) announcement
-            // In this case, the admin form doesn't show classIds, so we keep existing ones
-        } else if (role === 'admin') { // Admin is editing their own or a new one from scratch
-            finalTargetClassIds = []; // Admin targets generally by role, not specific classes via this form
+        } else if (role === 'admin') { 
+            finalTargetClassIds = []; 
         }
     }
 
@@ -281,6 +283,11 @@ export default function AnnouncementsPage() {
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Pengumuman Diperbarui", description: `"${data.title}" berhasil diperbarui.` });
+      
+      // Optionally, create a notification for update as well
+      // For simplicity, I'm skipping notification creation on edit for now
+      // but you can add similar logic as in handleAddAnnouncementSubmit if needed.
+
       setIsEditDialogOpen(false);
       setSelectedAnnouncement(null);
       fetchAnnouncements();
@@ -600,3 +607,5 @@ export default function AnnouncementsPage() {
   );
 }
 
+
+    
