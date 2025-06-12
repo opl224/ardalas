@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserCircle } from "lucide-react";
 import type { Metadata } from 'next';
@@ -28,4 +29,8 @@ export default function ParentsPage() {
           <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
             Area untuk menampilkan daftar orang tua dan fungsionalitas CRUD.
           </div>
-        </Card
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
