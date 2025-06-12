@@ -24,10 +24,9 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarTrigger,
-  useSidebar, // Import useSidebar
-  Sheet,      // Import Sheet
-  SheetContent // Import SheetContent
+  useSidebar, 
 } from "@/components/ui/sidebar";
+import { Sheet, SheetContent } from "@/components/ui/sheet"; // Corrected import path
 import { useState } from "react";
 
 function AppLogo() {
@@ -176,9 +175,9 @@ export function AppSidebar() {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
         <SheetContent
-          side="left" // Or appropriate side
-          className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden" // Use theme variable or fixed width
-          aria-label="Main navigation" // Add aria-label for accessibility
+          side="left" 
+          className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          aria-label="Main navigation"
         >
           <div className="flex h-full w-full flex-col">
             {sidebarContent}
@@ -190,7 +189,7 @@ export function AppSidebar() {
 
   return (
       <Sidebar
-        className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md hidden md:flex" // Keep md:flex, hidden by default on small screens
+        className="border-r border-border/50 bg-sidebar/80 backdrop-blur-md hidden md:flex" 
         collapsible="icon"
       >
         {sidebarContent}
