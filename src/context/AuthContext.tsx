@@ -10,6 +10,7 @@ import React, { useEffect, useContext, createContext, useState, type ReactNode }
 
 interface UserProfile extends FirebaseUser {
   role?: Role;
+  assignedClassIds?: string[]; // For teachers
   // Add other profile fields as needed
 }
 
@@ -33,15 +34,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // Fetch user role from Firestore
+        // Fetch user role and other details from Firestore
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
-        let userRole: Role | undefined;
+        
+        let userProfileData: UserProfile = { ...firebaseUser };
+
         if (userDocSnap.exists()) {
-          userRole = userDocSnap.data()?.role as Role;
-          setRole(userRole || null);
+          const firestoreData = userDocSnap.data();
+          userProfileData.role = firestoreData?.role as Role | undefined;
+          setRole(userProfileData.role || null);
+
+          if (userProfileData.role === 'guru') {
+            userProfileData.assignedClassIds = firestoreData?.assignedClassIds || [];
+          }
         }
-        setUser({ ...firebaseUser, role: userRole });
+        setUser(userProfileData);
       } else {
         setUser(null);
         setRole(null);
