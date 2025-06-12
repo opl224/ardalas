@@ -30,7 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger, 
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -62,7 +62,8 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  deleteField,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -72,37 +73,63 @@ interface ClassMin {
 }
 
 interface User {
-  id: string; // Corresponds to Firebase Auth UID and Firestore document ID
+  id: string; 
   name: string;
   email: string;
   role: Role;
   assignedClassIds?: string[]; // For teachers
-  createdAt?: Timestamp; // Firestore timestamp
+  classId?: string; // For students
+  className?: string; // For students, denormalized
+  createdAt?: Timestamp; 
 }
 
-const addUserFormSchema = z.object({
+const baseUserSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }),
-  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
   role: z.enum(ROLES, { message: "Pilih peran yang valid." }),
   assignedClassIds: z.array(z.string()).optional(),
-}).refine(data => data.role !== 'guru' || (data.assignedClassIds && data.assignedClassIds.length > 0) || !(data.assignedClassIds === undefined || data.assignedClassIds.length === 0), { // TEMPORARY: Making assignedClassIds optional for now
+  classId: z.string().optional(),
+});
+
+const addUserFormSchema = baseUserSchema.extend({
+  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
+}).refine(data => {
+    if (data.role === 'guru') {
+      return data.assignedClassIds && data.assignedClassIds.length > 0;
+    }
+    return true;
+  }, {
     message: "Guru harus memiliki setidaknya satu kelas yang ditugaskan.",
     path: ["assignedClassIds"],
-    // This refinement might be too strict initially, disabling for now
-    // condition: (data) => data.role === 'guru', // only apply if role is guru
+}).refine(data => {
+    if (data.role === 'siswa') {
+      return !!data.classId;
+    }
+    return true;
+  }, {
+    message: "Siswa harus memiliki satu kelas yang ditetapkan.",
+    path: ["classId"],
 });
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
-const editUserFormSchema = z.object({
+const editUserFormSchema = baseUserSchema.extend({
   id: z.string(),
-  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  email: z.string().email({ message: "Format email tidak valid." }),
-  role: z.enum(ROLES, { message: "Pilih peran yang valid." }),
-  assignedClassIds: z.array(z.string()).optional(),
-}).refine(data => data.role !== 'guru' || (data.assignedClassIds && data.assignedClassIds.length > 0) || !(data.assignedClassIds === undefined || data.assignedClassIds.length === 0), { // TEMPORARY: Making assignedClassIds optional for now
+}).refine(data => {
+    if (data.role === 'guru') {
+      return data.assignedClassIds && data.assignedClassIds.length > 0;
+    }
+    return true;
+  }, {
     message: "Guru harus memiliki setidaknya satu kelas yang ditugaskan.",
     path: ["assignedClassIds"],
+}).refine(data => {
+    if (data.role === 'siswa') {
+      return !!data.classId;
+    }
+    return true;
+  }, {
+    message: "Siswa harus memiliki satu kelas yang ditetapkan.",
+    path: ["classId"],
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
@@ -126,6 +153,7 @@ export default function UserAdministrationPage() {
       password: "",
       role: "siswa",
       assignedClassIds: [],
+      classId: undefined,
     },
   });
 
@@ -133,6 +161,7 @@ export default function UserAdministrationPage() {
     resolver: zodResolver(editUserFormSchema),
     defaultValues: {
         assignedClassIds: [],
+        classId: undefined,
     }
   });
 
@@ -163,6 +192,8 @@ export default function UserAdministrationPage() {
         email: docSnap.data().email,
         role: docSnap.data().role,
         assignedClassIds: docSnap.data().assignedClassIds || [],
+        classId: docSnap.data().classId,
+        className: docSnap.data().className,
         createdAt: docSnap.data().createdAt,
       }));
       setUsers(fetchedUsers);
@@ -186,12 +217,20 @@ export default function UserAdministrationPage() {
     if (watchAddUserRole !== 'guru') {
       addUserForm.setValue("assignedClassIds", []);
     }
+    if (watchAddUserRole !== 'siswa') {
+      addUserForm.setValue("classId", undefined);
+    }
+     addUserForm.trigger(["assignedClassIds", "classId"]);
   }, [watchAddUserRole, addUserForm]);
 
   useEffect(() => {
     if (watchEditUserRole !== 'guru') {
       editUserForm.setValue("assignedClassIds", []);
     }
+    if (watchEditUserRole !== 'siswa') {
+      editUserForm.setValue("classId", undefined);
+    }
+    editUserForm.trigger(["assignedClassIds", "classId"]);
   }, [watchEditUserRole, editUserForm]);
 
   useEffect(() => {
@@ -202,6 +241,7 @@ export default function UserAdministrationPage() {
         email: selectedUser.email,
         role: selectedUser.role,
         assignedClassIds: selectedUser.assignedClassIds || [],
+        classId: selectedUser.classId || undefined,
       });
     }
   }, [selectedUser, isEditUserDialogOpen, editUserForm]);
@@ -220,13 +260,24 @@ export default function UserAdministrationPage() {
       };
       if (data.role === 'guru') {
         userData.assignedClassIds = data.assignedClassIds || [];
+      } else {
+        userData.assignedClassIds = deleteField();
+      }
+
+      if (data.role === 'siswa' && data.classId) {
+        const selectedClass = allClasses.find(c => c.id === data.classId);
+        userData.classId = data.classId;
+        userData.className = selectedClass?.name || "";
+      } else {
+        userData.classId = deleteField();
+        userData.className = deleteField();
       }
 
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
       
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddUserDialogOpen(false);
-      addUserForm.reset();
+      addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined });
       setShowPassword(false);
       fetchUsers();
     } catch (error) {
@@ -235,7 +286,7 @@ export default function UserAdministrationPage() {
       if (firebaseError.code === "auth/email-already-in-use") {
         errorMessage = "Email ini sudah terdaftar.";
         addUserForm.setError("email", { type: "manual", message: errorMessage });
-      } // ... other error handling
+      }
       console.error("Error adding user:", firebaseError);
       toast({ title: "Gagal Menambahkan Pengguna", description: errorMessage, variant: "destructive" });
     }
@@ -251,11 +302,22 @@ export default function UserAdministrationPage() {
         email: data.email, 
         role: data.role,
       };
+
       if (data.role === 'guru') {
         updateData.assignedClassIds = data.assignedClassIds || [];
       } else {
-        updateData.assignedClassIds = []; // Or delete the field: deleteField()
+        updateData.assignedClassIds = deleteField();
       }
+
+      if (data.role === 'siswa' && data.classId) {
+        const selectedClass = allClasses.find(c => c.id === data.classId);
+        updateData.classId = data.classId;
+        updateData.className = selectedClass?.name || "";
+      } else {
+        updateData.classId = deleteField();
+        updateData.className = deleteField();
+      }
+      
       await updateDoc(userDocRef, updateData);
       
       toast({ title: "Pengguna Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -271,6 +333,9 @@ export default function UserAdministrationPage() {
   const handleDeleteUser = async (userId: string, userName?: string) => {
     try {
       await deleteDoc(doc(db, "users", userId));
+      // Note: Deleting user from Firebase Auth is a separate, more complex operation
+      // usually handled by a Cloud Function for security reasons (requires admin privileges).
+      // This function only deletes the Firestore user document.
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
       setSelectedUser(null);
       fetchUsers();
@@ -289,55 +354,85 @@ export default function UserAdministrationPage() {
     setSelectedUser(user);
   };
   
-  const renderAssignedClasses = (assignedIds?: string[]) => {
+  const renderAssignedClassesForTeacher = (assignedIds?: string[]) => {
     if (!assignedIds || assignedIds.length === 0) return "-";
     return assignedIds.map(id => allClasses.find(c => c.id === id)?.name || id).join(", ");
   }
 
   const renderClassAssignmentField = (formInstance: typeof addUserForm | typeof editUserForm, currentRole: Role | undefined) => {
-    if (currentRole !== 'guru') return null;
-
-    return (
-      <div>
-        <Label>Kelas yang Ditugaskan</Label>
-        {isLoadingClasses ? (
-          <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
-        ) : allClasses.length === 0 ? (
-          <p className="text-sm text-muted-foreground mt-1">Tidak ada kelas tersedia.</p>
-        ) : (
-          <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
-            {allClasses.map((cls) => (
-              <FormField
-                key={cls.id}
+    if (currentRole === 'guru') {
+      return (
+        <div>
+          <Label>Kelas yang Ditugaskan</Label>
+          {isLoadingClasses ? (
+            <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
+          ) : allClasses.length === 0 ? (
+            <p className="text-sm text-muted-foreground mt-1">Tidak ada kelas tersedia.</p>
+          ) : (
+            <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
+              {allClasses.map((cls) => (
+                <FormField
+                  key={cls.id}
+                  control={formInstance.control}
+                  name="assignedClassIds"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value?.includes(cls.id)}
+                          onCheckedChange={(checked) => {
+                            const currentValue = field.value || [];
+                            return checked
+                              ? field.onChange([...currentValue, cls.id])
+                              : field.onChange(currentValue.filter((value) => value !== cls.id));
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal text-sm">
+                        {cls.name}
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+          )}
+          {(formInstance.formState.errors as any).assignedClassIds && (
+            <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).assignedClassIds.message}</p>
+          )}
+        </div>
+      );
+    } else if (currentRole === 'siswa') {
+      return (
+         <div>
+            <Label htmlFor="classId">Kelas Siswa</Label>
+            <Controller
+                name="classId"
                 control={formInstance.control}
-                name="assignedClassIds"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value?.includes(cls.id)}
-                        onCheckedChange={(checked) => {
-                          const currentValue = field.value || [];
-                          return checked
-                            ? field.onChange([...currentValue, cls.id])
-                            : field.onChange(currentValue.filter((value) => value !== cls.id));
-                        }}
-                      />
-                    </FormControl>
-                    <FormLabel className="font-normal text-sm">
-                      {cls.name}
-                    </FormLabel>
-                  </FormItem>
+                    <Select
+                        onValueChange={(value) => { field.onChange(value); formInstance.trigger("classId");}}
+                        value={field.value || undefined}
+                        disabled={isLoadingClasses}
+                    >
+                        <SelectTrigger id="classId" className="mt-1">
+                            <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : "Pilih kelas"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                            {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            {allClasses.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
+                        </SelectContent>
+                    </Select>
                 )}
-              />
-            ))}
-          </div>
-        )}
-        {(formInstance.formState.errors as any).assignedClassIds && (
-          <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).assignedClassIds.message}</p>
-        )}
-      </div>
-    );
+            />
+            {(formInstance.formState.errors as any).classId && (
+                <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).classId.message}</p>
+            )}
+        </div>
+      );
+    }
+    return null;
   };
 
 
@@ -345,7 +440,7 @@ export default function UserAdministrationPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Administrasi Pengguna</h1>
-        <p className="text-muted-foreground">Kelola akun pengguna, peran, dan hak akses kelas untuk guru.</p>
+        <p className="text-muted-foreground">Kelola akun pengguna, peran, dan penetapan kelas.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -355,7 +450,11 @@ export default function UserAdministrationPage() {
           </CardTitle>
           <Dialog open={isAddUserDialogOpen} onOpenChange={(isOpen) => {
             setIsAddUserDialogOpen(isOpen);
-            if (!isOpen) { addUserForm.reset(); setShowPassword(false); addUserForm.clearErrors(); }
+            if (!isOpen) { 
+                addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined }); 
+                setShowPassword(false); 
+                addUserForm.clearErrors(); 
+            }
           }}>
             <DialogTrigger asChild>
               <Button size="sm" onClick={() => { if(allClasses.length === 0 && !isLoadingClasses) fetchAllClasses();}}>
@@ -366,7 +465,7 @@ export default function UserAdministrationPage() {
               <DialogHeader>
                 <DialogTitle>Tambah Pengguna Baru</DialogTitle>
                 <DialogDescription>
-                  Isi detail pengguna. Jika peran adalah Guru, Anda dapat menetapkan kelas.
+                  Isi detail pengguna. Tetapkan kelas jika peran adalah Guru atau Siswa.
                 </DialogDescription>
               </DialogHeader>
               <Form {...addUserForm}>
@@ -397,7 +496,10 @@ export default function UserAdministrationPage() {
                     name="role"
                     control={addUserForm.control}
                     render={({ field }) => (
-                        <Select onValueChange={(value) => { field.onChange(value as Role); addUserForm.trigger("assignedClassIds"); }} defaultValue={field.value}>
+                        <Select onValueChange={(value) => { 
+                            field.onChange(value as Role); 
+                            addUserForm.trigger(["assignedClassIds", "classId"]); 
+                        }} defaultValue={field.value}>
                             <SelectTrigger id="role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
                             <SelectContent>
                             {ROLES.map((roleItem) => ( <SelectItem key={roleItem} value={roleItem}>{roleDisplayNames[roleItem]}</SelectItem> ))}
@@ -430,7 +532,7 @@ export default function UserAdministrationPage() {
                     <TableHead>Nama</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Peran</TableHead>
-                    <TableHead>Kelas (Guru)</TableHead>
+                    <TableHead>Kelas Ditugaskan/Dimiliki</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -440,14 +542,18 @@ export default function UserAdministrationPage() {
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
-                      <TableCell>{user.role === 'guru' ? renderAssignedClasses(user.assignedClassIds) : "-"}</TableCell>
+                      <TableCell>
+                        {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
+                         user.role === 'siswa' ? (user.className || user.classId || '-') :
+                         "-"}
+                      </TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="icon" onClick={() => openEditDialog(user)} aria-label={`Edit ${user.name}`}><Edit className="h-4 w-4" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(user)} aria-label={`Hapus ${user.name}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           {selectedUser && selectedUser.id === user.id && (
                             <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span>.</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database.</AlertDialogDescription></AlertDialogHeader>
                               <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
                             </AlertDialogContent>
                           )}
@@ -469,7 +575,7 @@ export default function UserAdministrationPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Pengguna</DialogTitle>
-            <DialogDescription>Perbarui detail pengguna. Jika peran adalah Guru, Anda dapat mengubah penetapan kelas.</DialogDescription>
+            <DialogDescription>Perbarui detail pengguna. Tetapkan kelas jika peran adalah Guru atau Siswa.</DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <Form {...editUserForm}>
@@ -491,7 +597,10 @@ export default function UserAdministrationPage() {
                     name="role"
                     control={editUserForm.control}
                     render={({ field }) => (
-                        <Select onValueChange={(value) => { field.onChange(value as Role); editUserForm.trigger("assignedClassIds"); }} value={field.value}>
+                        <Select onValueChange={(value) => { 
+                            field.onChange(value as Role); 
+                            editUserForm.trigger(["assignedClassIds", "classId"]); 
+                        }} value={field.value}>
                             <SelectTrigger id="edit-role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
                             <SelectContent>
                             {ROLES.map((roleItem) => (<SelectItem key={roleItem} value={roleItem}>{roleDisplayNames[roleItem]}</SelectItem>))}
@@ -517,3 +626,5 @@ export default function UserAdministrationPage() {
   );
 }
 
+
+    
