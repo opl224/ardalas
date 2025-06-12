@@ -29,12 +29,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ROLES, Role, roleDisplayNames } from "@/config/roles";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +49,9 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  where,
+  documentId,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -60,25 +62,46 @@ interface AnnouncementData {
   id: string;
   title: string;
   content: string;
-  date: Timestamp; // Publication or relevance date
+  date: Timestamp; 
   targetAudience: Role[];
+  targetClassIds?: string[]; // ID kelas yang dituju, opsional
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   createdById?: string;
   createdByName?: string;
 }
 
-const announcementFormSchema = z.object({
+const baseAnnouncementSchema = z.object({
   title: z.string().min(5, { message: "Judul minimal 5 karakter." }),
   content: z.string().min(10, { message: "Konten minimal 10 karakter." }),
-  targetAudience: z.array(z.enum(ROLES)).min(1, { message: "Pilih minimal satu target audiens." }),
-  // Date will be set automatically on save or can be added if manual date setting is needed
+  targetAudience: z.array(z.enum(ROLES)).min(1, { message: "Pilih minimal satu target peran." }),
+  targetClassIds: z.array(z.string()).optional(),
 });
+
+// Custom refinement for teacher role
+const announcementFormSchema = baseAnnouncementSchema.refine(
+  (data) => {
+    // This validation is context-dependent (based on role)
+    // It's better handled in the submit handler or by dynamic schema adjustments
+    // For now, we assume role is available in the component context when submitting
+    return true; 
+  },
+  {
+    message: "Guru harus memilih minimal satu kelas jika menargetkan Siswa atau Orang Tua.",
+    path: ["targetClassIds"], // This path might not be ideal for a general refinement
+  }
+);
 type AnnouncementFormValues = z.infer<typeof announcementFormSchema>;
 
-const editAnnouncementFormSchema = announcementFormSchema.extend({ id: z.string() });
+const editAnnouncementFormSchema = baseAnnouncementSchema.extend({ id: z.string() });
 type EditAnnouncementFormValues = z.infer<typeof editAnnouncementFormSchema>;
 
+const ROLES_FOR_TEACHER_TARGETING: Role[] = ["siswa", "orangtua"];
+
+interface ClassMin {
+  id: string;
+  name: string;
+}
 
 export default function AnnouncementsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -87,6 +110,9 @@ export default function AnnouncementsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementData | null>(null);
+  
+  const [teacherClasses, setTeacherClasses] = useState<ClassMin[]>([]);
+  const [isLoadingTeacherClasses, setIsLoadingTeacherClasses] = useState(false);
 
   const { toast } = useToast();
 
@@ -96,11 +122,18 @@ export default function AnnouncementsPage() {
       title: "",
       content: "",
       targetAudience: [],
+      targetClassIds: [],
     },
   });
 
   const editAnnouncementForm = useForm<EditAnnouncementFormValues>({
     resolver: zodResolver(editAnnouncementFormSchema),
+    defaultValues: { // Default values for edit form are set in useEffect
+      title: "",
+      content: "",
+      targetAudience: [],
+      targetClassIds: [],
+    }
   });
 
   const fetchAnnouncements = async () => {
@@ -126,13 +159,46 @@ export default function AnnouncementsPage() {
     if (!authLoading) fetchAnnouncements();
   }, [authLoading]);
 
+  // Fetch teacher's classes when add/edit dialog is opened by a teacher
+  useEffect(() => {
+    if (role === 'guru' && user && (isAddDialogOpen || (isEditDialogOpen && selectedAnnouncement))) {
+      const fetchTeacherClasses = async () => {
+        setIsLoadingTeacherClasses(true);
+        try {
+          // Assuming lessons link teachers to classes
+          const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", user.uid));
+          const lessonsSnapshot = await getDocs(lessonsQuery);
+          const classIds = new Set<string>();
+          lessonsSnapshot.docs.forEach(doc => classIds.add(doc.data().classId));
+
+          if (classIds.size > 0) {
+            const classesQuery = query(collection(db, "classes"), where(documentId(), "in", Array.from(classIds)), orderBy("name"));
+            const classesSnapshot = await getDocs(classesQuery);
+            setTeacherClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name } as ClassMin)));
+          } else {
+            setTeacherClasses([]);
+          }
+        } catch (error) {
+          console.error("Error fetching teacher classes:", error);
+          toast({ title: "Gagal memuat data kelas guru", variant: "destructive" });
+          setTeacherClasses([]);
+        } finally {
+          setIsLoadingTeacherClasses(false);
+        }
+      };
+      fetchTeacherClasses();
+    }
+  }, [role, user, isAddDialogOpen, isEditDialogOpen, selectedAnnouncement, toast]);
+
+
   useEffect(() => {
     if (selectedAnnouncement && isEditDialogOpen) {
       editAnnouncementForm.reset({
         id: selectedAnnouncement.id,
         title: selectedAnnouncement.title,
         content: selectedAnnouncement.content,
-        targetAudience: selectedAnnouncement.targetAudience,
+        targetAudience: selectedAnnouncement.targetAudience || [],
+        targetClassIds: selectedAnnouncement.targetClassIds || [],
       });
     }
   }, [selectedAnnouncement, isEditDialogOpen, editAnnouncementForm]);
@@ -143,10 +209,24 @@ export default function AnnouncementsPage() {
         return;
     }
     addAnnouncementForm.clearErrors();
+
+    if (role === 'guru' && (data.targetAudience.includes('siswa') || data.targetAudience.includes('orangtua')) && (!data.targetClassIds || data.targetClassIds.length === 0)) {
+      addAnnouncementForm.setError("targetClassIds", { type: "manual", message: "Pilih minimal satu kelas target." });
+      toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan siswa atau orang tua.", variant: "destructive"});
+      return;
+    }
+    
+    let finalTargetClassIds = data.targetClassIds;
+    if (role !== 'guru') { // Admin announcements don't target specific classes this way
+        finalTargetClassIds = [];
+    }
+
+
     try {
       await addDoc(collection(db, "announcements"), {
         ...data,
-        date: Timestamp.now(), // Use current time as publication date
+        targetClassIds: finalTargetClassIds,
+        date: Timestamp.now(),
         createdById: user.uid,
         createdByName: user.displayName || user.email,
         createdAt: serverTimestamp(),
@@ -154,7 +234,7 @@ export default function AnnouncementsPage() {
       });
       toast({ title: "Pengumuman Ditambahkan", description: `"${data.title}" berhasil dipublikasikan.` });
       setIsAddDialogOpen(false);
-      addAnnouncementForm.reset({ title: "", content: "", targetAudience: [] });
+      addAnnouncementForm.reset({ title: "", content: "", targetAudience: [], targetClassIds: [] });
       fetchAnnouncements();
     } catch (error) {
       console.error("Error adding announcement:", error);
@@ -165,11 +245,39 @@ export default function AnnouncementsPage() {
   const handleEditAnnouncementSubmit: SubmitHandler<EditAnnouncementFormValues> = async (data) => {
     if (!selectedAnnouncement || !user) return;
     editAnnouncementForm.clearErrors();
+
+    if (role === 'guru' && (data.targetAudience.includes('siswa') || data.targetAudience.includes('orangtua')) && (!data.targetClassIds || data.targetClassIds.length === 0)) {
+      editAnnouncementForm.setError("targetClassIds", { type: "manual", message: "Pilih minimal satu kelas target." });
+      toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan siswa atau orang tua.", variant: "destructive"});
+      return;
+    }
+
+    let finalTargetClassIds = data.targetClassIds;
+    if (role !== 'guru' && selectedAnnouncement.createdById === user.uid) { // Admin editing, clear class IDs if they were set by a teacher
+        // Or, preserve if admin wants to keep class targeting. For now, let's assume admin uses general roles.
+        // If an admin edits a teacher's announcement, what should happen to targetClassIds?
+        // For simplicity now: if admin edits, targetClassIds are preserved if already there, but admin form does not show class selection.
+        // If current editor is not a guru, and the original creator was not a guru, or if it's a new admin announcement, class IDs are not primary.
+        // Let's keep it simple: if the current user is an admin, they don't manage targetClassIds directly through this form.
+        // This logic can be complex. If admin edits, and wants to change scope, they'd likely change targetAudience.
+        // We will ensure that if an admin is editing, `finalTargetClassIds` is what's already there or what their form implies.
+        // Since admin form doesn't have `targetClassIds` input, we should ensure it doesn't accidentally clear it if it was set.
+        // Best to pass `data.targetClassIds` as is, or ensure it's empty if admin is creating.
+        finalTargetClassIds = selectedAnnouncement.targetClassIds || []; // Preserve if admin is editing.
+        if (selectedAnnouncement.createdById !== user.uid && role === 'admin') { 
+            // Admin is editing someone else's (potentially a teacher's) announcement
+            // In this case, the admin form doesn't show classIds, so we keep existing ones
+        } else if (role === 'admin') { // Admin is editing their own or a new one from scratch
+            finalTargetClassIds = []; // Admin targets generally by role, not specific classes via this form
+        }
+    }
+
+
     try {
       const announcementDocRef = doc(db, "announcements", data.id);
       await updateDoc(announcementDocRef, {
         ...data,
-        // date: Timestamp.now(), // Optionally update date on edit, or keep original
+        targetClassIds: finalTargetClassIds,
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Pengumuman Diperbarui", description: `"${data.title}" berhasil diperbarui.` });
@@ -226,40 +334,120 @@ export default function AnnouncementsPage() {
         <Textarea id={`${dialogType}-announcement-content`} {...formInstance.register("content")} className="mt-1 min-h-[150px]" />
         {(formInstance.formState.errors as any).content && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).content.message}</p>}
       </div>
-      <div>
-        <Label>Target Audiens</Label>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {ROLES.map((roleKey) => (
-            <FormField
-              key={roleKey}
-              control={formInstance.control}
-              name="targetAudience"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value?.includes(roleKey)}
-                      onCheckedChange={(checked) => {
-                        return checked
-                          ? field.onChange([...(field.value || []), roleKey])
-                          : field.onChange(
-                              (field.value || []).filter(
-                                (value) => value !== roleKey
-                              )
-                            );
-                      }}
-                    />
-                  </FormControl>
-                  <FormLabel className="font-normal">
-                    {roleDisplayNames[roleKey]}
-                  </FormLabel>
-                </FormItem>
-              )}
-            />
-          ))}
+
+      {role === 'guru' ? (
+        <>
+          <div>
+            <Label>Target Kelas</Label>
+            {isLoadingTeacherClasses ? (
+              <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
+            ) : teacherClasses.length === 0 ? (
+              <p className="text-sm text-muted-foreground mt-1">Tidak ada kelas yang diajar atau data kelas belum termuat.</p>
+            ) : (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {teacherClasses.map((cls) => (
+                  <FormField
+                    key={cls.id}
+                    control={formInstance.control}
+                    name="targetClassIds"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value?.includes(cls.id)}
+                            onCheckedChange={(checked) => {
+                              return checked
+                                ? field.onChange([...(field.value || []), cls.id])
+                                : field.onChange(
+                                    (field.value || []).filter(
+                                      (value) => value !== cls.id
+                                    )
+                                  );
+                            }}
+                          />
+                        </FormControl>
+                        <FormLabel className="font-normal">
+                          {cls.name}
+                        </FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+            {(formInstance.formState.errors as any).targetClassIds && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetClassIds.message}</p>}
+          </div>
+          <div>
+            <Label>Target Peran di Kelas Tersebut</Label>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {ROLES_FOR_TEACHER_TARGETING.map((roleKey) => (
+                <FormField
+                  key={roleKey}
+                  control={formInstance.control}
+                  name="targetAudience"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value?.includes(roleKey)}
+                          onCheckedChange={(checked) => {
+                            return checked
+                              ? field.onChange([...(field.value || []), roleKey])
+                              : field.onChange(
+                                  (field.value || []).filter(
+                                    (value) => value !== roleKey
+                                  )
+                                );
+                          }}
+                        />
+                      </FormControl>
+                      <FormLabel className="font-normal">
+                        {roleDisplayNames[roleKey]}
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
+              ))}
+            </div>
+            {(formInstance.formState.errors as any).targetAudience && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetAudience.message}</p>}
+          </div>
+        </>
+      ) : ( // Admin or other roles with general targeting
+        <div>
+          <Label>Target Audiens</Label>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {ROLES.map((roleKey) => (
+              <FormField
+                key={roleKey}
+                control={formInstance.control}
+                name="targetAudience"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value?.includes(roleKey)}
+                        onCheckedChange={(checked) => {
+                          return checked
+                            ? field.onChange([...(field.value || []), roleKey])
+                            : field.onChange(
+                                (field.value || []).filter(
+                                  (value) => value !== roleKey
+                                )
+                              );
+                        }}
+                      />
+                    </FormControl>
+                    <FormLabel className="font-normal">
+                      {roleDisplayNames[roleKey]}
+                    </FormLabel>
+                  </FormItem>
+                )}
+              />
+            ))}
+          </div>
+          {(formInstance.formState.errors as any).targetAudience && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetAudience.message}</p>}
         </div>
-        {(formInstance.formState.errors as any).targetAudience && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetAudience.message}</p>}
-      </div>
+      )}
     </>
   );
 
@@ -273,7 +461,7 @@ export default function AnnouncementsPage() {
         {canManageAnnouncements && (
            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
             setIsAddDialogOpen(isOpen);
-            if (!isOpen) { addAnnouncementForm.reset({ title: "", content: "", targetAudience: [] }); addAnnouncementForm.clearErrors(); }
+            if (!isOpen) { addAnnouncementForm.reset({ title: "", content: "", targetAudience: [], targetClassIds: [] }); addAnnouncementForm.clearErrors(); }
           }}>
             <DialogTrigger asChild>
               <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Buat Pengumuman</Button>
@@ -330,10 +518,16 @@ export default function AnnouncementsPage() {
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-xl">{announcement.title}</CardTitle>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1 flex-wrap">
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
                     <span>Untuk: {announcement.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ")}</span>
+                    {announcement.targetClassIds && announcement.targetClassIds.length > 0 && (
+                        <>
+                         <span>&bull;</span>
+                         <span>Kelas: {teacherClasses.filter(tc => announcement.targetClassIds?.includes(tc.id)).map(tc => tc.name).join(", ") || announcement.targetClassIds.join(", ")}</span>
+                        </>
+                    )}
                     {announcement.createdByName && <span>&bull; Oleh: {announcement.createdByName}</span>}
                   </div>
                 </div>
@@ -365,6 +559,7 @@ export default function AnnouncementsPage() {
             <CardContent>
               <p className="text-sm text-foreground whitespace-pre-line line-clamp-3">{announcement.content}</p>
               <Button variant="link" asChild className="p-0 h-auto mt-2 text-primary">
+                {/* TODO: Link to a full announcement page, currently not implemented */}
                 <Link href={`/announcements`}>Baca Selengkapnya</Link>
               </Button>
             </CardContent>
