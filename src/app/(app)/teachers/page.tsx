@@ -34,7 +34,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Users, PlusCircle, Edit, Trash2 } from "lucide-react";
+import Image from "next/image";
 import { useState, useEffect, type ReactNode } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,13 +69,21 @@ interface Teacher {
   name: string;
   email: string;
   subject: string; // Mata pelajaran yang diajar
+  address?: string;
+  phone?: string;
+  gender?: "laki-laki" | "perempuan";
   createdAt?: Timestamp; 
 }
+
+const GENDERS = ["laki-laki", "perempuan"] as const;
 
 const teacherFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }),
   subject: z.string().min(2, { message: "Mata pelajaran minimal 2 karakter." }),
+  address: z.string().trim().optional(),
+  phone: z.string().trim().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal('')),
+  gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
 });
 type TeacherFormValues = z.infer<typeof teacherFormSchema>;
 
@@ -90,6 +107,9 @@ export default function TeachersPage() {
       name: "",
       email: "",
       subject: "",
+      address: "",
+      phone: "",
+      gender: undefined,
     },
   });
 
@@ -108,6 +128,9 @@ export default function TeachersPage() {
         name: docSnap.data().name,
         email: docSnap.data().email,
         subject: docSnap.data().subject,
+        address: docSnap.data().address,
+        phone: docSnap.data().phone,
+        gender: docSnap.data().gender,
         createdAt: docSnap.data().createdAt,
       }));
       setTeachers(fetchedTeachers);
@@ -134,6 +157,9 @@ export default function TeachersPage() {
         name: selectedTeacher.name,
         email: selectedTeacher.email,
         subject: selectedTeacher.subject,
+        address: selectedTeacher.address || "",
+        phone: selectedTeacher.phone || "",
+        gender: selectedTeacher.gender,
       });
     }
   }, [selectedTeacher, isEditTeacherDialogOpen, editTeacherForm]);
@@ -149,16 +175,15 @@ export default function TeachersPage() {
       
       toast({ title: "Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddTeacherDialogOpen(false);
-      addTeacherForm.reset();
+      addTeacherForm.reset({name: "", email: "", subject: "", address: "", phone: "", gender: undefined});
       fetchTeachers(); 
     } catch (error: any) {
       console.error("Error adding teacher:", error);
-       // Check for specific Firestore errors if needed, e.g., permissions
       let errorMessage = "Gagal menambahkan guru.";
       if (error.message && error.message.includes("Missing or insufficient permissions")) {
         errorMessage = "Anda tidak memiliki izin untuk menambahkan guru.";
-      } else if (error.code === "already-exists" ) { // Example for unique constraint if implemented via rules/functions
-        errorMessage = "Email guru sudah terdaftar."; // This would need backend check
+      } else if (error.code === "already-exists" ) { 
+        errorMessage = "Email guru sudah terdaftar."; 
         addTeacherForm.setError("email", { type: "manual", message: errorMessage });
       }
       toast({
@@ -178,6 +203,9 @@ export default function TeachersPage() {
         name: data.name,
         email: data.email,
         subject: data.subject,
+        address: data.address,
+        phone: data.phone,
+        gender: data.gender,
       });
       
       toast({ title: "Data Guru Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -198,7 +226,7 @@ export default function TeachersPage() {
     try {
       await deleteDoc(doc(db, "teachers", teacherId));
       toast({ title: "Data Guru Dihapus", description: `${teacherName || 'Guru'} berhasil dihapus.` });
-      setSelectedTeacher(null); // Clear selection if any
+      setSelectedTeacher(null); 
       fetchTeachers();
     } catch (error) {
       console.error("Error deleting teacher:", error);
@@ -219,6 +247,65 @@ export default function TeachersPage() {
     setSelectedTeacher(teacher); 
   };
 
+  const renderTeacherFormFields = (formInstance: typeof addTeacherForm | typeof editTeacherForm, formType: 'add' | 'edit') => (
+    <>
+      <div>
+        <Label htmlFor={`${formType}-name`}>Nama Lengkap</Label>
+        <Input id={`${formType}-name`} {...formInstance.register("name")} className="mt-1" />
+        {formInstance.formState.errors.name && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-email`}>Email</Label>
+        <Input id={`${formType}-email`} type="email" {...formInstance.register("email")} className="mt-1" />
+        {formInstance.formState.errors.email && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-subject`}>Mata Pelajaran</Label>
+        <Input id={`${formType}-subject`} {...formInstance.register("subject")} className="mt-1" />
+        {formInstance.formState.errors.subject && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.subject.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-address`}>Alamat (Opsional)</Label>
+        <Textarea id={`${formType}-address`} {...formInstance.register("address")} className="mt-1" />
+        {formInstance.formState.errors.address && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-phone`}>Nomor Telepon (Opsional)</Label>
+        <Input id={`${formType}-phone`} type="tel" {...formInstance.register("phone")} className="mt-1" />
+        {formInstance.formState.errors.phone && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.phone.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-gender`}>Jenis Kelamin</Label>
+        <Select
+          onValueChange={(value) => formInstance.setValue("gender", value as "laki-laki" | "perempuan", { shouldValidate: true })}
+          defaultValue={formInstance.getValues("gender")}
+        >
+          <SelectTrigger id={`${formType}-gender`} className="mt-1">
+            <SelectValue placeholder="Pilih jenis kelamin" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="laki-laki">Laki-laki</SelectItem>
+            <SelectItem value="perempuan">Perempuan</SelectItem>
+          </SelectContent>
+        </Select>
+        {formInstance.formState.errors.gender && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.gender.message}</p>
+        )}
+      </div>
+    </>
+  );
+
+
   return (
     <div className="space-y-6">
       <div>
@@ -234,7 +321,7 @@ export default function TeachersPage() {
           <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
             setIsAddTeacherDialogOpen(isOpen);
             if (!isOpen) {
-              addTeacherForm.reset();
+              addTeacherForm.reset({name: "", email: "", subject: "", address: "", phone: "", gender: undefined});
               addTeacherForm.clearErrors();
             }
           }}>
@@ -243,35 +330,15 @@ export default function TeachersPage() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Tambah Guru
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Tambah Guru Baru</DialogTitle>
                 <DialogDescription>
                   Isi detail guru untuk menambahkan data baru.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="add-name">Nama Lengkap</Label>
-                  <Input id="add-name" {...addTeacherForm.register("name")} className="mt-1" />
-                  {addTeacherForm.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">{addTeacherForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-email">Email</Label>
-                  <Input id="add-email" type="email" {...addTeacherForm.register("email")} className="mt-1" />
-                  {addTeacherForm.formState.errors.email && (
-                    <p className="text-sm text-destructive mt-1">{addTeacherForm.formState.errors.email.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-subject">Mata Pelajaran</Label>
-                  <Input id="add-subject" {...addTeacherForm.register("subject")} className="mt-1" />
-                  {addTeacherForm.formState.errors.subject && (
-                    <p className="text-sm text-destructive mt-1">{addTeacherForm.formState.errors.subject.message}</p>
-                  )}
-                </div>
+              <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                {renderTeacherFormFields(addTeacherForm, 'add')}
                 <DialogFooter>
                   <DialogClose asChild>
                      <Button type="button" variant="outline">Batal</Button>
@@ -298,7 +365,10 @@ export default function TeachersPage() {
                   <TableRow>
                     <TableHead>Nama</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
+                    <TableHead>Mapel</TableHead>
+                    <TableHead>Alamat</TableHead>
+                    <TableHead>Telepon</TableHead>
+                    <TableHead>Gender</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -308,6 +378,15 @@ export default function TeachersPage() {
                       <TableCell className="font-medium">{teacher.name}</TableCell>
                       <TableCell>{teacher.email}</TableCell>
                       <TableCell>{teacher.subject}</TableCell>
+                      <TableCell>{teacher.address || "-"}</TableCell>
+                      <TableCell>{teacher.phone || "-"}</TableCell>
+                      <TableCell>
+                        {teacher.gender === "laki-laki" ? 
+                          <Image src="https://placehold.co/24x24.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
+                         teacher.gender === "perempuan" ? 
+                          <Image src="https://placehold.co/24x24.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
+                         "-"}
+                      </TableCell>
                       <TableCell className="text-right space-x-2">
                         <Button variant="outline" size="icon" onClick={() => openEditDialog(teacher)} aria-label={`Edit ${teacher.name}`}>
                           <Edit className="h-4 w-4" />
@@ -318,7 +397,7 @@ export default function TeachersPage() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
-                          {selectedTeacher && selectedTeacher.id === teacher.id && ( // Ensure correct dialog content
+                          {selectedTeacher && selectedTeacher.id === teacher.id && ( 
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
@@ -356,7 +435,7 @@ export default function TeachersPage() {
             editTeacherForm.clearErrors();
           }
       }}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Data Guru</DialogTitle>
             <DialogDescription>
@@ -364,29 +443,9 @@ export default function TeachersPage() {
             </DialogDescription>
           </DialogHeader>
           {selectedTeacher && (
-            <form onSubmit={editTeacherForm.handleSubmit(handleEditTeacherSubmit)} className="space-y-4 py-4">
+            <form onSubmit={editTeacherForm.handleSubmit(handleEditTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Input type="hidden" {...editTeacherForm.register("id")} />
-              <div>
-                <Label htmlFor="edit-name">Nama Lengkap</Label>
-                <Input id="edit-name" {...editTeacherForm.register("name")} className="mt-1" />
-                {editTeacherForm.formState.errors.name && (
-                  <p className="text-sm text-destructive mt-1">{editTeacherForm.formState.errors.name.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-email">Email</Label>
-                <Input id="edit-email" type="email" {...editTeacherForm.register("email")} className="mt-1" />
-                {editTeacherForm.formState.errors.email && (
-                  <p className="text-sm text-destructive mt-1">{editTeacherForm.formState.errors.email.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-subject">Mata Pelajaran</Label>
-                <Input id="edit-subject" {...editTeacherForm.register("subject")} className="mt-1" />
-                {editTeacherForm.formState.errors.subject && (
-                  <p className="text-sm text-destructive mt-1">{editTeacherForm.formState.errors.subject.message}</p>
-                )}
-              </div>
+              {renderTeacherFormFields(editTeacherForm, 'edit')}
               <DialogFooter>
                  <DialogClose asChild>
                     <Button type="button" variant="outline" onClick={() => { setIsEditTeacherDialogOpen(false); setSelectedTeacher(null); }}>Batal</Button>
@@ -402,5 +461,7 @@ export default function TeachersPage() {
     </div>
   );
 }
+
+    
 
     

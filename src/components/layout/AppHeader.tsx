@@ -299,7 +299,7 @@ export function AppHeader() {
   const pageTitle = currentNavItem?.title || "SDN";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background px-4 sm:px-8">
       {/* Left Aligned Items: Mobile Trigger + Page Title */}
       <div className="flex items-center gap-2">
         {isMobile && (
@@ -317,14 +317,14 @@ export function AppHeader() {
 
       {/* Right Aligned Items: Search, Notifications, User Menu */}
       <div className="flex items-center gap-2 sm:gap-4">
-        <form className="relative hidden sm:block flex-1 md:grow-0">
+        {/* <form className="relative hidden sm:block flex-1 md:grow-0">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
               placeholder="Cari..."
               className="w-full rounded-lg bg-muted pl-8 md:w-[200px] lg:w-[320px]"
             />
-        </form>
+        </form> */}
         <NotificationBell />
         <UserNav />
       </div>
