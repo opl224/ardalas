@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -14,12 +14,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, startOfDay } from "date-fns";
+import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -37,6 +37,10 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+
 
 interface ClassMin { id: string; name: string; }
 interface StudentMin { id: string; name: string; }
@@ -51,6 +55,17 @@ interface StudentAttendanceRecord {
   notes?: string;
 }
 
+interface MonthlyAttendanceSummary {
+  studentId: string;
+  studentName: string;
+  hadir: number;
+  sakit: number;
+  izin: number;
+  alpa: number;
+  totalDays: number; // Total instructional days in the month for this class
+}
+
+
 const attendanceFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
   date: z.date({ required_error: "Tanggal harus diisi." }),
@@ -63,6 +78,14 @@ const attendanceFormSchema = z.object({
 });
 type AttendanceFormValues = z.infer<typeof attendanceFormSchema>;
 
+const months = [
+  { value: 0, label: "Januari" }, { value: 1, label: "Februari" }, { value: 2, label: "Maret" },
+  { value: 3, label: "April" }, { value: 4, label: "Mei" }, { value: 5, label: "Juni" },
+  { value: 6, label: "Juli" }, { value: 7, label: "Agustus" }, { value: 8, label: "September" },
+  { value: 9, label: "Oktober" }, { value: 10, label: "November" }, { value: 11, label: "Desember" }
+];
+
+
 export default function AttendancePage() {
   const { user, role, loading: authLoading } = useAuth(); 
   const [classes, setClasses] = useState<ClassMin[]>([]);
@@ -74,6 +97,12 @@ export default function AttendancePage() {
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>();
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [existingAttendanceDocId, setExistingAttendanceDocId] = useState<string | null>(null);
+
+  // State for export
+  const [selectedExportMonth, setSelectedExportMonth] = useState<number>(getMonth(new Date()));
+  const [selectedExportYear, setSelectedExportYear] = useState<number>(getYear(new Date()));
+  const [isExporting, setIsExporting] = useState(false);
+
 
   const { toast } = useToast();
 
@@ -92,8 +121,8 @@ export default function AttendancePage() {
   });
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to load
-    if (!role || !["admin", "guru"].includes(role)) return; // Early exit if not authorized
+    if (authLoading) return; 
+    if (!role || !["admin", "guru"].includes(role)) return; 
 
     const fetchClasses = async () => {
       setIsLoadingClasses(true);
@@ -121,7 +150,6 @@ export default function AttendancePage() {
       setIsLoadingStudents(true);
       form.setValue("studentAttendances", []); 
       try {
-        // Assumes students have 'classId' field that matches doc ID from 'classes'
         const studentsQuery = query(collection(db, "students"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
 
@@ -241,9 +269,8 @@ export default function AttendancePage() {
       recordedById: user.uid,
       recordedByName: user.displayName || user.email || "N/A",
       lastUpdatedAt: serverTimestamp(),
-      createdAt: existingAttendanceDocId ? undefined : serverTimestamp(), // Only set createdAt on new doc
+      createdAt: existingAttendanceDocId ? undefined : serverTimestamp(), 
     };
-    // Remove createdAt if it's undefined to avoid writing it during an update
     if (attendanceData.createdAt === undefined) {
       delete attendanceData.createdAt;
     }
@@ -252,7 +279,6 @@ export default function AttendancePage() {
     try {
       let docIdToSave = existingAttendanceDocId;
       if (!docIdToSave) {
-        // Firestore will auto-generate an ID if we don't specify one for a new doc
         docIdToSave = doc(collection(db, "attendances")).id; 
       }
       
@@ -284,6 +310,269 @@ export default function AttendancePage() {
       setExistingAttendanceDocId(null); 
     }
   };
+
+  // --- Export Functions ---
+  const handleExportDailyExcel = () => {
+    if (!selectedClassId || !selectedDate || fields.length === 0) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const formattedDate = format(selectedDate, "yyyy-MM-dd", { locale: indonesiaLocale });
+      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${formattedDate}.xlsx`;
+
+      const dataToExport = fields.map(record => ({
+        "Nama Siswa": record.studentName,
+        "Status": record.status,
+        "Catatan": record.notes || "",
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `Kehadiran ${formattedDate}`);
+      
+      // Add header row with class and date info
+      XLSX.utils.sheet_add_aoa(worksheet, [
+        [`Laporan Kehadiran Harian - Kelas: ${className} - Tanggal: ${format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale })}`],
+        [] // Empty row for spacing
+      ], { origin: "A1" });
+
+
+      // Adjust column widths (optional, basic example)
+      const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
+      worksheet['!cols'] = cols;
+
+      XLSX.writeFile(workbook, fileName);
+      toast({ title: "Ekspor Berhasil", description: `${fileName} telah diunduh.` });
+    } catch (error) {
+      console.error("Error exporting daily to Excel:", error);
+      toast({ title: "Gagal Mengekspor ke Excel", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportDailyPdf = () => {
+    if (!selectedClassId || !selectedDate || fields.length === 0) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const formattedDate = format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale });
+      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Laporan Kehadiran Harian`, 14, 15);
+      doc.setFontSize(12);
+      doc.text(`Kelas: ${className}`, 14, 22);
+      doc.text(`Tanggal: ${formattedDate}`, 14, 29);
+
+      const tableColumn = ["No", "Nama Siswa", "Status", "Catatan"];
+      const tableRows: (string | number)[][] = [];
+
+      fields.forEach((record, index) => {
+        const attendanceData = [
+          index + 1,
+          record.studentName,
+          record.status,
+          record.notes || "-",
+        ];
+        tableRows.push(attendanceData);
+      });
+
+      autoTable(doc, {
+        startY: 35,
+        head: [tableColumn],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [22, 160, 133] }, // Example color
+      });
+
+      doc.save(fileName);
+      toast({ title: "Ekspor PDF Berhasil", description: `${fileName} telah diunduh.` });
+    } catch (error) {
+      console.error("Error exporting daily to PDF:", error);
+      toast({ title: "Gagal Mengekspor ke PDF", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const generateMonthlyAttendanceSummary = async (classId: string, year: number, month: number): Promise<MonthlyAttendanceSummary[]> => {
+    const startDate = startOfDay(setMonth(setYear(new Date(), year), month));
+    const endDate = lastDayOfMonth(startDate);
+
+    const studentsSnapshot = await getDocs(query(collection(db, "students"), where("classId", "==", classId), orderBy("name")));
+    const classStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+
+    const studentSummaries: Record<string, MonthlyAttendanceSummary> = {};
+    classStudents.forEach(student => {
+        studentSummaries[student.id] = {
+            studentId: student.id,
+            studentName: student.name,
+            hadir: 0, sakit: 0, izin: 0, alpa: 0,
+            totalDays: 0, // Placeholder, can be calculated based on actual attendance days or school days
+        };
+    });
+    
+    const attendanceQuery = query(
+        collection(db, "attendances"),
+        where("classId", "==", classId),
+        where("date", ">=", Timestamp.fromDate(startDate)),
+        where("date", "<=", Timestamp.fromDate(endDate))
+    );
+    const attendanceSnapshot = await getDocs(attendanceQuery);
+    const attendedDaysPerStudent: Record<string, Set<string>> = {};
+
+
+    attendanceSnapshot.docs.forEach(docSnap => {
+        const attendanceDayData = docSnap.data() as Omit<AttendanceFormValues, 'date'> & { date: Timestamp };
+        const dateStr = format(attendanceDayData.date.toDate(), "yyyy-MM-dd");
+
+        attendanceDayData.studentAttendances.forEach(record => {
+            if (studentSummaries[record.studentId]) {
+                 if (!attendedDaysPerStudent[record.studentId]) {
+                    attendedDaysPerStudent[record.studentId] = new Set();
+                }
+                attendedDaysPerStudent[record.studentId].add(dateStr);
+
+                switch (record.status) {
+                    case "Hadir": studentSummaries[record.studentId].hadir++; break;
+                    case "Sakit": studentSummaries[record.studentId].sakit++; break;
+                    case "Izin": studentSummaries[record.studentId].izin++; break;
+                    case "Alpa": studentSummaries[record.studentId].alpa++; break;
+                }
+            }
+        });
+    });
+
+    Object.keys(studentSummaries).forEach(studentId => {
+        studentSummaries[studentId].totalDays = attendedDaysPerStudent[studentId] ? attendedDaysPerStudent[studentId].size : 0;
+    });
+
+    return Object.values(studentSummaries);
+};
+
+
+  const handleExportMonthlyExcel = async () => {
+     if (!selectedClassId || selectedExportMonth === null || !selectedExportYear) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
+      if (summaryData.length === 0) {
+        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
+        return;
+      }
+
+      const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
+      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.xlsx`;
+
+      const dataToExport = summaryData.map(record => ({
+        "Nama Siswa": record.studentName,
+        "Hadir": record.hadir,
+        "Sakit": record.sakit,
+        "Izin": record.izin,
+        "Alpa": record.alpa,
+        "Total Hari Tercatat": record.totalDays,
+      }));
+      
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, `${monthName} ${selectedExportYear}`);
+      
+      XLSX.utils.sheet_add_aoa(worksheet, [
+        [`Laporan Kehadiran Bulanan - Kelas: ${className}`],
+        [`Bulan: ${monthName} ${selectedExportYear}`],
+        [] 
+      ], { origin: "A1" });
+
+      const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(15, key.length + 2) }));
+      worksheet['!cols'] = cols;
+
+      XLSX.writeFile(workbook, fileName);
+      toast({ title: "Ekspor Bulanan Berhasil", description: `${fileName} telah diunduh.` });
+
+    } catch (error) {
+        console.error("Error exporting monthly to Excel:", error);
+        toast({ title: "Gagal Mengekspor Rekap Bulanan Excel", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+  const handleExportMonthlyPdf = async () => {
+    if (!selectedClassId || selectedExportMonth === null || !selectedExportYear) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
+       if (summaryData.length === 0) {
+        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
+        return;
+      }
+
+      const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
+      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.pdf`;
+
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Laporan Kehadiran Bulanan`, 14, 15);
+      doc.setFontSize(12);
+      doc.text(`Kelas: ${className}`, 14, 22);
+      doc.text(`Bulan: ${monthName} ${selectedExportYear}`, 14, 29);
+
+      const tableColumn = ["No", "Nama Siswa", "Hadir", "Sakit", "Izin", "Alpa", "Total Hari"];
+      const tableRows: (string | number)[][] = [];
+
+      summaryData.forEach((record, index) => {
+        const rowData = [
+          index + 1,
+          record.studentName,
+          record.hadir,
+          record.sakit,
+          record.izin,
+          record.alpa,
+          record.totalDays,
+        ];
+        tableRows.push(rowData);
+      });
+      
+      autoTable(doc, {
+        startY: 35,
+        head: [tableColumn],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [41, 128, 185] }, // Example color
+      });
+
+      doc.save(fileName);
+      toast({ title: "Ekspor PDF Bulanan Berhasil", description: `${fileName} telah diunduh.` });
+
+
+    } catch (error) {
+        console.error("Error exporting monthly to PDF:", error);
+        toast({ title: "Gagal Mengekspor Rekap Bulanan PDF", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
 
   if (authLoading) {
     return (
@@ -465,6 +754,94 @@ export default function AttendancePage() {
           </CardContent>
         </Card>
       </form>
+
+      {/* Export Card */}
+      <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-6 w-6 text-primary" />
+            <span>Rekap & Ekspor Kehadiran</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <Label htmlFor="exportClassId">Kelas (untuk Rekap)</Label>
+              <Select
+                value={selectedClassId} // Re-use selectedClassId from main form for context
+                onValueChange={(value) => setSelectedClassId(value)} // Allow changing context for export
+                disabled={isLoadingClasses || isExporting}
+              >
+                <SelectTrigger id="exportClassId" className="mt-1">
+                  <SelectValue placeholder={isLoadingClasses ? "Memuat..." : "Pilih kelas"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="exportMonth">Bulan (untuk Rekap Bulanan)</Label>
+              <Select
+                value={selectedExportMonth.toString()}
+                onValueChange={(value) => setSelectedExportMonth(parseInt(value))}
+                disabled={isExporting}
+              >
+                <SelectTrigger id="exportMonth" className="mt-1">
+                  <SelectValue placeholder="Pilih bulan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {months.map(m => <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="exportYear">Tahun (untuk Rekap Bulanan)</Label>
+              <Input
+                id="exportYear"
+                type="number"
+                value={selectedExportYear}
+                onChange={(e) => setSelectedExportYear(parseInt(e.target.value))}
+                className="mt-1"
+                placeholder="Contoh: 2024"
+                disabled={isExporting}
+              />
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="grid grid-cols-2 md:grid-cols-4 gap-4">
+           <Button 
+            onClick={handleExportDailyExcel} 
+            disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}
+           >
+            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian
+          </Button>
+          <Button 
+            onClick={handleExportDailyPdf} 
+            disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}
+            variant="outline"
+          >
+            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <FileDown className="mr-2 h-4 w-4" /> PDF Harian
+          </Button>
+          <Button 
+            onClick={handleExportMonthlyExcel} 
+            disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}
+          >
+            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan
+          </Button>
+          <Button 
+            onClick={handleExportMonthlyPdf} 
+            disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}
+            variant="outline"
+          >
+            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <FileDown className="mr-2 h-4 w-4" /> PDF Bulanan
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
