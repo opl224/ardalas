@@ -17,11 +17,12 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, UserCircle } from "lucide-react";
+import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft } from "lucide-react"; // Added PanelLeft
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { SidebarTrigger } from "../ui/sidebar";
+import { useSidebar } from "@/components/ui/sidebar"; // Import useSidebar
+import { SheetTrigger } from "@/components/ui/sheet"; // Import SheetTrigger
 import { useState, useEffect, type ReactNode } from "react";
 import {
   collection,
@@ -37,14 +38,14 @@ import {
 } from "firebase/firestore";
 
 interface NotificationDoc {
-  id: string; // Firestore document ID
+  id: string; 
   title: string;
   description: string;
   read: boolean;
-  createdAt: Timestamp | null; // Allow null for robustness
+  createdAt: Timestamp | null; 
   href?: string;
   type?: string;
-  userId?: string; // Ensure this field exists for querying
+  userId?: string; 
 }
 
 function NotificationBell() {
@@ -54,7 +55,7 @@ function NotificationBell() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (!user || !user.uid) { // Add check for user.uid
+    if (!user || !user.uid) { 
       setNotifications([]);
       setUnreadCount(0);
       return;
@@ -74,13 +75,11 @@ function NotificationBell() {
         const fetchedNotifications: NotificationDoc[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          // Ensure createdAt exists and is a Firestore Timestamp before pushing
-          // Also ensure other critical fields exist
           fetchedNotifications.push({ 
             id: docSnap.id, 
             title: data.title || "Tanpa Judul",
             description: data.description || "",
-            read: data.read === true, // Ensure boolean
+            read: data.read === true, 
             createdAt: data.createdAt instanceof Timestamp ? data.createdAt : null,
             href: data.href,
             type: data.type,
@@ -108,7 +107,6 @@ function NotificationBell() {
     const notificationRef = doc(db, "notifications", id);
     try {
       await updateDoc(notificationRef, { read: true });
-      // Optimistic update handled by onSnapshot
     } catch (error) {
       console.error("Error marking notification as read:", error);
       toast({
@@ -130,7 +128,6 @@ function NotificationBell() {
     });
     try {
       await batch.commit();
-      // Optimistic update handled by onSnapshot
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       toast({
@@ -266,7 +263,7 @@ function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings/profile"> {/* Assuming a profile settings page exists */}
+          <Link href="/settings/profile"> 
             <UserCircle className="mr-2 h-4 w-4" />
             <span>Profil</span>
           </Link>
@@ -290,14 +287,20 @@ function UserNav() {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar(); // Get isMobile and setOpenMobile
   const currentNavItem = navItems.find(item => item.href === pathname || (item.href !== "/dashboard" && pathname.startsWith(item.href)));
   const pageTitle = currentNavItem?.title || "EduCentral";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 px-4 shadow-sm backdrop-blur-md sm:px-6">
-      <div className="md:hidden"> 
-        <SidebarTrigger />
-      </div>
+      {isMobile && (
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Sidebar</span>
+          </Button>
+        </SheetTrigger>
+      )}
       
       <div className="flex items-center gap-2">
         <h1 className="text-xl font-semibold font-headline">{pageTitle}</h1>
