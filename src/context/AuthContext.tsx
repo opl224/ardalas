@@ -4,7 +4,7 @@
 import type { User as FirebaseUser } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 import type { Role } from "@/config/roles";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, Timestamp } from "firebase/firestore";
 // Import React and other hooks/types explicitly
 import React, { useEffect, useContext, createContext, useState, type ReactNode } from "react";
 
@@ -36,36 +36,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // Fetch user role and other details from Firestore
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
-        let userProfileData: UserProfile = { ...firebaseUser } as UserProfile; // Cast to include custom fields
+        let userProfileData: UserProfile = { 
+          ...firebaseUser,
+          // displayName will be initially from firebaseUser, can be overridden below
+        } as UserProfile; 
 
         if (userDocSnap.exists()) {
           const firestoreData = userDocSnap.data();
           userProfileData.role = firestoreData?.role as Role | undefined;
           setRole(userProfileData.role || null);
 
+          // Prioritize name from Firestore for displayName if Firebase Auth displayName is missing
+          if (!userProfileData.displayName && firestoreData?.name) {
+            userProfileData.displayName = firestoreData.name;
+          }
+          // Still ensure it's at least an empty string or null if both are missing
+          userProfileData.displayName = userProfileData.displayName || firestoreData?.name || null;
+
+
           if (userProfileData.role === 'guru') {
             userProfileData.assignedClassIds = firestoreData?.assignedClassIds || [];
           } else if (userProfileData.role === 'siswa') {
             userProfileData.classId = firestoreData?.classId;
-            // Assuming student documents in 'users' collection might have 'className'
-            // If not, this will be undefined, and we'll need to fetch it from 'classes' collection
-            // based on classId when displaying or storing submission.
-            // For now, let's assume it *could* be there.
-            const studentDocRef = doc(db, "students", firebaseUser.uid); // Students specific data might be in 'students' collection
-            const studentDocSnap = await getDoc(studentDocRef);
-            if (studentDocSnap.exists()) {
-                userProfileData.classId = studentDocSnap.data()?.classId;
-                userProfileData.className = studentDocSnap.data()?.className;
-            } else { // Fallback to users collection if not in students, or if students collection isn't the primary source for this
-                 userProfileData.classId = firestoreData?.classId; // classId from 'users' doc
-                 userProfileData.className = firestoreData?.className; // className from 'users' doc
-            }
+            userProfileData.className = firestoreData?.className;
 
-            // If className is still not found, try to fetch from classes collection
             if (userProfileData.classId && !userProfileData.className) {
                 const classDocRef = doc(db, "classes", userProfileData.classId);
                 const classDocSnap = await getDoc(classDocRef);
@@ -74,6 +71,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 }
             }
           }
+        } else {
+          // User exists in Auth but not in Firestore users collection (should ideally not happen post-registration)
+          // Fallback to FirebaseUser's displayName if any, role would be null
+           userProfileData.displayName = firebaseUser.displayName || null;
+           setRole(null);
         }
         setUser(userProfileData);
       } else {
@@ -100,6 +102,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    
-    

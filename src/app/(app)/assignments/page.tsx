@@ -301,7 +301,7 @@ export default function AssignmentsPage() {
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (authLoading) {
       setIsLoading(true); 
       return;
@@ -328,6 +328,7 @@ export default function AssignmentsPage() {
     } else if (isTeacherOrAdminRole) {
       fetchAssignments(); 
     } else {
+      // Should not happen if roles are correctly assigned
       setAssignments([]);
       setIsLoading(false);
     }
@@ -444,8 +445,8 @@ export default function AssignmentsPage() {
   };
 
   const handleStudentSubmitAssignment: SubmitHandler<StudentSubmissionFormValues> = async (data) => {
-    if (!user || !selectedAssignmentForSubmission || !user.uid || !user.displayName || !user.classId) {
-      toast({ title: "Aksi Gagal", description: "Data pengguna atau tugas tidak lengkap.", variant: "destructive" });
+    if (!user || !selectedAssignmentForSubmission || !user.uid || !user.displayName || !user.classId || !user.className) {
+      toast({ title: "Aksi Gagal", description: "Data pengguna (nama, ID kelas, atau nama kelas) atau data tugas tidak lengkap. Harap logout dan login kembali, atau hubungi admin jika masalah berlanjut.", variant: "destructive" });
       return;
     }
 
@@ -456,7 +457,7 @@ export default function AssignmentsPage() {
       studentId: user.uid,
       studentName: user.displayName,
       classId: user.classId,
-      className: user.className || "", // Assuming className is in AuthContext user
+      className: user.className, 
       submissionLink: data.submissionLink,
       submittedAt: Timestamp.now(),
       notes: data.notes,
@@ -659,9 +660,9 @@ export default function AssignmentsPage() {
             <DialogHeader>
               <DialogTitle>Kerjakan Tugas: {selectedAssignmentForSubmission.title}</DialogTitle>
               <DialogDescription>
-                <p className="text-sm text-muted-foreground">Mata Pelajaran: {selectedAssignmentForSubmission.subjectName}</p>
-                <p className="text-sm text-muted-foreground">Batas Waktu: {format(selectedAssignmentForSubmission.dueDate.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
-                {selectedAssignmentForSubmission.description && <p className="mt-2 whitespace-pre-line">{selectedAssignmentForSubmission.description}</p>}
+                <div>Mata Pelajaran: {selectedAssignmentForSubmission.subjectName}</div>
+                <div>Batas Waktu: {format(selectedAssignmentForSubmission.dueDate.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</div>
+                {selectedAssignmentForSubmission.description && <div className="mt-2 whitespace-pre-line">{selectedAssignmentForSubmission.description}</div>}
                 {selectedAssignmentForSubmission.fileURL && (
                     <Button variant="link" asChild className="p-0 h-auto mt-2">
                         <Link href={selectedAssignmentForSubmission.fileURL} target="_blank" rel="noopener noreferrer">
