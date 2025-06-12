@@ -14,52 +14,127 @@ import {
 import { Input } from "@/components/ui/input";
 import { navItems } from "@/config/nav";
 import { useAuth } from "@/context/AuthContext";
-import { auth } from "@/lib/firebase/config";
+import { auth, db } from "@/lib/firebase/config"; // Added db
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, UserCircle, AlertCircle } from "lucide-react";
+import { Bell, LogOut, Search, Settings, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { SidebarTrigger } from "../ui/sidebar";
-import { useState, useEffect, type ReactNode } from "react"; // Added ReactNode
+import { useState, useEffect, type ReactNode } from "react";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  onSnapshot,
+  doc,
+  updateDoc,
+  writeBatch,
+  Timestamp, // Added Timestamp
+} from "firebase/firestore";
 
-interface MockNotification {
-  id: string;
+interface NotificationDoc {
+  id: string; // Firestore document ID
   title: string;
   description: string;
   read: boolean;
-  createdAt: Date;
+  createdAt: Timestamp; // Firestore Timestamp
   href?: string;
+  // userId: string; // Field to target the user, assumed in Firestore documents
+  type?: string;
 }
 
 function NotificationBell() {
-  const [notifications, setNotifications] = useState<MockNotification[]>([]);
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<NotificationDoc[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate fetching notifications
-    const mockData: MockNotification[] = [
-      { id: "1", title: "Pengumuman Baru: Libur Sekolah", description: "Kegiatan belajar mengajar diliburkan...", read: false, createdAt: new Date(Date.now() - 3600000) }, // 1 hour ago
-      { id: "2", title: "Tugas Matematika Dikumpulkan Besok", description: "Jangan lupa kumpulkan tugas Bab 3.", read: true, createdAt: new Date(Date.now() - 86400000) }, // 1 day ago
-      { id: "3", title: "Acara Sekolah: Pentas Seni", description: "Pentas seni akan diadakan hari Sabtu.", read: false, createdAt: new Date(Date.now() - 172800000) }, // 2 days ago
-    ];
-    setNotifications(mockData);
-    setUnreadCount(mockData.filter(n => !n.read).length);
-  }, []);
+    if (!user) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
 
-  const handleMarkAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
+    const notificationsRef = collection(db, "notifications");
+    // Query for notifications targeted to the current user, ordered by creation time
+    const q = query(
+      notificationsRef,
+      where("userId", "==", user.uid), // Assuming 'userId' field exists on notification docs
+      orderBy("createdAt", "desc"),
+      limit(10) // Limit to a reasonable number for the dropdown
     );
-    setUnreadCount(prev => prev > 0 ? prev - 1 : 0);
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedNotifications: NotificationDoc[] = [];
+        snapshot.forEach((doc) => {
+          fetchedNotifications.push({ id: doc.id, ...doc.data() } as NotificationDoc);
+        });
+        setNotifications(fetchedNotifications);
+        setUnreadCount(fetchedNotifications.filter(n => !n.read).length);
+      },
+      (error) => {
+        console.error("Error fetching notifications:", error);
+        toast({
+          title: "Gagal Memuat Notifikasi",
+          description: "Terjadi kesalahan saat mengambil notifikasi.",
+          variant: "destructive",
+        });
+      }
+    );
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, [user, toast]);
+
+  const handleMarkAsRead = async (id: string) => {
+    if (!user) return;
+    const notificationRef = doc(db, "notifications", id);
+    try {
+      await updateDoc(notificationRef, { read: true });
+      // Optimistic update for UI, or rely on onSnapshot to refresh
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, read: true } : n)
+      );
+      setUnreadCount(prev => prev > 0 ? prev - 1 : 0);
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      toast({
+        title: "Update Notifikasi Gagal",
+        description: "Gagal menandai notifikasi sebagai dibaca.",
+        variant: "destructive",
+      });
+    }
   };
   
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
+  const handleMarkAllAsRead = async () => {
+    if (!user || unreadCount === 0) return;
+    const batch = writeBatch(db);
+    notifications.forEach(notification => {
+      if (!notification.read) {
+        const notificationRef = doc(db, "notifications", notification.id);
+        batch.update(notificationRef, { read: true });
+      }
+    });
+    try {
+      await batch.commit();
+      // Optimistic update or rely on onSnapshot
+       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+       setUnreadCount(0);
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      toast({
+        title: "Update Notifikasi Gagal",
+        description: "Gagal menandai semua notifikasi sebagai dibaca.",
+        variant: "destructive",
+      });
+    }
   };
-
 
   return (
     <DropdownMenu>
@@ -77,7 +152,7 @@ function NotificationBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-80 bg-popover/90 backdrop-blur-md" align="end">
         <DropdownMenuLabel className="flex justify-between items-center">
-          <span>Notifikasi</span>
+          <span>Notifikasi ({unreadCount})</span>
           {unreadCount > 0 && (
             <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={handleMarkAllAsRead}>
               Tandai semua dibaca
@@ -87,10 +162,10 @@ function NotificationBell() {
         <DropdownMenuSeparator />
         {notifications.length === 0 ? (
           <DropdownMenuItem disabled className="justify-center text-muted-foreground">
-            Tidak ada notifikasi baru.
+            Tidak ada notifikasi.
           </DropdownMenuItem>
         ) : (
-          notifications.slice(0, 5).map(notification => ( // Show max 5 notifications
+          notifications.slice(0, 5).map(notification => (
             <DropdownMenuItem 
               key={notification.id} 
               className={cn("flex flex-col items-start gap-1", !notification.read && "bg-accent/50")}
@@ -102,7 +177,7 @@ function NotificationBell() {
                     <p className="font-semibold text-sm">{notification.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/70">
-                      {notification.createdAt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      {notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </p>
                  </Link>
               ) : (
@@ -110,7 +185,7 @@ function NotificationBell() {
                   <p className="font-semibold text-sm">{notification.title}</p>
                   <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                    <p className="text-xs text-muted-foreground/70">
-                      {notification.createdAt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                     {notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                     </p>
                 </div>
               )}
@@ -121,7 +196,6 @@ function NotificationBell() {
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild className="justify-center">
-              {/* In a real app, this would link to a dedicated notifications page */}
               <Link href="/notifications" className="text-sm text-primary">Lihat Semua Notifikasi</Link>
             </DropdownMenuItem>
           </>
@@ -183,7 +257,7 @@ function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/settings/profile">
+          <Link href="/settings/profile"> {/* Assuming a profile settings page exists */}
             <UserCircle className="mr-2 h-4 w-4" />
             <span>Profil</span>
           </Link>
@@ -236,3 +310,4 @@ export function AppHeader() {
   );
 }
 
+    
