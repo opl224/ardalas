@@ -299,22 +299,25 @@ export function AppHeader() {
   const pageTitle = currentNavItem?.title || "SDN";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background px-4 sm:px-6">
-      {isMobile && (
-        <SheetTrigger asChild>
-          <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
-            <PanelLeft className="h-5 w-5" />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
-        </SheetTrigger>
-      )}
-      
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background px-4 sm:px-6">
+      {/* Left Aligned Items: Mobile Trigger + Page Title */}
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold font-headline">{pageTitle}</h1>
+        {isMobile && (
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
+              <PanelLeft className="h-5 w-5" />
+              <span className="sr-only">Toggle Sidebar</span>
+            </Button>
+          </SheetTrigger>
+        )}
+        <div className="flex items-center"> {/* Wrapper for title only */}
+          <h1 className="text-xl font-semibold font-headline">{pageTitle}</h1>
+        </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-2 sm:gap-4">
-        <form className="relative ml-auto hidden sm:block flex-1 md:grow-0">
+      {/* Right Aligned Items: Search, Notifications, User Menu */}
+      <div className="flex items-center gap-2 sm:gap-4">
+        <form className="relative hidden sm:block flex-1 md:grow-0">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="search"
