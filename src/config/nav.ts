@@ -44,7 +44,7 @@ export const navItems: NavItem[] = [
     roles: ["admin", "guru", "siswa"], // Visible to admin, guru, and siswa
     children: [
       { title: "Guru", href: "/teachers", icon: Users, roles: ["admin"] },
-      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru", "siswa"] }, // Siswa can now access
+      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru", "siswa"] },
       { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin"] },
     ],
   },
@@ -81,7 +81,15 @@ export const navItems: NavItem[] = [
       { title: "Pesan", href: "/messages", icon: MessageSquare }, 
     ],
   },
-  { title: "Pengaturan", href: "/settings", icon: Settings }, 
+  { 
+    title: "Pengaturan", 
+    href: "#", // Parent item, no direct link
+    icon: Settings,
+    children: [
+      { title: "Profil", href: "/settings/profile", icon: UserCircle }
+      // Tambahkan item pengaturan lain di sini jika perlu
+    ]
+  }, 
 ];
 
 // bottomNavItems sekarang hanya untuk referensi, Pengaturan sudah dipindah
