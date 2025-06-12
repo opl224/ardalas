@@ -33,7 +33,7 @@ import {
   doc,
   updateDoc,
   writeBatch,
-  Timestamp, // Added Timestamp
+  Timestamp, 
 } from "firebase/firestore";
 
 interface NotificationDoc {
@@ -43,7 +43,6 @@ interface NotificationDoc {
   read: boolean;
   createdAt: Timestamp; // Firestore Timestamp
   href?: string;
-  // userId: string; // Field to target the user, assumed in Firestore documents
   type?: string;
 }
 
@@ -61,12 +60,11 @@ function NotificationBell() {
     }
 
     const notificationsRef = collection(db, "notifications");
-    // Query for notifications targeted to the current user, ordered by creation time
     const q = query(
       notificationsRef,
-      where("userId", "==", user.uid), // Assuming 'userId' field exists on notification docs
+      where("userId", "==", user.uid), 
       orderBy("createdAt", "desc"),
-      limit(10) // Limit to a reasonable number for the dropdown
+      limit(10) 
     );
 
     const unsubscribe = onSnapshot(
@@ -74,7 +72,17 @@ function NotificationBell() {
       (snapshot) => {
         const fetchedNotifications: NotificationDoc[] = [];
         snapshot.forEach((doc) => {
-          fetchedNotifications.push({ id: doc.id, ...doc.data() } as NotificationDoc);
+          // Ensure createdAt is a Timestamp before pushing
+          const data = doc.data();
+          if (data.createdAt instanceof Timestamp) {
+            fetchedNotifications.push({ id: doc.id, ...data } as NotificationDoc);
+          } else {
+            // Handle cases where createdAt might not be a Timestamp or is missing
+            // For example, log an error or provide a default date
+            console.warn(`Notification with ID ${doc.id} has invalid createdAt field.`);
+            // Optionally push with a placeholder date or skip
+            // fetchedNotifications.push({ id: doc.id, ...data, createdAt: Timestamp.now() } as NotificationDoc); 
+          }
         });
         setNotifications(fetchedNotifications);
         setUnreadCount(fetchedNotifications.filter(n => !n.read).length);
@@ -89,7 +97,7 @@ function NotificationBell() {
       }
     );
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe(); 
   }, [user, toast]);
 
   const handleMarkAsRead = async (id: string) => {
@@ -97,7 +105,6 @@ function NotificationBell() {
     const notificationRef = doc(db, "notifications", id);
     try {
       await updateDoc(notificationRef, { read: true });
-      // Optimistic update for UI, or rely on onSnapshot to refresh
       setNotifications(prev => 
         prev.map(n => n.id === id ? { ...n, read: true } : n)
       );
@@ -123,7 +130,6 @@ function NotificationBell() {
     });
     try {
       await batch.commit();
-      // Optimistic update or rely on onSnapshot
        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
        setUnreadCount(0);
     } catch (error) {
@@ -177,7 +183,9 @@ function NotificationBell() {
                     <p className="font-semibold text-sm">{notification.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/70">
-                      {notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {notification.createdAt && typeof notification.createdAt.toDate === 'function' 
+                        ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                        : "Tanggal tidak valid"}
                     </p>
                  </Link>
               ) : (
@@ -185,7 +193,9 @@ function NotificationBell() {
                   <p className="font-semibold text-sm">{notification.title}</p>
                   <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
                    <p className="text-xs text-muted-foreground/70">
-                     {notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                     {notification.createdAt && typeof notification.createdAt.toDate === 'function'
+                       ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                       : "Tanggal tidak valid"}
                     </p>
                 </div>
               )}
@@ -309,5 +319,3 @@ export function AppHeader() {
     </header>
   );
 }
-
-    
