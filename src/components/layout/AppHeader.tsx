@@ -76,7 +76,11 @@ function NotificationBell() {
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
           // Ensure createdAt is a Firestore Timestamp or null
-          const createdAtTimestamp = data.createdAt instanceof Timestamp ? data.createdAt : null;
+          let createdAtTimestamp: Timestamp | null = null;
+          if (data.createdAt instanceof Timestamp) {
+            createdAtTimestamp = data.createdAt;
+          }
+
 
           fetchedNotifications.push({ 
             id: docSnap.id, 
@@ -295,7 +299,7 @@ export function AppHeader() {
   const pageTitle = currentNavItem?.title || "SDN";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-background px-4 sm:px-6">
       {isMobile && (
         <SheetTrigger asChild>
           <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
@@ -324,4 +328,3 @@ export function AppHeader() {
     </header>
   );
 }
-

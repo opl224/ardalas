@@ -14,7 +14,7 @@ import { auth } from "@/lib/firebase/config";
 import { useToast } from "@/hooks/use-toast";
 import {
   Sidebar,
-  SidebarHeader,
+  // SidebarHeader, // No longer used directly here for desktop trigger
   SidebarContent,
   SidebarFooter,
   SidebarMenu,
@@ -23,7 +23,6 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  SidebarTrigger as DesktopSidebarTrigger, 
   useSidebar, 
 } from "@/components/ui/sidebar";
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -139,19 +138,17 @@ export function AppSidebar() {
     }
   };
 
-  const sidebarSharedContent = (
+  const sidebarDesktopContent = (
     <>
-      <SidebarHeader className="p-5 border-b border-border/50">
-        <div id="mobile-sidebar-title-component" className="flex items-center justify-between">
-          <AppLogo />
-        </div>
-      </SidebarHeader>
+      <div className="flex h-16 items-center border-b border-border px-4"> {/* Adjusted for header height and border */}
+         <AppLogo />
+      </div>
       <SidebarContent className="flex-1 p-2 overflow-y-auto">
         <SidebarMenu>
           {renderNavItemsRecursive(navItems, pathname, role)}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="p-2 border-t border-border/50">
+      <SidebarFooter className="p-2 border-t border-border">
         <SidebarMenu>
           {user && (
             <SidebarMenuItem>
@@ -178,18 +175,18 @@ export function AppSidebar() {
         className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground flex flex-col"
         aria-labelledby="mobile-sidebar-title-component" 
       >
-        <SheetHeader className="p-4 border-b border-border/50">
-          <div id="mobile-sidebar-title-component" className="flex items-center justify-between">
+        <SheetHeader className="p-4 border-b border-border">
+          <div className="flex items-center justify-between">
              <AppLogo />
           </div>
-          <SheetTitle id="mobile-sidebar-title-component-sr" className="sr-only">Navigasi Utama</SheetTitle>
+          <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
         <SidebarContent className="flex-1 p-2 overflow-y-auto">
           <SidebarMenu>
             {renderNavItemsRecursive(navItems, pathname, role)}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="p-2 border-t border-border/50">
+        <SidebarFooter className="p-2 border-t border-border">
           <SidebarMenu>
             {user && (
               <SidebarMenuItem>
@@ -210,11 +207,10 @@ export function AppSidebar() {
 
   return (
       <Sidebar
-        className="border-r border-border/50 bg-sidebar hidden md:flex" 
+        className="border-r border-border bg-sidebar hidden md:flex" 
         collapsible="icon"
       >
-        {sidebarSharedContent}
+        {sidebarDesktopContent}
       </Sidebar>
   );
 }
-
