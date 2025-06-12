@@ -26,7 +26,7 @@ import {
   SidebarTrigger,
   useSidebar, 
 } from "@/components/ui/sidebar";
-import { Sheet, SheetContent } from "@/components/ui/sheet"; // Corrected import path
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useState } from "react";
 
 function AppLogo() {
@@ -142,7 +142,7 @@ export function AppSidebar() {
   const sidebarContent = (
     <>
       <SidebarHeader className="p-4 border-b border-border/50">
-        <div className="flex items-center justify-between">
+        <div id="mobile-sidebar-title" className="flex items-center justify-between">
           <AppLogo />
           <SidebarTrigger className="md:hidden" />
         </div>
@@ -177,7 +177,7 @@ export function AppSidebar() {
         <SheetContent
           side="left" 
           className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-          aria-label="Main navigation"
+          aria-labelledby="mobile-sidebar-title"
         >
           <div className="flex h-full w-full flex-col">
             {sidebarContent}
