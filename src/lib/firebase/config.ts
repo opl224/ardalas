@@ -18,6 +18,25 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "YOUR_MEASUREMENT_ID"
 };
 
+// Check if placeholder values are being used and log a warning
+if (
+  firebaseConfig.apiKey === "YOUR_API_KEY" ||
+  firebaseConfig.authDomain === "YOUR_AUTH_DOMAIN" ||
+  firebaseConfig.projectId === "YOUR_PROJECT_ID" ||
+  firebaseConfig.storageBucket === "YOUR_STORAGE_BUCKET" ||
+  firebaseConfig.messagingSenderId === "YOUR_MESSAGING_SENDER_ID" ||
+  firebaseConfig.appId === "YOUR_APP_ID"
+) {
+  console.warn(
+    "--------------------------------------------------------------------------\n" +
+    "WARNING: Firebase is configured with placeholder values.\n" +
+    "Your application may not function correctly.\n" +
+    "Please ensure your .env file (e.g., .env.local) has the correct\n" +
+    "NEXT_PUBLIC_FIREBASE_... environment variables set.\n" +
+    "--------------------------------------------------------------------------"
+  );
+}
+
 // Initialize Firebase
 let app: FirebaseApp;
 if (!getApps().length) {
