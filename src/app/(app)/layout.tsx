@@ -1,3 +1,4 @@
+
 "use client"; 
 
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -18,7 +19,7 @@ function AppLayoutInternal({ children }: { children: ReactNode }) {
     <Sheet open={isMobile && openMobile} onOpenChange={setOpenMobile}>
       <div className="flex min-h-screen w-full">
         <AppSidebar /> {/* Renders SheetContent for mobile */}
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col pl-px"> {/* Added pl-px here */}
           <AppHeader /> {/* Renders SheetTrigger for mobile */}
           <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
             <div className="mx-auto w-full max-w-screen-2xl">
