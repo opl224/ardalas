@@ -13,9 +13,9 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // For notes
+import { Input } from "@/components/ui/input";
 import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -46,7 +46,7 @@ type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
 
 interface StudentAttendanceRecord {
   studentId: string;
-  studentName: string; // Denormalized
+  studentName: string; 
   status: AttendanceStatus;
   notes?: string;
 }
@@ -64,7 +64,7 @@ const attendanceFormSchema = z.object({
 type AttendanceFormValues = z.infer<typeof attendanceFormSchema>;
 
 export default function AttendancePage() {
-  const { user, role } = useAuth(); // To get recorder ID if needed
+  const { user, role, loading: authLoading } = useAuth(); 
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [students, setStudents] = useState<StudentMin[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
@@ -91,8 +91,10 @@ export default function AttendancePage() {
     name: "studentAttendances",
   });
 
-  // Fetch classes for dropdown
   useEffect(() => {
+    if (authLoading) return; // Wait for auth to load
+    if (!role || !["admin", "guru"].includes(role)) return; // Early exit if not authorized
+
     const fetchClasses = async () => {
       setIsLoadingClasses(true);
       try {
@@ -106,54 +108,37 @@ export default function AttendancePage() {
       }
     };
     fetchClasses();
-  }, [toast]);
+  }, [toast, authLoading, role]);
 
-  // Fetch students when classId changes
   useEffect(() => {
+    if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
     if (!selectedClassId) {
       setStudents([]);
-      replace([]); // Clear student attendance fields
+      replace([]); 
       return;
     }
     const fetchStudents = async () => {
       setIsLoadingStudents(true);
-      form.setValue("studentAttendances", []); // Clear previous students
+      form.setValue("studentAttendances", []); 
       try {
-        // Assuming students have a 'kelasId' field or similar for filtering
-        // Or students are subcollection of class. For now, assume 'students' collection has 'kelas' or 'classId' string field.
-        // This part might need adjustment based on actual Student data structure.
-        // For simplicity, let's assume students are fetched and then filtered client-side or direct query on 'kelas'.
-        // Or, we might need a 'classId' field on student documents.
-        // Let's assume students collection has a field 'kelas' which is the class name string.
-        // Better would be a classId field on students.
-        // For now, to make it work, let's fetch all students and populate based on that.
-        // This is NOT efficient for large student counts.
-        // Ideally, students should have a `classId` field.
-
-        // A more robust approach if students have a 'classId' field:
+        // Assumes students have 'classId' field that matches doc ID from 'classes'
         const studentsQuery = query(collection(db, "students"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
-        // If student has 'kelas' (string name field)
-        // const selectedClassName = classes.find(c => c.id === selectedClassId)?.name;
-        // const studentsQuery = selectedClassName ? query(collection(db, "students"), where("kelas", "==", selectedClassName), orderBy("name", "asc")) : null;
-        
-        // For this example, let's ensure 'students' collection docs have a 'classId' field that matches doc ID from 'classes'
         const studentsSnapshot = await getDocs(studentsQuery);
 
         const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setStudents(fetchedStudents);
         
-        // Initialize form array with fetched students
         const initialAttendance = fetchedStudents.map(student => ({
           studentId: student.id,
           studentName: student.name,
-          status: "Hadir" as AttendanceStatus, // Default to 'Hadir'
+          status: "Hadir" as AttendanceStatus,
           notes: "",
         }));
-        replace(initialAttendance); // Use replace to set the whole array
+        replace(initialAttendance); 
 
       } catch (error) {
         console.error("Error fetching students: ", error);
-        toast({ title: "Gagal Memuat Siswa", description: "Pastikan siswa memiliki field 'classId'.", variant: "destructive" });
+        toast({ title: "Gagal Memuat Siswa", description: "Pastikan siswa memiliki field 'classId' yang benar.", variant: "destructive" });
         setStudents([]);
         replace([]);
       } finally {
@@ -161,14 +146,13 @@ export default function AttendancePage() {
       }
     };
     fetchStudents();
-  }, [selectedClassId, classes, toast, replace, form]);
+  }, [selectedClassId, toast, replace, form, authLoading, role]);
 
 
-  // Fetch existing attendance data when classId or date changes
   useEffect(() => {
+    if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
     if (!selectedClassId || !selectedDate) {
       setExistingAttendanceDocId(null);
-      // Reset student statuses if no class/date selected, or handled by student fetch
       if (students.length > 0) {
          const resetAttendance = students.map(student => ({
           studentId: student.id,
@@ -187,7 +171,6 @@ export default function AttendancePage() {
       const dateToQuery = Timestamp.fromDate(startOfDay(selectedDate));
 
       try {
-        // Query for an attendance document for this class and date
         const attendanceQuery = query(
           collection(db, "attendances"),
           where("classId", "==", selectedClassId),
@@ -200,7 +183,6 @@ export default function AttendancePage() {
           setExistingAttendanceDocId(attendanceDoc.id);
           const data = attendanceDoc.data() as Omit<AttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: StudentAttendanceRecord[] };
           
-          // Ensure form.studentAttendances has all students from the class, then update with saved statuses
           const currentClassStudents = students.length > 0 ? students : (await getDocs(query(collection(db, "students"), where("classId", "==", selectedClassId), orderBy("name", "asc")))).docs.map(d => ({id: d.id, name: d.data().name}));
 
           const mergedStudentAttendances = currentClassStudents.map(student => {
@@ -215,7 +197,6 @@ export default function AttendancePage() {
           form.setValue("studentAttendances", mergedStudentAttendances);
 
         } else {
-          // No existing record, reset form fields for students of this class (if students are loaded)
           if (students.length > 0) {
             const initialAttendance = students.map(student => ({
               studentId: student.id,
@@ -234,12 +215,11 @@ export default function AttendancePage() {
       }
     };
 
-    // Only fetch attendance if students for the class are already populated or about to be
     if(students.length > 0 || !isLoadingStudents) {
         fetchAttendance();
     }
 
-  }, [selectedClassId, selectedDate, toast, form, students, isLoadingStudents]);
+  }, [selectedClassId, selectedDate, toast, form, students, isLoadingStudents, authLoading, role]);
 
 
   const handleSaveAttendance: SubmitHandler<AttendanceFormValues> = async (data) => {
@@ -259,24 +239,26 @@ export default function AttendancePage() {
       date: attendanceDate,
       studentAttendances: data.studentAttendances,
       recordedById: user.uid,
-      recordedByName: user.displayName || user.email,
+      recordedByName: user.displayName || user.email || "N/A",
       lastUpdatedAt: serverTimestamp(),
+      createdAt: existingAttendanceDocId ? undefined : serverTimestamp(), // Only set createdAt on new doc
     };
+    // Remove createdAt if it's undefined to avoid writing it during an update
+    if (attendanceData.createdAt === undefined) {
+      delete attendanceData.createdAt;
+    }
+
 
     try {
       let docIdToSave = existingAttendanceDocId;
       if (!docIdToSave) {
-        // Create a predictable ID or let Firestore auto-generate
-        // For simplicity, let's use classId_dateString as ID if we want to ensure one record per class/day
-        // const dateString = format(data.date, "yyyy-MM-dd");
-        // docIdToSave = `${data.classId}_${dateString}`;
-        // Or just let Firestore generate an ID if conflicts are handled by query before saving
-        docIdToSave = doc(collection(db, "attendances")).id; // Generate new ID
+        // Firestore will auto-generate an ID if we don't specify one for a new doc
+        docIdToSave = doc(collection(db, "attendances")).id; 
       }
       
-      await setDoc(doc(db, "attendances", docIdToSave), attendanceData, { merge: true }); // Use merge to update if exists with this ID
+      await setDoc(doc(db, "attendances", docIdToSave), attendanceData, { merge: true }); 
 
-      setExistingAttendanceDocId(docIdToSave); // Update existing doc ID
+      setExistingAttendanceDocId(docIdToSave); 
       toast({ title: "Kehadiran Disimpan", description: "Data kehadiran berhasil disimpan." });
     } catch (error) {
       console.error("Error saving attendance: ", error);
@@ -289,9 +271,9 @@ export default function AttendancePage() {
   const handleClassChange = (classId: string) => {
     setSelectedClassId(classId);
     form.setValue("classId", classId);
-    form.setValue("studentAttendances", []); // Clear student attendances when class changes
-    setStudents([]); // Clear student list
-    setExistingAttendanceDocId(null); // Reset existing doc id
+    form.setValue("studentAttendances", []); 
+    setStudents([]); 
+    setExistingAttendanceDocId(null); 
   };
 
   const handleDateChange = (date?: Date) => {
@@ -299,13 +281,27 @@ export default function AttendancePage() {
       const newDate = startOfDay(date);
       setSelectedDate(newDate);
       form.setValue("date", newDate);
-      setExistingAttendanceDocId(null); // Reset existing doc id
+      setExistingAttendanceDocId(null); 
     }
   };
 
-  const currentRole = role; // Get role from auth context
+  if (authLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold font-headline">Manajemen Kehadiran</h1>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center p-8">
+              <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
+              Memuat data pengguna...
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  if (!currentRole || !["admin", "guru"].includes(currentRole)) {
+  if (!role || !["admin", "guru"].includes(role)) {
     return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold font-headline">Manajemen Kehadiran</h1>
@@ -343,7 +339,7 @@ export default function AttendancePage() {
                 <Select
                   value={selectedClassId}
                   onValueChange={handleClassChange}
-                  disabled={isLoadingClasses}
+                  disabled={isLoadingClasses || isSubmitting}
                 >
                   <SelectTrigger id="classId" className="mt-1">
                     <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : "Pilih kelas"} />
@@ -351,6 +347,7 @@ export default function AttendancePage() {
                   <SelectContent>
                     {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
                     {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {classes.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.classId && <p className="text-sm text-destructive mt-1">{form.formState.errors.classId.message}</p>}
@@ -362,7 +359,7 @@ export default function AttendancePage() {
                     <Button
                       variant={"outline"}
                       className="w-full justify-start text-left font-normal mt-1"
-                      disabled={isLoadingAttendance}
+                      disabled={isLoadingAttendance || isSubmitting}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {selectedDate ? format(selectedDate, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
@@ -374,7 +371,7 @@ export default function AttendancePage() {
                       selected={selectedDate}
                       onSelect={handleDateChange}
                       initialFocus
-                      disabled={isLoadingAttendance}
+                      disabled={isLoadingAttendance || isSubmitting}
                     />
                   </PopoverContent>
                 </Popover>
@@ -395,7 +392,7 @@ export default function AttendancePage() {
                  </div>
               ) : fields.length > 0 ? (
                 <div className="mt-4 space-y-4">
-                  <h3 className="text-lg font-medium">Daftar Siswa</h3>
+                  <h3 className="text-lg font-medium">Daftar Siswa ({students.length} siswa)</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead className="border-b">
