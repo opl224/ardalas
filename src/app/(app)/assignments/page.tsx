@@ -187,19 +187,16 @@ export default function AssignmentsPage() {
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
-        getDocs(collection(db, "students")) // Fetch all students to count for classes
+        getDocs(collection(db, "users")) // Fetch all users to count students for classes
       ]);
       setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       
       const classData = classesSnapshot.docs.map(doc => {
         const classId = doc.id;
-        const studentCount = studentsSnapshot.docs.filter(sDoc => sDoc.data().classId === classId).length;
+        const studentCount = studentsSnapshot.docs.filter(sDoc => sDoc.data().role === "siswa" && sDoc.data().classId === classId).length;
         return { id: classId, name: doc.data().name, totalStudents: studentCount };
       });
-      setClasses(classData.map(c => ({id: c.id, name: c.name}))); // Store minimal for dropdowns
-
-      // We'll use this full classData with student counts when fetching assignments for teachers
-      // This is a bit of a workaround, ideally this count would be on the class doc or aggregated elsewhere
+      setClasses(classData.map(c => ({id: c.id, name: c.name}))); 
 
       setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
@@ -212,17 +209,14 @@ export default function AssignmentsPage() {
     setIsLoading(true);
     try {
       if (isTeacherOrAdminRole) {
-        await fetchDropdownData(); // Ensure dropdowns are loaded for teacher/admin if they open the add/edit dialog
+        await fetchDropdownData(); 
       }
       
       let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
       
-      // This 'user' is from useAuth() hook, which should have classId if role is siswa
       if (isStudentRole && user?.classId && user.classId.trim() !== "") {
         assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
       } else if (isStudentRole && (!user?.classId || user.classId.trim() === "")) {
-        // Student not associated with a class, or classId is empty, show no assignments
-        // This condition is also handled in the useEffect that calls fetchAssignments
         setAssignments([]);
         setIsLoading(false);
         return;
@@ -273,10 +267,9 @@ export default function AssignmentsPage() {
         });
 
       } else if (isTeacherOrAdminRole) {
-        // For teacher/admin, fetch submission counts for each assignment's class
         const classStudentCounts: Record<string, number> = {};
-        const studentsSnapshot = await getDocs(collection(db, "students"));
-        studentsSnapshot.forEach(sDoc => {
+        const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "siswa")));
+        usersSnapshot.forEach(sDoc => {
             const classId = sDoc.data().classId;
             if(classId) classStudentCounts[classId] = (classStudentCounts[classId] || 0) + 1;
         });
@@ -328,11 +321,9 @@ export default function AssignmentsPage() {
     } else if (isTeacherOrAdminRole) {
       fetchAssignments(); 
     } else {
-      // Should not happen if roles are correctly assigned
       setAssignments([]);
       setIsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, role, user?.classId]);
 
 
@@ -358,7 +349,6 @@ export default function AssignmentsPage() {
     return { subjectName: subject?.name, className: aClass?.name, teacherName: teacher?.name };
   };
 
-  // --- Teacher/Admin Handlers ---
   const handleAddAssignmentSubmit: SubmitHandler<AssignmentFormValues> = async (data) => { 
     addAssignmentForm.clearErrors();
     const { subjectName, className, teacherName } = getDenormalizedNames(data);
@@ -366,13 +356,46 @@ export default function AssignmentsPage() {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek, kelas, dan guru valid.", variant: "destructive"});
       return;
     }
+    if (!user) {
+        toast({ title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive" });
+        return;
+    }
+
     try {
-      await addDoc(collection(db, "assignments"), { ...data, dueDate: Timestamp.fromDate(data.dueDate), subjectName, className, teacherName, createdAt: serverTimestamp() });
+      const assignmentData = { ...data, dueDate: Timestamp.fromDate(data.dueDate), subjectName, className, teacherName, createdAt: serverTimestamp() };
+      const newAssignmentRef = await addDoc(collection(db, "assignments"), assignmentData);
       toast({ title: "Tugas Ditambahkan" });
+      
+      // Create notifications
+      const batch = writeBatch(db);
+      const notificationBase = {
+        title: `Tugas Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
+        description: data.description?.substring(0, 50) + (data.description && data.description.length > 50 ? "..." : "") || `Batas waktu: ${format(data.dueDate, "dd MMM yyyy, HH:mm", {locale: indonesiaLocale})}`,
+        href: `/assignments`, 
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "new_assignment",
+      };
+
+      const usersRef = collection(db, "users");
+      const qStudents = query(usersRef, where("role", "==", "siswa"), where("classId", "==", data.classId));
+      const studentsSnapshot = await getDocs(qStudents);
+
+      studentsSnapshot.forEach((studentDoc) => {
+        const studentNotificationRef = doc(collection(db, "notifications"));
+        batch.set(studentNotificationRef, { ...notificationBase, userId: studentDoc.id });
+      });
+
+      const creatorNotificationRef = doc(collection(db, "notifications"));
+      batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda membuat tugas baru: ${data.title}` });
+      
+      await batch.commit();
+      
       setIsAddDialogOpen(false);
       addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "" });
       fetchAssignments();
     } catch (error: any) {
+      console.error("Error adding assignment or notifications:", error);
       toast({ title: "Gagal Menambahkan Tugas", variant: "destructive" });
     }
   };
@@ -397,7 +420,6 @@ export default function AssignmentsPage() {
   };
   const handleDeleteAssignment = async (assignmentId: string) => { 
     try {
-      // Also delete submissions related to this assignment
       const submissionsQuery = query(collection(db, "assignmentSubmissions"), where("assignmentId", "==", assignmentId));
       const submissionsSnapshot = await getDocs(submissionsQuery);
       const batch = writeBatch(db);
@@ -433,7 +455,6 @@ export default function AssignmentsPage() {
     }
   };
 
-  // --- Student Handlers ---
   const handleOpenSubmitAssignmentDialog = (assignment: AssignmentData) => {
     setSelectedAssignmentForSubmission(assignment);
     const existingSubmission = studentSubmissions.get(assignment.id);
@@ -465,21 +486,18 @@ export default function AssignmentsPage() {
     };
 
     try {
-      // Check if student already submitted this assignment
       const existingSubmission = studentSubmissions.get(selectedAssignmentForSubmission.id);
       if (existingSubmission?.id) {
-        // Update existing submission
         await updateDoc(doc(db, "assignmentSubmissions", existingSubmission.id), submissionData);
         toast({ title: "Pengumpulan Diperbarui" });
       } else {
-        // Add new submission
         await addDoc(collection(db, "assignmentSubmissions"), submissionData);
         toast({ title: "Tugas Terkirim" });
       }
       setIsSubmitAssignmentDialogOpen(false);
       setSelectedAssignmentForSubmission(null);
       studentSubmitForm.reset();
-      fetchAssignments(); // Re-fetch to update status
+      fetchAssignments(); 
     } catch (error) {
       console.error("Error submitting assignment:", error);
       toast({ title: "Gagal Mengirim Tugas", variant: "destructive" });
@@ -487,7 +505,7 @@ export default function AssignmentsPage() {
   };
 
 
-  if (authLoading || (!user && !authLoading)) { // Show loading if auth is loading OR if not logged in and not done loading auth
+  if (authLoading || (!user && !authLoading)) { 
     return <div className="space-y-6"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
@@ -518,7 +536,6 @@ export default function AssignmentsPage() {
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader><DialogTitle>Tambah Tugas Baru</DialogTitle><DialogDescription>Isi detail tugas.</DialogDescription></DialogHeader>
                 <form onSubmit={addAssignmentForm.handleSubmit(handleAddAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  {/* Teacher/Admin Add Form Fields (Existing) */}
                   <div><Label htmlFor="add-assignment-title">Judul Tugas</Label><Input id="add-assignment-title" {...addAssignmentForm.register("title")} className="mt-1" />{addAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.title.message}</p>}</div>
                   <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
                   <div><Label htmlFor="add-assignment-classId">Kelas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
@@ -632,14 +649,12 @@ export default function AssignmentsPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Assignment Dialog (Teacher/Admin) */}
       {isTeacherOrAdminRole && selectedAssignment && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) { setSelectedAssignment(null); editAssignmentForm.clearErrors(); } }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle>Edit Tugas</DialogTitle><DialogDescription>Perbarui detail tugas.</DialogDescription></DialogHeader>
             <form onSubmit={editAssignmentForm.handleSubmit(handleEditAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Input type="hidden" {...editAssignmentForm.register("id")} />
-              {/* Teacher/Admin Edit Form Fields (Existing) - Simplified for brevity */}
               <div><Label htmlFor="edit-assignment-title">Judul Tugas</Label><Input id="edit-assignment-title" {...editAssignmentForm.register("title")} className="mt-1" />{editAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.title.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => editAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("subjectId")}><SelectTrigger id="edit-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.subjectId.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-classId">Kelas</Label><Select onValueChange={(value) => editAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("classId")}><SelectTrigger id="edit-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.classId.message}</p>}</div>
@@ -653,7 +668,6 @@ export default function AssignmentsPage() {
         </Dialog>
       )}
 
-      {/* Student Submit Assignment Dialog */}
       {isStudentRole && selectedAssignmentForSubmission && (
         <Dialog open={isSubmitAssignmentDialogOpen} onOpenChange={(isOpen) => { setIsSubmitAssignmentDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForSubmission(null); studentSubmitForm.reset(); }}>
           <DialogContent className="sm:max-w-lg">
@@ -693,7 +707,6 @@ export default function AssignmentsPage() {
         </Dialog>
       )}
 
-      {/* Teacher View Submissions Dialog */}
        {isTeacherOrAdminRole && selectedAssignmentToViewSubmissions && (
         <Dialog open={isViewSubmissionsDialogOpen} onOpenChange={(isOpen) => { setIsViewSubmissionsDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentToViewSubmissions(null); }}>
             <DialogContent className="sm:max-w-2xl">
@@ -742,3 +755,4 @@ export default function AssignmentsPage() {
     </div>
   );
 }
+

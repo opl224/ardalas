@@ -255,7 +255,7 @@ function UserNav() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 bg-popover/90 backdrop-blur-md" align="end" forceMount>
-        <DropdownMenuLabel className="font-normal">
+        {/* <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.displayName || "Pengguna"}</p>
             <p className="text-xs leading-none text-muted-foreground">
@@ -267,7 +267,7 @@ function UserNav() {
               </p>
             )}
           </div>
-        </DropdownMenuLabel>
+        </DropdownMenuLabel> */}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/settings/profile"> 

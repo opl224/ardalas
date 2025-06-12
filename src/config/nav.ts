@@ -84,11 +84,7 @@ export const navItems: NavItem[] = [
   { 
     title: "Pengaturan", 
     href: "#", // Parent item, no direct link
-    icon: Settings,
-    children: [
-      { title: "Profil", href: "/settings/profile", icon: UserCircle }
-      // Tambahkan item pengaturan lain di sini jika perlu
-    ]
+    icon: Settings
   }, 
 ];
 

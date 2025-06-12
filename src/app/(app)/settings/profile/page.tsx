@@ -106,15 +106,6 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
-
-          <div className="pt-4 flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" className="w-full sm:w-auto">
-                <Edit3 className="mr-2 h-4 w-4" /> Edit Profil
-            </Button>
-            <Button variant="outline" className="w-full sm:w-auto">
-                <KeyRound className="mr-2 h-4 w-4" /> Ganti Password
-            </Button>
-          </div>
            <p className="text-xs text-muted-foreground text-center pt-2">
             Untuk perubahan data sensitif lainnya, silakan hubungi Administrator.
           </p>

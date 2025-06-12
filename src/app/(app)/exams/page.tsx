@@ -63,9 +63,12 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  where,
+  writeBatch
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext"; // Added useAuth import
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
@@ -122,6 +125,7 @@ const editExamFormSchema = baseExamObjectSchema.extend({
 type EditExamFormValues = z.infer<typeof editExamFormSchema>;
 
 export default function ExamsPage() {
+  const { user } = useAuth(); // Get the logged-in user (creator)
   const [exams, setExams] = useState<ExamData[]>([]);
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
@@ -181,7 +185,7 @@ export default function ExamsPage() {
           subjectName: data.subjectName,
           classId: data.classId,
           className: data.className,
-          date: data.date, // Firestore Timestamp
+          date: data.date, 
           startTime: data.startTime,
           endTime: data.endTime,
           description: data.description,
@@ -208,7 +212,7 @@ export default function ExamsPage() {
         title: selectedExam.title,
         subjectId: selectedExam.subjectId,
         classId: selectedExam.classId,
-        date: selectedExam.date.toDate(), // Convert Firestore Timestamp to JS Date
+        date: selectedExam.date.toDate(), 
         startTime: selectedExam.startTime,
         endTime: selectedExam.endTime,
         description: selectedExam.description || "",
@@ -233,21 +237,52 @@ export default function ExamsPage() {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek dan kelas valid.", variant: "destructive"});
       return;
     }
+    if (!user) {
+        toast({ title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive" });
+        return;
+    }
 
     try {
-      await addDoc(collection(db, "exams"), {
+      const examData = {
         ...data,
-        date: Timestamp.fromDate(data.date), // Convert JS Date to Firestore Timestamp
+        date: Timestamp.fromDate(data.date), 
         subjectName,
         className,
         createdAt: serverTimestamp(),
-      });
+      };
+      const newExamRef = await addDoc(collection(db, "exams"), examData);
       toast({ title: "Ujian Ditambahkan", description: "Jadwal ujian berhasil disimpan." });
+
+      // Create notifications
+      const batch = writeBatch(db);
+      const notificationBase = {
+        title: `Jadwal Ujian: ${data.title.substring(0,25)}${data.title.length > 25 ? "..." : ""} (${subjectName})`,
+        description: `Tanggal: ${format(data.date, "dd MMM yyyy", {locale: indonesiaLocale})}, Pukul ${data.startTime} - ${data.endTime}`,
+        href: `/exams`,
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "new_exam",
+      };
+
+      const usersRef = collection(db, "users");
+      const qStudents = query(usersRef, where("role", "==", "siswa"), where("classId", "==", data.classId));
+      const studentsSnapshot = await getDocs(qStudents);
+
+      studentsSnapshot.forEach((studentDoc) => {
+        const studentNotificationRef = doc(collection(db, "notifications"));
+        batch.set(studentNotificationRef, { ...notificationBase, userId: studentDoc.id });
+      });
+      
+      const creatorNotificationRef = doc(collection(db, "notifications"));
+      batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda membuat jadwal ujian: ${data.title} (${subjectName})` });
+      
+      await batch.commit();
+
       setIsAddDialogOpen(false);
       addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "" });
       fetchExams();
     } catch (error: any) {
-      console.error("Error adding exam:", error);
+      console.error("Error adding exam or notifications:", error);
       toast({ title: "Gagal Menambahkan Ujian", description: "Terjadi kesalahan.", variant: "destructive" });
     }
   };
@@ -266,7 +301,7 @@ export default function ExamsPage() {
       const examDocRef = doc(db, "exams", data.id);
       await updateDoc(examDocRef, {
         ...data, 
-        date: Timestamp.fromDate(data.date), // Convert JS Date to Firestore Timestamp
+        date: Timestamp.fromDate(data.date), 
         subjectName,
         className,
       });
@@ -556,3 +591,4 @@ export default function ExamsPage() {
     </div>
   );
 }
+
