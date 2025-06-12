@@ -14,6 +14,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
@@ -334,14 +340,12 @@ export default function AttendancePage() {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, `Kehadiran ${formattedDate}`);
       
-      // Add header row with class and date info
       XLSX.utils.sheet_add_aoa(worksheet, [
         [`Laporan Kehadiran Harian - Kelas: ${className} - Tanggal: ${format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale })}`],
-        [] // Empty row for spacing
+        [] 
       ], { origin: "A1" });
 
 
-      // Adjust column widths (optional, basic example)
       const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
       worksheet['!cols'] = cols;
 
@@ -392,7 +396,7 @@ export default function AttendancePage() {
         head: [tableColumn],
         body: tableRows,
         theme: 'grid',
-        headStyles: { fillColor: [22, 160, 133] }, // Example color
+        headStyles: { fillColor: [22, 160, 133] }, 
       });
 
       doc.save(fileName);
@@ -418,7 +422,7 @@ export default function AttendancePage() {
             studentId: student.id,
             studentName: student.name,
             hadir: 0, sakit: 0, izin: 0, alpa: 0,
-            totalDays: 0, // Placeholder, can be calculated based on actual attendance days or school days
+            totalDays: 0, 
         };
     });
     
@@ -471,6 +475,7 @@ export default function AttendancePage() {
       const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
       if (summaryData.length === 0) {
         toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
+        setIsExporting(false);
         return;
       }
 
@@ -522,6 +527,7 @@ export default function AttendancePage() {
       const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
        if (summaryData.length === 0) {
         toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
+        setIsExporting(false);
         return;
       }
 
@@ -558,7 +564,7 @@ export default function AttendancePage() {
         head: [tableColumn],
         body: tableRows,
         theme: 'grid',
-        headStyles: { fillColor: [41, 128, 185] }, // Example color
+        headStyles: { fillColor: [41, 128, 185] }, 
       });
 
       doc.save(fileName);
@@ -755,7 +761,6 @@ export default function AttendancePage() {
         </Card>
       </form>
 
-      {/* Export Card */}
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -768,8 +773,8 @@ export default function AttendancePage() {
             <div>
               <Label htmlFor="exportClassId">Kelas (untuk Rekap)</Label>
               <Select
-                value={selectedClassId} // Re-use selectedClassId from main form for context
-                onValueChange={(value) => setSelectedClassId(value)} // Allow changing context for export
+                value={selectedClassId} 
+                onValueChange={(value) => setSelectedClassId(value)} 
                 disabled={isLoadingClasses || isExporting}
               >
                 <SelectTrigger id="exportClassId" className="mt-1">
@@ -809,37 +814,41 @@ export default function AttendancePage() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="grid grid-cols-2 md:grid-cols-4 gap-4">
-           <Button 
-            onClick={handleExportDailyExcel} 
-            disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}
-           >
-            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian
-          </Button>
-          <Button 
-            onClick={handleExportDailyPdf} 
-            disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}
-            variant="outline"
-          >
-            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <FileDown className="mr-2 h-4 w-4" /> PDF Harian
-          </Button>
-          <Button 
-            onClick={handleExportMonthlyExcel} 
-            disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}
-          >
-            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan
-          </Button>
-          <Button 
-            onClick={handleExportMonthlyPdf} 
-            disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}
-            variant="outline"
-          >
-            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            <FileDown className="mr-2 h-4 w-4" /> PDF Bulanan
-          </Button>
+        <CardFooter className="flex justify-end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button disabled={isExporting}>
+                {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <FileDown className="mr-2 h-4 w-4" /> Ekspor
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleExportDailyExcel}
+                disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportDailyPdf}
+                disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}
+              >
+                <FileDown className="mr-2 h-4 w-4" /> PDF Harian
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportMonthlyExcel}
+                disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}
+              >
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportMonthlyPdf}
+                disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}
+              >
+                <FileDown className="mr-2 h-4 w-4" /> PDF Bulanan
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardFooter>
       </Card>
     </div>
