@@ -12,6 +12,8 @@ interface UserProfile extends FirebaseUser {
   role?: Role;
   assignedClassIds?: string[]; // For teachers
   // Add other profile fields as needed
+  classId?: string; // For students
+  className?: string; // For students
 }
 
 interface AuthContextType {
@@ -38,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, "users", firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
-        let userProfileData: UserProfile = { ...firebaseUser };
+        let userProfileData: UserProfile = { ...firebaseUser } as UserProfile; // Cast to include custom fields
 
         if (userDocSnap.exists()) {
           const firestoreData = userDocSnap.data();
@@ -47,6 +49,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (userProfileData.role === 'guru') {
             userProfileData.assignedClassIds = firestoreData?.assignedClassIds || [];
+          } else if (userProfileData.role === 'siswa') {
+            userProfileData.classId = firestoreData?.classId;
+            // Assuming student documents in 'users' collection might have 'className'
+            // If not, this will be undefined, and we'll need to fetch it from 'classes' collection
+            // based on classId when displaying or storing submission.
+            // For now, let's assume it *could* be there.
+            const studentDocRef = doc(db, "students", firebaseUser.uid); // Students specific data might be in 'students' collection
+            const studentDocSnap = await getDoc(studentDocRef);
+            if (studentDocSnap.exists()) {
+                userProfileData.classId = studentDocSnap.data()?.classId;
+                userProfileData.className = studentDocSnap.data()?.className;
+            } else { // Fallback to users collection if not in students, or if students collection isn't the primary source for this
+                 userProfileData.classId = firestoreData?.classId; // classId from 'users' doc
+                 userProfileData.className = firestoreData?.className; // className from 'users' doc
+            }
+
+            // If className is still not found, try to fetch from classes collection
+            if (userProfileData.classId && !userProfileData.className) {
+                const classDocRef = doc(db, "classes", userProfileData.classId);
+                const classDocSnap = await getDoc(classDocRef);
+                if (classDocSnap.exists()) {
+                    userProfileData.className = classDocSnap.data()?.name;
+                }
+            }
           }
         }
         setUser(userProfileData);
@@ -74,3 +100,6 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
+    
