@@ -72,6 +72,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
