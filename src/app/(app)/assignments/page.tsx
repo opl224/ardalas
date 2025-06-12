@@ -217,10 +217,10 @@ export default function AssignmentsPage() {
       
       let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
       
-      if (isStudentRole && user?.classId) {
+      if (isStudentRole && user?.classId && user.classId.trim() !== "") {
         assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
-      } else if (isStudentRole && !user?.classId) {
-        // Student not associated with a class, show no assignments
+      } else if (isStudentRole && (!user?.classId || user.classId.trim() === "")) {
+        // Student not associated with a class, or classId is empty, show no assignments
         setAssignments([]);
         setIsLoading(false);
         return;
@@ -331,7 +331,7 @@ export default function AssignmentsPage() {
   };
 
   // --- Teacher/Admin Handlers ---
-  const handleAddAssignmentSubmit: SubmitHandler<AssignmentFormValues> = async (data) => { /* Existing logic */ 
+  const handleAddAssignmentSubmit: SubmitHandler<AssignmentFormValues> = async (data) => { 
     addAssignmentForm.clearErrors();
     const { subjectName, className, teacherName } = getDenormalizedNames(data);
     if (!subjectName || !className || !teacherName) {
@@ -348,7 +348,7 @@ export default function AssignmentsPage() {
       toast({ title: "Gagal Menambahkan Tugas", variant: "destructive" });
     }
   };
-  const handleEditAssignmentSubmit: SubmitHandler<EditAssignmentFormValues> = async (data) => { /* Existing logic */
+  const handleEditAssignmentSubmit: SubmitHandler<EditAssignmentFormValues> = async (data) => { 
     if (!selectedAssignment) return;
     editAssignmentForm.clearErrors();
     const { subjectName, className, teacherName } = getDenormalizedNames(data);
@@ -367,7 +367,7 @@ export default function AssignmentsPage() {
       toast({ title: "Gagal Memperbarui Tugas", variant: "destructive" });
     }
   };
-  const handleDeleteAssignment = async (assignmentId: string) => { /* Existing logic */
+  const handleDeleteAssignment = async (assignmentId: string) => { 
     try {
       // Also delete submissions related to this assignment
       const submissionsQuery = query(collection(db, "assignmentSubmissions"), where("assignmentId", "==", assignmentId));
@@ -717,3 +717,4 @@ export default function AssignmentsPage() {
 
     
     
+
