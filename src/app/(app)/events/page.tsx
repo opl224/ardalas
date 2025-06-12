@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { CalendarDays, PlusCircle, Edit, Trash2, Loader2, AlertCircle, Save } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -83,7 +84,7 @@ interface EventData {
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-const baseEventFormSchema = z.object({
+const _baseEventObjectSchema = z.object({
   title: z.string().min(3, { message: "Judul acara minimal 3 karakter." }),
   description: z.string().optional(),
   date: z.date({ required_error: "Tanggal acara harus diisi." }),
@@ -92,23 +93,28 @@ const baseEventFormSchema = z.object({
   location: z.string().optional(),
   category: z.enum(EVENT_CATEGORIES).optional(),
   targetAudience: z.array(z.enum(ROLES)).optional(),
-}).refine(data => {
+});
+
+const eventTimeRefinement = (data: { startTime?: string; endTime?: string }) => {
   if (data.startTime && data.endTime) {
     const [startH, startM] = data.startTime.split(':').map(Number);
     const [endH, endM] = data.endTime.split(':').map(Number);
-    if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return true; // Let regex handle format
+    if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return true; // Let regex handle format errors
     return endH > startH || (endH === startH && endM > startM);
   }
   return true;
-}, {
+};
+
+const eventFormSchema = _baseEventObjectSchema.refine(eventTimeRefinement, {
   message: "Waktu selesai harus setelah waktu mulai.",
   path: ["endTime"],
 });
-
-const eventFormSchema = baseEventFormSchema;
 type EventFormValues = z.infer<typeof eventFormSchema>;
 
-const editEventFormSchema = baseEventFormSchema.extend({ id: z.string() });
+const editEventFormSchema = _baseEventObjectSchema.extend({ id: z.string() }).refine(eventTimeRefinement, {
+  message: "Waktu selesai harus setelah waktu mulai.",
+  path: ["endTime"],
+});
 type EditEventFormValues = z.infer<typeof editEventFormSchema>;
 
 export default function EventsPage() {
@@ -126,7 +132,7 @@ export default function EventsPage() {
     defaultValues: {
       title: "",
       description: "",
-      date: new Date(),
+      date: startOfDay(new Date()),
       startTime: "",
       endTime: "",
       location: "",
@@ -168,7 +174,7 @@ export default function EventsPage() {
         id: selectedEvent.id,
         title: selectedEvent.title,
         description: selectedEvent.description || "",
-        date: selectedEvent.date.toDate(),
+        date: selectedEvent.date.toDate(), // Convert Firestore Timestamp to JS Date
         startTime: selectedEvent.startTime || "",
         endTime: selectedEvent.endTime || "",
         location: selectedEvent.location || "",
@@ -179,7 +185,10 @@ export default function EventsPage() {
   }, [selectedEvent, isEditDialogOpen, editEventForm]);
 
   const handleAddEventSubmit: SubmitHandler<EventFormValues> = async (data) => {
-    if (!user) return;
+    if (!user) {
+        toast({ title: "Aksi Ditolak", description: "Anda harus login untuk menambahkan acara.", variant: "destructive"});
+        return;
+    }
     addEventForm.clearErrors();
     try {
       await addDoc(collection(db, "events"), {
@@ -187,13 +196,13 @@ export default function EventsPage() {
         date: Timestamp.fromDate(startOfDay(data.date)),
         targetAudience: data.targetAudience || [],
         createdById: user.uid,
-        createdByName: user.displayName || user.email,
+        createdByName: user.displayName || user.email || "N/A",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Acara Ditambahkan", description: `${data.title} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
-      addEventForm.reset({ date: new Date(), title: "", description: "", startTime: "", endTime: "", location: "", category: undefined, targetAudience: [] });
+      addEventForm.reset({ date: startOfDay(new Date()), title: "", description: "", startTime: "", endTime: "", location: "", category: undefined, targetAudience: [] });
       fetchEvents();
     } catch (error) {
       console.error("Error adding event:", error);
@@ -202,7 +211,10 @@ export default function EventsPage() {
   };
 
   const handleEditEventSubmit: SubmitHandler<EditEventFormValues> = async (data) => {
-    if (!selectedEvent || !user) return;
+    if (!selectedEvent || !user) {
+        toast({ title: "Aksi Ditolak", description: "Data atau pengguna tidak valid.", variant: "destructive"});
+        return;
+    }
     editEventForm.clearErrors();
     try {
       const eventDocRef = doc(db, "events", data.id);
@@ -210,8 +222,8 @@ export default function EventsPage() {
         ...data,
         date: Timestamp.fromDate(startOfDay(data.date)),
         targetAudience: data.targetAudience || [],
-        createdById: user.uid, // or keep original creator, up to policy
-        createdByName: user.displayName || user.email,
+        // createdById: user.uid, // Keep original creator or update, policy decision. For now, update.
+        // createdByName: user.displayName || user.email || "N/A",
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Acara Diperbarui", description: `${data.title} berhasil diperbarui.` });
@@ -256,15 +268,15 @@ export default function EventsPage() {
     );
   }
 
-  const renderFormFields = (formInstance: typeof addEventForm | typeof editEventForm) => (
+  const renderFormFields = (formInstance: typeof addEventForm | typeof editEventForm, dialogType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-title`}>Judul Acara</Label>
-        <Input id={`${formInstance === addEventForm ? 'add' : 'edit'}-event-title`} {...formInstance.register("title")} className="mt-1" />
-        {formInstance.formState.errors.title && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.title.message}</p>}
+        <Label htmlFor={`${dialogType}-event-title`}>Judul Acara</Label>
+        <Input id={`${dialogType}-event-title`} {...formInstance.register("title")} className="mt-1" />
+        {(formInstance.formState.errors as any).title && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).title.message}</p>}
       </div>
       <div>
-        <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-date`}>Tanggal Acara</Label>
+        <Label htmlFor={`${dialogType}-event-date`}>Tanggal Acara</Label>
         <Controller
             control={formInstance.control}
             name="date"
@@ -277,36 +289,36 @@ export default function EventsPage() {
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={field.value} onSelect={(date) => field.onChange(date || new Date())} initialFocus />
+                    <Calendar mode="single" selected={field.value} onSelect={(date) => field.onChange(date ? startOfDay(date) : startOfDay(new Date()))} initialFocus />
                     </PopoverContent>
                 </Popover>
             )}
         />
-        {formInstance.formState.errors.date && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.date.message}</p>}
+        {(formInstance.formState.errors as any).date && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).date.message}</p>}
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-startTime`}>Waktu Mulai (Opsional)</Label>
-          <Input id={`${formInstance === addEventForm ? 'add' : 'edit'}-event-startTime`} type="time" {...formInstance.register("startTime")} className="mt-1" />
-           {formInstance.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.startTime.message}</p>}
+          <Label htmlFor={`${dialogType}-event-startTime`}>Waktu Mulai (Opsional)</Label>
+          <Input id={`${dialogType}-event-startTime`} type="time" {...formInstance.register("startTime")} className="mt-1" />
+           {(formInstance.formState.errors as any).startTime && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).startTime.message}</p>}
         </div>
         <div>
-          <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-endTime`}>Waktu Selesai (Opsional)</Label>
-          <Input id={`${formInstance === addEventForm ? 'add' : 'edit'}-event-endTime`} type="time" {...formInstance.register("endTime")} className="mt-1" />
-          {formInstance.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.endTime.message}</p>}
+          <Label htmlFor={`${dialogType}-event-endTime`}>Waktu Selesai (Opsional)</Label>
+          <Input id={`${dialogType}-event-endTime`} type="time" {...formInstance.register("endTime")} className="mt-1" />
+          {(formInstance.formState.errors as any).endTime && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).endTime.message}</p>}
         </div>
       </div>
       <div>
-        <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-location`}>Lokasi (Opsional)</Label>
-        <Input id={`${formInstance === addEventForm ? 'add' : 'edit'}-event-location`} {...formInstance.register("location")} className="mt-1" />
+        <Label htmlFor={`${dialogType}-event-location`}>Lokasi (Opsional)</Label>
+        <Input id={`${dialogType}-event-location`} {...formInstance.register("location")} className="mt-1" />
       </div>
        <div>
-        <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-category`}>Kategori (Opsional)</Label>
+        <Label htmlFor={`${dialogType}-event-category`}>Kategori (Opsional)</Label>
         <Controller
             name="category"
             control={formInstance.control}
             render={({ field }) => (
-                 <select {...field} className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                 <select {...field} defaultValue={field.value || ""} className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                     <option value="">Pilih Kategori</option>
                     {EVENT_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
@@ -347,8 +359,8 @@ export default function EventsPage() {
         </div>
       </div>
       <div>
-        <Label htmlFor={`${formInstance === addEventForm ? 'add' : 'edit'}-event-description`}>Deskripsi (Opsional)</Label>
-        <Textarea id={`${formInstance === addEventForm ? 'add' : 'edit'}-event-description`} {...formInstance.register("description")} className="mt-1" />
+        <Label htmlFor={`${dialogType}-event-description`}>Deskripsi (Opsional)</Label>
+        <Textarea id={`${dialogType}-event-description`} {...formInstance.register("description")} className="mt-1" />
       </div>
     </>
   );
@@ -369,15 +381,16 @@ export default function EventsPage() {
           {canManageEvents && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
-              if (!isOpen) { addEventForm.reset({ date: new Date(), title: "", description: "", startTime: "", endTime: "", location: "", category: undefined, targetAudience: [] }); addEventForm.clearErrors(); }
+              if (!isOpen) { addEventForm.reset({ date: startOfDay(new Date()), title: "", description: "", startTime: "", endTime: "", location: "", category: undefined, targetAudience: [] }); addEventForm.clearErrors(); }
             }}>
               <DialogTrigger asChild>
                 <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Tambah Acara</Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-lg">
                 <DialogHeader><DialogTitle>Tambah Acara Baru</DialogTitle><DialogDescription>Isi detail acara sekolah.</DialogDescription></DialogHeader>
+                <Form {...addEventForm}>
                 <form onSubmit={addEventForm.handleSubmit(handleAddEventSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  {renderFormFields(addEventForm)}
+                  {renderFormFields(addEventForm, 'add')}
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                     <Button type="submit" disabled={addEventForm.formState.isSubmitting}>
@@ -386,6 +399,7 @@ export default function EventsPage() {
                     </Button>
                   </DialogFooter>
                 </form>
+                </Form>
               </DialogContent>
             </Dialog>
           )}
@@ -411,7 +425,7 @@ export default function EventsPage() {
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">{event.title}</TableCell>
                       <TableCell>{format(event.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
-                      <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : ''}</TableCell>
+                      <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : (event.startTime ? ' - Selesai' : '-')}</TableCell>
                       <TableCell>{event.category || "-"}</TableCell>
                       <TableCell>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>
                       {canManageEvents && (
@@ -451,8 +465,10 @@ export default function EventsPage() {
         }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader><DialogTitle>Edit Acara</DialogTitle><DialogDescription>Perbarui detail acara sekolah.</DialogDescription></DialogHeader>
+             <Form {...editEventForm}>
             <form onSubmit={editEventForm.handleSubmit(handleEditEventSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-              {renderFormFields(editEventForm)}
+              <Input type="hidden" {...editEventForm.register("id")} />
+              {renderFormFields(editEventForm, 'edit')}
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                 <Button type="submit" disabled={editEventForm.formState.isSubmitting}>
@@ -460,6 +476,7 @@ export default function EventsPage() {
                   Simpan Perubahan</Button>
               </DialogFooter>
             </form>
+            </Form>
           </DialogContent>
         </Dialog>
       )}
