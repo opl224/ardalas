@@ -86,6 +86,8 @@ const editClassFormSchema = classFormSchema.extend({
 });
 type EditClassFormValues = z.infer<typeof editClassFormSchema>;
 
+const NO_TEACHER_VALUE = "_NONE_";
+
 export default function ClassesPage() {
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); // For teacher dropdown
@@ -131,7 +133,7 @@ export default function ClassesPage() {
   const fetchClasses = async () => {
     setIsLoading(true);
     try {
-      await fetchTeachersForDropdown(); // Fetch teachers first or concurrently
+      await fetchTeachersForDropdown(); 
       const classesCollectionRef = collection(db, "classes");
       const q = query(classesCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
@@ -164,21 +166,21 @@ export default function ClassesPage() {
       editClassForm.reset({
         id: selectedClass.id,
         name: selectedClass.name,
-        teacherId: selectedClass.teacherId || undefined,
+        teacherId: selectedClass.teacherId || undefined, // Ensure undefined for no teacher
       });
     }
   }, [selectedClass, isEditDialogOpen, editClassForm]);
 
   const handleAddClassSubmit: SubmitHandler<ClassFormValues> = async (data) => {
     addClassForm.clearErrors();
-    const selectedTeacher = teachers.find(t => t.id === data.teacherId);
+    const selectedTeacher = data.teacherId ? teachers.find(t => t.id === data.teacherId) : undefined;
     
     try {
       const classesCollectionRef = collection(db, "classes");
       await addDoc(classesCollectionRef, {
         name: data.name,
-        teacherId: data.teacherId || null, // Store null if not selected
-        teacherName: selectedTeacher?.name || null, // Store teacher name or null
+        teacherId: data.teacherId || null, 
+        teacherName: selectedTeacher?.name || null, 
         createdAt: serverTimestamp(),
       });
       
@@ -199,7 +201,7 @@ export default function ClassesPage() {
   const handleEditClassSubmit: SubmitHandler<EditClassFormValues> = async (data) => {
     if (!selectedClass) return;
     editClassForm.clearErrors();
-    const selectedTeacher = teachers.find(t => t.id === data.teacherId);
+    const selectedTeacher = data.teacherId ? teachers.find(t => t.id === data.teacherId) : undefined;
 
     try {
       const classDocRef = doc(db, "classes", data.id);
@@ -290,7 +292,7 @@ export default function ClassesPage() {
                 <div>
                   <Label htmlFor="add-class-teacherId">Wali Kelas (Opsional)</Label>
                   <Select
-                    onValueChange={(value) => addClassForm.setValue("teacherId", value, { shouldValidate: true })}
+                    onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
                     defaultValue={addClassForm.getValues("teacherId")}
                   >
                     <SelectTrigger id="add-class-teacherId" className="mt-1">
@@ -298,7 +300,7 @@ export default function ClassesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {teachers.length === 0 && <SelectItem value="loading" disabled>Memuat guru...</SelectItem>}
-                      <SelectItem value="">Tidak Ada Wali Kelas</SelectItem>
+                      <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
                       {teachers.map((teacher) => (
                         <SelectItem key={teacher.id} value={teacher.id}>
                           {teacher.name}
@@ -412,14 +414,14 @@ export default function ClassesPage() {
               <div>
                   <Label htmlFor="edit-class-teacherId">Wali Kelas (Opsional)</Label>
                   <Select
-                    onValueChange={(value) => editClassForm.setValue("teacherId", value, { shouldValidate: true })}
-                    defaultValue={editClassForm.getValues("teacherId")}
+                    onValueChange={(value) => editClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
+                    defaultValue={editClassForm.getValues("teacherId") || undefined}
                   >
                     <SelectTrigger id="edit-class-teacherId" className="mt-1">
                       <SelectValue placeholder="Pilih wali kelas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Tidak Ada Wali Kelas</SelectItem>
+                      <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
                       {teachers.map((teacher) => (
                         <SelectItem key={teacher.id} value={teacher.id}>
                           {teacher.name}
