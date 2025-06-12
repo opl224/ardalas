@@ -23,10 +23,10 @@ import {
   SidebarMenuSub,
   SidebarMenuSubItem,
   SidebarMenuSubButton,
-  SidebarTrigger as DesktopSidebarTrigger,
+  SidebarTrigger as DesktopSidebarTrigger, // Alias for clarity
   useSidebar, 
 } from "@/components/ui/sidebar";
-import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"; // Sheet is no longer needed here, just SheetContent & related
+import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useState } from "react";
 
 function AppLogo() {
@@ -144,7 +144,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4 border-b border-border/50">
         <div className="flex items-center justify-between">
           <AppLogo />
-           {!isMobile && <DesktopSidebarTrigger className="hidden md:flex" /> }
+          {/* Tombol DesktopSidebarTrigger dihilangkan dari sini */}
         </div>
       </SidebarHeader>
       <SidebarContent className="flex-1 p-2 overflow-y-auto">
@@ -174,7 +174,6 @@ export function AppSidebar() {
 
   if (isMobile) {
     return (
-      // The <Sheet> component is now in AppLayout. AppSidebar only renders SheetContent for mobile.
       <SheetContent
         side="left" 
         className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground flex flex-col"
