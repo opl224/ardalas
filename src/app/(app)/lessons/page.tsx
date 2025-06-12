@@ -88,7 +88,7 @@ const DAYS_OF_WEEK = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] as c
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 
-const lessonFormSchema = z.object({
+const baseLessonObjectSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   classId: z.string({ required_error: "Pilih kelas." }),
   teacherId: z.string({ required_error: "Pilih guru." }),
@@ -97,24 +97,33 @@ const lessonFormSchema = z.object({
   endTime: z.string().regex(timeRegex, { message: "Format waktu selesai JJ:MM (e.g., 08:30)." }),
   topic: z.string().optional(),
   materials: z.string().optional(),
-}).refine(data => {
-    // Basic validation: endTime must be after startTime
-    const [startH, startM] = data.startTime.split(':').map(Number);
-    const [endH, endM] = data.endTime.split(':').map(Number);
-    if (endH < startH || (endH === startH && endM <= startM)) {
-        return false;
-    }
-    return true;
-}, {
+});
+
+const lessonTimeRefinement = (data: { startTime: string; endTime: string; }) => {
+  // Basic validation: endTime must be after startTime
+  const [startH, startM] = data.startTime.split(':').map(Number);
+  const [endH, endM] = data.endTime.split(':').map(Number);
+  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return false; // Invalid time format handled by regex, but good to be safe
+  if (endH < startH || (endH === startH && endM <= startM)) {
+      return false;
+  }
+  return true;
+};
+
+const lessonFormSchema = baseLessonObjectSchema.refine(lessonTimeRefinement, {
     message: "Waktu selesai harus setelah waktu mulai.",
     path: ["endTime"],
 });
 
 type LessonFormValues = z.infer<typeof lessonFormSchema>;
 
-const editLessonFormSchema = lessonFormSchema.extend({
+const editLessonFormSchema = baseLessonObjectSchema.extend({
   id: z.string(),
+}).refine(lessonTimeRefinement, {
+  message: "Waktu selesai harus setelah waktu mulai.",
+  path: ["endTime"],
 });
+
 type EditLessonFormValues = z.infer<typeof editLessonFormSchema>;
 
 export default function LessonsPage() {
@@ -220,7 +229,7 @@ export default function LessonsPage() {
     }
   }, [selectedLesson, isEditDialogOpen, editLessonForm]);
 
-  const getDenormalizedNames = (data: LessonFormValues) => {
+  const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
     const subject = subjects.find(s => s.id === data.subjectId);
     const aClass = classes.find(c => c.id === data.classId);
     const teacher = teachers.find(t => t.id === data.teacherId);
@@ -271,7 +280,7 @@ export default function LessonsPage() {
     try {
       const lessonDocRef = doc(db, "lessons", data.id);
       await updateDoc(lessonDocRef, {
-        ...data,
+        ...data, // id will be part of data
         subjectName,
         className,
         teacherName,
