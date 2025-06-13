@@ -68,7 +68,7 @@ import {
   writeBatch
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/context/AuthContext"; // Added useAuth import
+import { useAuth } from "@/context/AuthContext"; 
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
@@ -125,7 +125,7 @@ const editExamFormSchema = baseExamObjectSchema.extend({
 type EditExamFormValues = z.infer<typeof editExamFormSchema>;
 
 export default function ExamsPage() {
-  const { user } = useAuth(); // Get the logged-in user (creator)
+  const { user, role } = useAuth(); 
   const [exams, setExams] = useState<ExamData[]>([]);
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
@@ -336,6 +336,8 @@ export default function ExamsPage() {
     setSelectedExam(exam);
   };
 
+  const canManageExams = role === "admin" || role === "guru";
+
   return (
     <div className="space-y-6">
       <div>
@@ -348,96 +350,98 @@ export default function ExamsPage() {
             <FileText className="h-6 w-6 text-primary" />
             <span>Daftar Ujian</span>
           </CardTitle>
-          <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-            setIsAddDialogOpen(isOpen);
-            if (!isOpen) { addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "" }); addExamForm.clearErrors(); }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0) fetchDropdownData(); }}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Tambah Ujian
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Tambah Jadwal Ujian Baru</DialogTitle>
-                <DialogDescription>
-                  Isi detail jadwal ujian.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={addExamForm.handleSubmit(handleAddExamSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                <div>
-                  <Label htmlFor="add-exam-title">Judul Ujian</Label>
-                  <Input id="add-exam-title" {...addExamForm.register("title")} className="mt-1" />
-                  {addExamForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.title.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="add-exam-subjectId">Mata Pelajaran</Label>
-                  <Select onValueChange={(value) => addExamForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addExamForm.getValues("subjectId")}>
-                    <SelectTrigger id="add-exam-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
-                    <SelectContent>
-                      {subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                      {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {addExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.subjectId.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="add-exam-classId">Kelas</Label>
-                  <Select onValueChange={(value) => addExamForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addExamForm.getValues("classId")}>
-                    <SelectTrigger id="add-exam-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                    <SelectContent>
-                      {classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                      {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {addExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.classId.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="add-exam-date">Tanggal Ujian</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className="w-full justify-start text-left font-normal mt-1"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {addExamForm.watch("date") ? format(addExamForm.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={addExamForm.watch("date")}
-                        onSelect={(date) => addExamForm.setValue("date", date || new Date(), { shouldValidate: true })}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {addExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.date.message}</p>}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="add-exam-startTime">Waktu Mulai</Label>
-                        <Input id="add-exam-startTime" type="time" {...addExamForm.register("startTime")} className="mt-1" />
-                        {addExamForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.startTime.message}</p>}
-                    </div>
-                    <div>
-                        <Label htmlFor="add-exam-endTime">Waktu Selesai</Label>
-                        <Input id="add-exam-endTime" type="time" {...addExamForm.register("endTime")} className="mt-1" />
-                        {addExamForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.endTime.message}</p>}
-                    </div>
-                </div>
-                <div>
-                  <Label htmlFor="add-exam-description">Deskripsi (Opsional)</Label>
-                  <Textarea id="add-exam-description" {...addExamForm.register("description")} className="mt-1" />
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                  <Button type="submit" disabled={addExamForm.formState.isSubmitting}>{addExamForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Jadwal"}</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {canManageExams && (
+            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+              setIsAddDialogOpen(isOpen);
+              if (!isOpen) { addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "" }); addExamForm.clearErrors(); }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0) fetchDropdownData(); }}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Ujian
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Tambah Jadwal Ujian Baru</DialogTitle>
+                  <DialogDescription>
+                    Isi detail jadwal ujian.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={addExamForm.handleSubmit(handleAddExamSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                  <div>
+                    <Label htmlFor="add-exam-title">Judul Ujian</Label>
+                    <Input id="add-exam-title" {...addExamForm.register("title")} className="mt-1" />
+                    {addExamForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.title.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="add-exam-subjectId">Mata Pelajaran</Label>
+                    <Select onValueChange={(value) => addExamForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addExamForm.getValues("subjectId")}>
+                      <SelectTrigger id="add-exam-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                      <SelectContent>
+                        {subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {addExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.subjectId.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="add-exam-classId">Kelas</Label>
+                    <Select onValueChange={(value) => addExamForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addExamForm.getValues("classId")}>
+                      <SelectTrigger id="add-exam-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                      <SelectContent>
+                        {classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {addExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.classId.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="add-exam-date">Tanggal Ujian</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className="w-full justify-start text-left font-normal mt-1"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {addExamForm.watch("date") ? format(addExamForm.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={addExamForm.watch("date")}
+                          onSelect={(date) => addExamForm.setValue("date", date || new Date(), { shouldValidate: true })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {addExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.date.message}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div>
+                          <Label htmlFor="add-exam-startTime">Waktu Mulai</Label>
+                          <Input id="add-exam-startTime" type="time" {...addExamForm.register("startTime")} className="mt-1" />
+                          {addExamForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.startTime.message}</p>}
+                      </div>
+                      <div>
+                          <Label htmlFor="add-exam-endTime">Waktu Selesai</Label>
+                          <Input id="add-exam-endTime" type="time" {...addExamForm.register("endTime")} className="mt-1" />
+                          {addExamForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.endTime.message}</p>}
+                      </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="add-exam-description">Deskripsi (Opsional)</Label>
+                    <Textarea id="add-exam-description" {...addExamForm.register("description")} className="mt-1" />
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                    <Button type="submit" disabled={addExamForm.formState.isSubmitting}>{addExamForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Jadwal"}</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -454,7 +458,7 @@ export default function ExamsPage() {
                     <TableHead>Kelas</TableHead>
                     <TableHead>Tanggal</TableHead>
                     <TableHead>Waktu</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    {canManageExams && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -465,32 +469,34 @@ export default function ExamsPage() {
                       <TableCell>{exam.className || exam.classId}</TableCell>
                       <TableCell>{format(exam.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</TableCell>
                       <TableCell>{exam.startTime} - {exam.endTime}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => openEditDialog(exam)} aria-label={`Edit ujian ${exam.title}`}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(exam)} aria-label={`Hapus ujian ${exam.title}`}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          {selectedExam && selectedExam.id === exam.id && (
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tindakan ini akan menghapus jadwal ujian <span className="font-semibold">{selectedExam?.title}</span>.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setSelectedExam(null)}>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteExam(selectedExam.id)}>Ya, Hapus Jadwal</AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          )}
-                        </AlertDialog>
-                      </TableCell>
+                      {canManageExams && (
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="outline" size="icon" onClick={() => openEditDialog(exam)} aria-label={`Edit ujian ${exam.title}`}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(exam)} aria-label={`Hapus ujian ${exam.title}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            {selectedExam && selectedExam.id === exam.id && (
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tindakan ini akan menghapus jadwal ujian <span className="font-semibold">{selectedExam?.title}</span>.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setSelectedExam(null)}>Batal</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteExam(selectedExam.id)}>Ya, Hapus Jadwal</AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            )}
+                          </AlertDialog>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -504,90 +510,92 @@ export default function ExamsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
-        setIsEditDialogOpen(isOpen);
-        if (!isOpen) { setSelectedExam(null); editExamForm.clearErrors(); }
-      }}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Jadwal Ujian</DialogTitle>
-            <DialogDescription>Perbarui detail jadwal ujian.</DialogDescription>
-          </DialogHeader>
-          {selectedExam && (
-            <form onSubmit={editExamForm.handleSubmit(handleEditExamSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-              <Input type="hidden" {...editExamForm.register("id")} />
-              <div>
-                <Label htmlFor="edit-exam-title">Judul Ujian</Label>
-                <Input id="edit-exam-title" {...editExamForm.register("title")} className="mt-1" />
-                {editExamForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.title.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="edit-exam-subjectId">Mata Pelajaran</Label>
-                <Select onValueChange={(value) => editExamForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editExamForm.getValues("subjectId")}>
-                  <SelectTrigger id="edit-exam-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
-                  <SelectContent>
-                    {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {editExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.subjectId.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="edit-exam-classId">Kelas</Label>
-                <Select onValueChange={(value) => editExamForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editExamForm.getValues("classId")}>
-                  <SelectTrigger id="edit-exam-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                  <SelectContent>
-                    {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {editExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.classId.message}</p>}
-              </div>
-              <div>
-                  <Label htmlFor="edit-exam-date">Tanggal Ujian</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className="w-full justify-start text-left font-normal mt-1"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editExamForm.watch("date") ? format(editExamForm.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={editExamForm.watch("date")}
-                        onSelect={(date) => editExamForm.setValue("date", date || new Date(), { shouldValidate: true })}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {editExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.date.message}</p>}
+      {canManageExams && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+          setIsEditDialogOpen(isOpen);
+          if (!isOpen) { setSelectedExam(null); editExamForm.clearErrors(); }
+        }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Jadwal Ujian</DialogTitle>
+              <DialogDescription>Perbarui detail jadwal ujian.</DialogDescription>
+            </DialogHeader>
+            {selectedExam && (
+              <form onSubmit={editExamForm.handleSubmit(handleEditExamSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <Input type="hidden" {...editExamForm.register("id")} />
+                <div>
+                  <Label htmlFor="edit-exam-title">Judul Ujian</Label>
+                  <Input id="edit-exam-title" {...editExamForm.register("title")} className="mt-1" />
+                  {editExamForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.title.message}</p>}
                 </div>
-              <div className="grid grid-cols-2 gap-4">
-                  <div>
-                      <Label htmlFor="edit-exam-startTime">Waktu Mulai</Label>
-                      <Input id="edit-exam-startTime" type="time" {...editExamForm.register("startTime")} className="mt-1" />
-                      {editExamForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.startTime.message}</p>}
+                <div>
+                  <Label htmlFor="edit-exam-subjectId">Mata Pelajaran</Label>
+                  <Select onValueChange={(value) => editExamForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editExamForm.getValues("subjectId")}>
+                    <SelectTrigger id="edit-exam-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {editExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.subjectId.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="edit-exam-classId">Kelas</Label>
+                  <Select onValueChange={(value) => editExamForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editExamForm.getValues("classId")}>
+                    <SelectTrigger id="edit-exam-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                    <SelectContent>
+                      {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {editExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.classId.message}</p>}
+                </div>
+                <div>
+                    <Label htmlFor="edit-exam-date">Tanggal Ujian</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className="w-full justify-start text-left font-normal mt-1"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editExamForm.watch("date") ? format(editExamForm.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={editExamForm.watch("date")}
+                          onSelect={(date) => editExamForm.setValue("date", date || new Date(), { shouldValidate: true })}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {editExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.date.message}</p>}
                   </div>
-                  <div>
-                      <Label htmlFor="edit-exam-endTime">Waktu Selesai</Label>
-                      <Input id="edit-exam-endTime" type="time" {...editExamForm.register("endTime")} className="mt-1" />
-                      {editExamForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.endTime.message}</p>}
-                  </div>
-              </div>
-              <div>
-                <Label htmlFor="edit-exam-description">Deskripsi (Opsional)</Label>
-                <Textarea id="edit-exam-description" {...editExamForm.register("description")} className="mt-1" />
-              </div>
-              <DialogFooter>
-                <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                <Button type="submit" disabled={editExamForm.formState.isSubmitting}>{editExamForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="edit-exam-startTime">Waktu Mulai</Label>
+                        <Input id="edit-exam-startTime" type="time" {...editExamForm.register("startTime")} className="mt-1" />
+                        {editExamForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.startTime.message}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-exam-endTime">Waktu Selesai</Label>
+                        <Input id="edit-exam-endTime" type="time" {...editExamForm.register("endTime")} className="mt-1" />
+                        {editExamForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.endTime.message}</p>}
+                    </div>
+                </div>
+                <div>
+                  <Label htmlFor="edit-exam-description">Deskripsi (Opsional)</Label>
+                  <Textarea id="edit-exam-description" {...editExamForm.register("description")} className="mt-1" />
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                  <Button type="submit" disabled={editExamForm.formState.isSubmitting}>{editExamForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
