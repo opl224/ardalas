@@ -35,54 +35,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      if (firebaseUser) {
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        
-        let userProfileData: UserProfile = { 
-          ...firebaseUser,
-          // displayName will be initially from firebaseUser, can be overridden below
-        } as UserProfile; 
+      try {
+        if (firebaseUser) {
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          
+          // Start with FirebaseUser data
+          let userProfileData: UserProfile = { 
+            ...firebaseUser,
+            // displayName will be initially from firebaseUser, potentially overridden
+          } as UserProfile; 
 
-        if (userDocSnap.exists()) {
-          const firestoreData = userDocSnap.data();
-          userProfileData.role = firestoreData?.role as Role | undefined;
-          setRole(userProfileData.role || null);
-
-          // Prioritize name from Firestore for displayName if Firebase Auth displayName is missing
-          if (!userProfileData.displayName && firestoreData?.name) {
-            userProfileData.displayName = firestoreData.name;
-          }
-          // Still ensure it's at least an empty string or null if both are missing
-          userProfileData.displayName = userProfileData.displayName || firestoreData?.name || null;
-
-
-          if (userProfileData.role === 'guru') {
-            userProfileData.assignedClassIds = firestoreData?.assignedClassIds || [];
-          } else if (userProfileData.role === 'siswa') {
-            userProfileData.classId = firestoreData?.classId;
-            userProfileData.className = firestoreData?.className;
-
-            if (userProfileData.classId && !userProfileData.className) {
-                const classDocRef = doc(db, "classes", userProfileData.classId);
-                const classDocSnap = await getDoc(classDocRef);
-                if (classDocSnap.exists()) {
-                    userProfileData.className = classDocSnap.data()?.name;
-                }
+          if (userDocSnap.exists()) {
+            const firestoreData = userDocSnap.data();
+            userProfileData.role = firestoreData?.role as Role | undefined;
+            
+            // Prioritize Firestore 'name' for displayName if Firebase Auth 'displayName' is missing/empty
+            // and Firestore 'name' exists.
+            if ((!firebaseUser.displayName || firebaseUser.displayName.trim() === "") && firestoreData?.name) {
+              userProfileData.displayName = firestoreData.name;
+            } else {
+              // Fallback to Firebase Auth displayName or null if that's also missing
+              userProfileData.displayName = firebaseUser.displayName || null;
             }
+
+            if (userProfileData.role === 'guru') {
+              userProfileData.assignedClassIds = firestoreData?.assignedClassIds || [];
+            } else if (userProfileData.role === 'siswa') {
+              userProfileData.classId = firestoreData?.classId;
+              userProfileData.className = firestoreData?.className;
+
+              // If className is still missing but classId exists, try to fetch it
+              if (userProfileData.classId && !userProfileData.className) {
+                  const classDocRef = doc(db, "classes", userProfileData.classId);
+                  const classDocSnap = await getDoc(classDocRef);
+                  if (classDocSnap.exists()) {
+                      userProfileData.className = classDocSnap.data()?.name;
+                  }
+              }
+            }
+          } else {
+            // User exists in Auth but not in Firestore users collection
+            // Use FirebaseUser's displayName; role will remain undefined (and thus null later)
+            userProfileData.displayName = firebaseUser.displayName || null;
           }
+          setUser(userProfileData);
+          setRole(userProfileData.role || null); // Set role based on profile data
         } else {
-          // User exists in Auth but not in Firestore users collection (should ideally not happen post-registration)
-          // Fallback to FirebaseUser's displayName if any, role would be null
-           userProfileData.displayName = firebaseUser.displayName || null;
-           setRole(null);
+          setUser(null);
+          setRole(null);
         }
-        setUser(userProfileData);
-      } else {
+      } catch (error) {
+        console.error("Error in onAuthStateChanged listener:", error);
+        // Ensure a clean state on error
         setUser(null);
         setRole(null);
+      } finally {
+        // Always set loading to false after processing
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -102,3 +113,4 @@ export const useAuth = () => {
   }
   return context;
 };
+
