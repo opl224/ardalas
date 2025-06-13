@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { UserCircle, Mail, Shield, Edit3, KeyRound } from "lucide-react";
+import { UserCircle, Mail, Shield, Edit3, KeyRound, School } from "lucide-react"; // Added School here
 import { roleDisplayNames } from "@/config/roles";
 import type { Metadata } from 'next';
 import Link from "next/link";
