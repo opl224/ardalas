@@ -255,7 +255,7 @@ export default function ResultsPage() {
 
 
   const watchClassId = addResultForm.watch("classId");
-  const watchSubjectId = addResultForm.watch("subjectId");
+  const watchSubjectIdForAdd = addResultForm.watch("subjectId");
   const watchAssignmentId = addResultForm.watch("assignmentId");
 
   const editWatchClassId = editResultForm.watch("classId");
@@ -264,82 +264,105 @@ export default function ResultsPage() {
 
 
   useEffect(() => {
+    const currentStudentId = addResultForm.getValues("studentId");
+    let newFilteredStudents: StudentMin[] = [];
     if (watchClassId) {
-      setFilteredStudents(students.filter(s => s.classId === watchClassId));
-      addResultForm.setValue("studentId", undefined); 
+      newFilteredStudents = students.filter(s => s.classId === watchClassId);
+      setFilteredStudents(newFilteredStudents);
+      if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
+        addResultForm.setValue("studentId", undefined, { shouldValidate: true });
+      }
     } else {
       setFilteredStudents([]);
+      addResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
-    
-    if (watchClassId && watchSubjectId) {
-      setFilteredAssignments(assignments.filter(a => a.classId === watchClassId && a.subjectId === watchSubjectId));
+  }, [watchClassId, students, addResultForm]);
+
+  useEffect(() => {
+    const currentClassIdValue = addResultForm.getValues("classId");
+    if (currentClassIdValue && watchSubjectIdForAdd) {
+      setFilteredAssignments(assignments.filter(a => a.classId === currentClassIdValue && a.subjectId === watchSubjectIdForAdd));
     } else {
       setFilteredAssignments([]);
     }
-    addResultForm.setValue("assignmentId", undefined);
-  }, [watchClassId, watchSubjectId, students, assignments, addResultForm]);
+    addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
+  }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
+
 
   useEffect(() => {
      const selectedAssignment = assignments.find(a => a.id === watchAssignmentId);
      if (selectedAssignment) {
-         addResultForm.setValue("assessmentTitle", selectedAssignment.title);
+         addResultForm.setValue("assessmentTitle", selectedAssignment.title, {shouldValidate: true});
          if (selectedAssignment.meetingNumber) {
-             addResultForm.setValue("meetingNumber", selectedAssignment.meetingNumber);
+             addResultForm.setValue("meetingNumber", selectedAssignment.meetingNumber, {shouldValidate: true});
          } else {
-             addResultForm.setValue("meetingNumber", undefined);
+             addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
      } else if (watchAssignmentId === "" || watchAssignmentId === undefined) { 
-         addResultForm.setValue("assessmentTitle", ""); 
-         addResultForm.setValue("meetingNumber", undefined);
+         addResultForm.setValue("assessmentTitle", "", {shouldValidate: true}); 
+         addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
      }
   }, [watchAssignmentId, assignments, addResultForm]);
   
   useEffect(() => {
+    const currentStudentId = editResultForm.getValues("studentId");
+    let newFilteredStudents: StudentMin[] = [];
     if (editWatchClassId) {
-      setFilteredStudents(students.filter(s => s.classId === editWatchClassId));
-    } else if (role === "admin" || role === "guru") { 
-      setFilteredStudents(students); 
+      newFilteredStudents = students.filter(s => s.classId === editWatchClassId);
+      setFilteredStudents(newFilteredStudents);
+      if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
+        editResultForm.setValue("studentId", undefined, { shouldValidate: true });
+      }
+    } else if (role === "admin" || role === "guru") {
+      setFilteredStudents(students);
     } else {
-        setFilteredStudents([]);
+      setFilteredStudents([]);
+      editResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
+  }, [editWatchClassId, students, editResultForm, role]);
 
-    if (editWatchClassId && editWatchSubjectId) {
-        setFilteredAssignments(assignments.filter(a => a.classId === editWatchClassId && a.subjectId === editWatchSubjectId));
+  useEffect(() => {
+    const currentClassIdValue = editResultForm.getValues("classId");
+    if (currentClassIdValue && editWatchSubjectId) {
+        setFilteredAssignments(assignments.filter(a => a.classId === currentClassIdValue && a.subjectId === editWatchSubjectId));
     } else {
         setFilteredAssignments([]);
     }
-    
-  }, [editWatchClassId, editWatchSubjectId, students, assignments, editResultForm, role]);
+    // Consider if assignmentId should be reset here or handled by initial population in selectedResult useEffect
+  }, [editWatchClassId, editWatchSubjectId, assignments, editResultForm]);
+
 
    useEffect(() => {
      const selectedAssignment = assignments.find(a => a.id === editWatchAssignmentId);
      if (selectedAssignment) {
-         editResultForm.setValue("assessmentTitle", selectedAssignment.title);
+         editResultForm.setValue("assessmentTitle", selectedAssignment.title, {shouldValidate: true});
           if (selectedAssignment.meetingNumber) {
-             editResultForm.setValue("meetingNumber", selectedAssignment.meetingNumber);
+             editResultForm.setValue("meetingNumber", selectedAssignment.meetingNumber, {shouldValidate: true});
          } else {
-             editResultForm.setValue("meetingNumber", undefined);
+             editResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
-     } else if (editWatchAssignmentId === "" || editWatchAssignmentId === undefined) {
-        
      }
   }, [editWatchAssignmentId, assignments, editResultForm]);
 
 
   useEffect(() => {
     if (selectedResult && isEditDialogOpen) {
+      const initialClassId = selectedResult.classId;
+      const initialSubjectId = selectedResult.subjectId;
+
+      if (initialClassId) {
+        setFilteredStudents(students.filter(s => s.classId === initialClassId));
+      }
       
-      setFilteredStudents(students.filter(s => s.classId === selectedResult.classId)); 
-      
-      if (selectedResult.classId && selectedResult.subjectId) {
-        setFilteredAssignments(assignments.filter(a => a.classId === selectedResult.classId && a.subjectId === selectedResult.subjectId));
+      if (initialClassId && initialSubjectId) {
+        setFilteredAssignments(assignments.filter(a => a.classId === initialClassId && a.subjectId === initialSubjectId));
       }
 
       editResultForm.reset({
         id: selectedResult.id,
-        classId: selectedResult.classId,
+        classId: initialClassId,
         studentId: selectedResult.studentId,
-        subjectId: selectedResult.subjectId,
+        subjectId: initialSubjectId,
         assessmentType: selectedResult.assessmentType,
         assessmentTitle: selectedResult.assessmentTitle,
         score: selectedResult.score,
@@ -400,7 +423,7 @@ export default function ResultsPage() {
       await addDoc(collection(db, "results"), resultData);
       toast({ title: "Hasil Belajar Ditambahkan", description: "Data berhasil disimpan." });
       setIsAddDialogOpen(false);
-      addResultForm.reset({ dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "", meetingNumber: undefined, assignmentId: undefined });
+      addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "", meetingNumber: undefined, assignmentId: undefined });
       fetchResults();
     } catch (error: any) {
       console.error("Error adding result:", error);
@@ -537,7 +560,7 @@ export default function ResultsPage() {
 
     
     const studentsForDropdown = dialogType === 'add' 
-        ? (watchClassId ? students.filter(s => s.classId === watchClassId) : [])
+        ? filteredStudents // Use state variable for add form
         : (editWatchClassId ? students.filter(s => s.classId === editWatchClassId) : (role === 'admin' || role === 'guru' ? students : []));
     
     
@@ -549,7 +572,7 @@ export default function ResultsPage() {
         <>
             <div>
                 <Label htmlFor={`${dialogType}-result-classId`}>Kelas</Label>
-                <Select onValueChange={(value) => {formInstance.setValue("classId", value, { shouldValidate: true }); formInstance.setValue("studentId", undefined); formInstance.setValue("assignmentId", undefined);}} value={currentClassId || undefined}>
+                <Select onValueChange={(value) => {formInstance.setValue("classId", value, { shouldValidate: true }); formInstance.setValue("studentId", undefined, { shouldValidate: true }); formInstance.setValue("assignmentId", undefined, { shouldValidate: true });}} value={currentClassId || undefined}>
                     <SelectTrigger id={`${dialogType}-result-classId`} className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
                     <SelectContent>
                     {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -559,7 +582,7 @@ export default function ResultsPage() {
             </div>
             <div>
                 <Label htmlFor={`${dialogType}-result-studentId`}>Siswa</Label>
-                <Select onValueChange={(value) => formInstance.setValue("studentId", value, { shouldValidate: true })} value={formInstance.getValues("studentId") || undefined} disabled={!currentClassId || studentsForDropdown.length === 0}>
+                <Select onValueChange={(value) => formInstance.setValue("studentId", value, { shouldValidate: true })} value={formInstance.watch("studentId") || undefined} disabled={!currentClassId || studentsForDropdown.length === 0}>
                     <SelectTrigger id={`${dialogType}-result-studentId`} className="mt-1"><SelectValue placeholder={!currentClassId ? "Pilih kelas dulu" : (studentsForDropdown.length === 0 ? "Tidak ada siswa di kelas ini" : "Pilih siswa")} /></SelectTrigger>
                     <SelectContent>
                     {studentsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -569,7 +592,7 @@ export default function ResultsPage() {
             </div>
             <div>
                 <Label htmlFor={`${dialogType}-result-subjectId`}>Mata Pelajaran</Label>
-                <Select onValueChange={(value) => {formInstance.setValue("subjectId", value, { shouldValidate: true }); formInstance.setValue("assignmentId", undefined);}} value={currentSubjectId || undefined}>
+                <Select onValueChange={(value) => {formInstance.setValue("subjectId", value, { shouldValidate: true }); formInstance.setValue("assignmentId", undefined, {shouldValidate: true});}} value={currentSubjectId || undefined}>
                     <SelectTrigger id={`${dialogType}-result-subjectId`} className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                     <SelectContent>
                     {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -628,7 +651,7 @@ export default function ResultsPage() {
 
             <div>
                 <Label htmlFor={`${dialogType}-result-assessmentType`}>Tipe Asesmen</Label>
-                <Select onValueChange={(value) => formInstance.setValue("assessmentType", value as AssessmentType, { shouldValidate: true })} value={formInstance.getValues("assessmentType")}>
+                <Select onValueChange={(value) => formInstance.setValue("assessmentType", value as AssessmentType, { shouldValidate: true })} value={formInstance.watch("assessmentType")}>
                     <SelectTrigger id={`${dialogType}-result-assessmentType`} className="mt-1"><SelectValue placeholder="Pilih tipe asesmen" /></SelectTrigger>
                     <SelectContent>
                     {ASSESSMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
@@ -728,10 +751,9 @@ export default function ResultsPage() {
                             <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
                                 {renderResultFormFields(addResultForm, 'add')}
                             </div>
-                            {/* Footer is now part of the scrollable form content or outside if using form attribute */}
-                             <DialogFooter className="pt-4 border-t">
+                            <DialogFooter className="pt-4 border-t">
                                 <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                                <Button type="submit" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
+                                <Button type="submit" form="addResultDialogForm" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
                             </DialogFooter>
                         </form>
                     </Form>
