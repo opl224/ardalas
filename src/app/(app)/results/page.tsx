@@ -231,7 +231,7 @@ export default function ResultsPage() {
     if (authLoading) return;
     fetchDropdownData(); 
     fetchResults();
-  }, [authLoading, user, role]);
+  }, [authLoading, user, role, user?.uid, user?.linkedStudentId]);
 
 
   const watchClassId = addResultForm.watch("classId");
@@ -635,8 +635,9 @@ export default function ResultsPage() {
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." : 
+                 role === 'siswa' && !user?.uid ? "Tidak dapat memuat data siswa. Silakan coba lagi." :
                  selectedAssessmentTypeFilter !== "all" ? `Tidak ada hasil belajar untuk tipe asesmen "${selectedAssessmentTypeFilter}". Coba filter lain.` :
-                 "Belum ada data hasil belajar."}
+                 "Belum ada data hasil belajar yang sesuai."}
             </div>
           )}
         </CardContent>
@@ -748,3 +749,4 @@ export default function ResultsPage() {
     </div>
   );
 }
+
