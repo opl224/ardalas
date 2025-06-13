@@ -4,8 +4,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { School, AlertCircle, Loader2 } from "lucide-react";
+import { School, AlertCircle, Loader2, Users } from "lucide-react"; // Added Users icon
 import type { Metadata } from 'next';
+import { Button } from "@/components/ui/button"; // Added Button import
+import Link from "next/link"; // Added Link import
 
 // Cannot export metadata from client component directly, will be handled by parent or layout
 // export const metadata: Metadata = {
@@ -87,16 +89,21 @@ export default function MyClassPage() {
           )}
           
           {user.classId && (
-            <div className="mt-6 space-y-2">
-                <h3 className="text-xl font-semibold">Detail Tambahan:</h3>
-                <p className="text-sm">ID Kelas: {user.classId}</p>
-                {/* Di sini Anda dapat menambahkan lebih banyak detail tentang kelas jika tersedia, 
-                    misalnya wali kelas, daftar pelajaran, dll., dengan mengambil data dari Firestore 
-                    berdasarkan user.classId */}
-                <p className="text-sm text-muted-foreground italic">
-                    Informasi lebih lanjut mengenai jadwal pelajaran, tugas, dan pengumuman kelas 
-                    dapat dilihat pada menu terkait.
-                </p>
+            <div className="mt-6 space-y-4">
+                <div>
+                    <h3 className="text-xl font-semibold mb-2">Detail Tambahan:</h3>
+                    <p className="text-sm">ID Kelas: {user.classId}</p>
+                    <p className="text-sm text-muted-foreground italic mt-1">
+                        Informasi lebih lanjut mengenai jadwal pelajaran, tugas, dan pengumuman kelas 
+                        dapat dilihat pada menu terkait.
+                    </p>
+                </div>
+                <Button asChild variant="outline">
+                  <Link href="/students">
+                    <Users className="mr-2 h-4 w-4" />
+                    Lihat Daftar Siswa Kelas Ini
+                  </Link>
+                </Button>
             </div>
           )}
         </CardContent>

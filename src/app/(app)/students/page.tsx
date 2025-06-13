@@ -58,10 +58,11 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  where // Added where import
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/context/AuthContext"; // Import useAuth
+import { useAuth } from "@/context/AuthContext"; 
 
 interface ClassMin {
   id: string;
@@ -92,7 +93,7 @@ const editStudentFormSchema = studentFormSchema.extend({
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 
 export default function StudentsPage() {
-  const { user: authUser, role: authRole } = useAuth(); // Get current user and role
+  const { user: authUser, role: authRole, loading: authLoading } = useAuth(); 
   const [students, setStudents] = useState<Student[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
@@ -140,14 +141,28 @@ export default function StudentsPage() {
   };
 
   const fetchStudents = async () => {
+    if (authLoading) return;
     setIsLoadingStudents(true);
     try {
-      if (allClasses.length === 0 && isLoadingClasses) { 
+      if (allClasses.length === 0 && !isLoadingClasses && (authRole === 'admin' || authRole === 'guru')) { 
           await fetchClassesForDropdown();
       }
+      
       const studentsCollectionRef = collection(db, "students");
-      const q = query(studentsCollectionRef, orderBy("name", "asc"));
-      const querySnapshot = await getDocs(q);
+      let studentsQuery;
+
+      if (authRole === 'siswa' && authUser?.classId) {
+        studentsQuery = query(studentsCollectionRef, where("classId", "==", authUser.classId), orderBy("name", "asc"));
+      } else if (authRole === 'admin' || authRole === 'guru') {
+        studentsQuery = query(studentsCollectionRef, orderBy("name", "asc"));
+      } else {
+        // Not admin, guru, or student with classId -> show no students, or handle as per app logic
+        setStudents([]);
+        setIsLoadingStudents(false);
+        return;
+      }
+
+      const querySnapshot = await getDocs(studentsQuery);
       const fetchedStudents: Student[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         name: docSnap.data().name,
@@ -170,9 +185,12 @@ export default function StudentsPage() {
   };
 
   useEffect(() => {
-    fetchClassesForDropdown(); 
+    // Fetch classes if admin/guru, or if student (to ensure their class name is up-to-date for display in forms)
+    if(authRole === 'admin' || authRole === 'guru' || authRole === 'siswa'){
+        fetchClassesForDropdown(); 
+    }
     fetchStudents();
-  }, []);
+  }, [authRole, authUser, authLoading]); // Re-fetch if auth state changes
 
   useEffect(() => {
     if (selectedStudent && isEditStudentDialogOpen) {
@@ -199,12 +217,10 @@ export default function StudentsPage() {
       }
       studentClassId = authUser.classId;
       studentClassName = authUser.className;
-      // Ensure form data's classId is also set (it should be if setValue was called on dialog open)
       if (data.classId !== studentClassId) {
-          console.warn("Form classId mismatch for student role, using authUser.classId");
-          data.classId = studentClassId;
+          data.classId = studentClassId; // Ensure form data matches auth user's class
       }
-    } else { // Admin or Guru
+    } else { 
       const selectedClassObj = allClasses.find(c => c.id === data.classId);
       if (!selectedClassObj) {
           toast({ title: "Kelas tidak valid", description: "Silakan pilih kelas yang valid untuk murid.", variant: "destructive" });
@@ -232,7 +248,7 @@ export default function StudentsPage() {
       
       toast({ title: "Murid Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddStudentDialogOpen(false);
-      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
+      addStudentForm.reset({ name: "", nis: "", email: "", classId: authRole === 'siswa' ? authUser?.classId : undefined });
       fetchStudents(); 
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -251,7 +267,6 @@ export default function StudentsPage() {
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
     editStudentForm.clearErrors();
-    // For editing, assume only admin/guru can change class. Students cannot edit other students.
     const selectedClass = allClasses.find(c => c.id === data.classId);
     if (!selectedClass) {
         toast({ title: "Kelas tidak valid", variant: "destructive" });
@@ -281,7 +296,6 @@ export default function StudentsPage() {
   };
 
   const handleDeleteStudent = async (studentId: string, studentName?: string) => {
-    // Assume only admin/guru can delete
     if (authRole === 'siswa') {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus murid.", variant: "destructive"});
         return;
@@ -362,7 +376,7 @@ export default function StudentsPage() {
             render={({ field }) => (
               <Select 
                 onValueChange={field.onChange} 
-                value={field.value || undefined} // Ensure value is string or undefined
+                value={field.value || undefined} 
                 disabled={isLoadingClasses}
               >
                 <SelectTrigger id={`${formType}-student-classId`} className="mt-1">
@@ -392,12 +406,20 @@ export default function StudentsPage() {
     </>
   );
 
+  const pageTitle = authRole === 'siswa' && authUser?.className 
+    ? `Daftar Siswa Kelas ${authUser.className}` 
+    : "Manajemen Murid";
+  
+  const pageDescription = authRole === 'siswa' && authUser?.className
+    ? `Daftar teman sekelas Anda.`
+    : "Kelola data murid, absensi, nilai, dan informasi terkait.";
+
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Manajemen Murid</h1>
-        <p className="text-muted-foreground">Kelola data murid, absensi, nilai, dan informasi terkait.</p>
+        <h1 className="text-3xl font-bold font-headline">{pageTitle}</h1>
+        <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -405,16 +427,16 @@ export default function StudentsPage() {
             <Users className="h-6 w-6 text-primary" />
             <span>Daftar Murid</span>
           </CardTitle>
-          { (authRole === 'admin' || authRole === 'guru' || (authRole === 'siswa' && authUser?.classId)) && ( // Show button for students only if they are in a class
+          { (authRole === 'admin' || authRole === 'guru' || (authRole === 'siswa' && authUser?.classId)) && ( 
             <Dialog 
               open={isAddStudentDialogOpen} 
               onOpenChange={(isOpen) => {
                 setIsAddStudentDialogOpen(isOpen);
                 if (!isOpen) {
-                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
+                  addStudentForm.reset({ name: "", nis: "", email: "", classId: authRole === 'siswa' ? authUser?.classId : undefined });
                   addStudentForm.clearErrors();
                 } else {
-                  if (allClasses.length === 0 && !isLoadingClasses) fetchClassesForDropdown();
+                  if (allClasses.length === 0 && !isLoadingClasses && (authRole === 'admin' || authRole === 'guru')) fetchClassesForDropdown();
                   if (authRole === 'siswa' && authUser?.classId) {
                     addStudentForm.setValue("classId", authUser.classId, { shouldValidate: true });
                   }
@@ -440,8 +462,8 @@ export default function StudentsPage() {
                     <DialogClose asChild>
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || (authRole !== 'siswa' && isLoadingClasses)}>
-                      {(addStudentForm.formState.isSubmitting || (authRole !== 'siswa' && isLoadingClasses)) ? "Menyimpan..." : "Simpan Murid"}
+                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || ((authRole === 'admin' || authRole === 'guru') && isLoadingClasses)}>
+                      {(addStudentForm.formState.isSubmitting || ((authRole === 'admin' || authRole === 'guru') && isLoadingClasses)) ? "Menyimpan..." : "Simpan Murid"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -450,7 +472,7 @@ export default function StudentsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoadingStudents || ( (authRole === 'admin' || authRole === 'guru') && isLoadingClasses) ? (
+          {isLoadingStudents || authLoading || ((authRole === 'admin' || authRole === 'guru') && isLoadingClasses) ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -512,13 +534,13 @@ export default function StudentsPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Tidak ada data murid untuk ditampilkan. Klik "Tambah Murid" untuk membuat data baru.
+              {authRole === 'siswa' ? "Tidak ada siswa lain di kelas Anda." : "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru."}
             </div>
           )}
         </CardContent>
       </Card>
 
-      { (authRole === 'admin' || authRole === 'guru') && ( // Edit dialog only for admin/guru
+      { (authRole === 'admin' || authRole === 'guru') && ( 
         <Dialog open={isEditStudentDialogOpen} onOpenChange={(isOpen) => {
             setIsEditStudentDialogOpen(isOpen);
             if (!isOpen) {
@@ -552,3 +574,4 @@ export default function StudentsPage() {
     </div>
   );
 }
+
