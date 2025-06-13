@@ -41,10 +41,10 @@ export const navItems: NavItem[] = [
     title: "Pengguna",
     href: "#", // Parent item, no direct link
     icon: Users,
-    roles: ["admin", "guru", "siswa"], // Visible to admin, guru, and siswa
+    roles: ["admin", "guru"], // Diubah: Siswa tidak lagi melihat menu ini
     children: [
       { title: "Guru", href: "/teachers", icon: Users, roles: ["admin"] },
-      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru", "siswa"] },
+      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru"] }, // Siswa akan mengakses daftar murid kelasnya via /my-class
       { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin"] },
     ],
   },
@@ -83,8 +83,11 @@ export const navItems: NavItem[] = [
   },
   { 
     title: "Pengaturan", 
-    href: "#", // Parent item, no direct link
-    icon: Settings
+    href: "/settings", 
+    icon: Settings,
+    children: [
+        { title: "Profil", href: "/settings/profile", icon: UserCircle },
+    ]
   }, 
 ];
 
@@ -92,3 +95,4 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     // Logout akan ditangani oleh tombol, bukan item nav langsung di daftar ini
 ];
+
