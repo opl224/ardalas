@@ -69,14 +69,14 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { Form } from "@/components/ui/form"; // Imported react-hook-form's Form component
+import { Form } from "@/components/ui/form"; 
 
 
 // Minimal interfaces for dropdowns
 interface ClassMin { id: string; name: string; }
 interface StudentMin { id: string; name: string; classId: string; }
 interface SubjectMin { id: string; name: string; }
-interface AssignmentMin { id: string; title: string; meetingNumber?: number; subjectId: string; classId: string; } // Added AssignmentMin
+interface AssignmentMin { id: string; title: string; meetingNumber?: number; subjectId: string; classId: string; } 
 
 const ASSESSMENT_TYPES = ["UTS", "UAS", "Tugas Harian", "Kuis", "Proyek", "Praktikum", "Lainnya"] as const;
 type AssessmentType = typeof ASSESSMENT_TYPES[number];
@@ -96,8 +96,8 @@ interface ResultData {
   grade?: string;
   dateOfAssessment: Timestamp; 
   feedback?: string;
-  assignmentId?: string; // Added
-  meetingNumber?: number; // Added
+  assignmentId?: string; 
+  meetingNumber?: number; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   recordedById?: string;
@@ -141,8 +141,8 @@ export default function ResultsPage() {
   const [students, setStudents] = useState<StudentMin[]>([]); 
   const [filteredStudents, setFilteredStudents] = useState<StudentMin[]>([]);
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentMin[]>([]); // State for assignments
-  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]); // For dropdown
+  const [assignments, setAssignments] = useState<AssignmentMin[]>([]); 
+  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]); 
 
   const [isLoadingData, setIsLoadingData] = useState(true); 
   const [isLoadingResults, setIsLoadingResults] = useState(true);
@@ -188,7 +188,7 @@ export default function ResultsPage() {
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "students"), orderBy("name", "asc"))), 
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "assignments"), orderBy("title", "asc"))), // Fetch all assignments
+        getDocs(query(collection(db, "assignments"), orderBy("title", "asc"))), 
       ]);
       setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       setStudents(studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, classId: doc.data().classId })));
@@ -270,7 +270,7 @@ export default function ResultsPage() {
     } else {
       setFilteredStudents([]);
     }
-    // Filter assignments when class or subject changes in add form
+    
     if (watchClassId && watchSubjectId) {
       setFilteredAssignments(assignments.filter(a => a.classId === watchClassId && a.subjectId === watchSubjectId));
     } else {
@@ -288,8 +288,8 @@ export default function ResultsPage() {
          } else {
              addResultForm.setValue("meetingNumber", undefined);
          }
-     } else if (watchAssignmentId === "" || watchAssignmentId === undefined) { // If "Input Manual" or cleared
-         addResultForm.setValue("assessmentTitle", ""); // Clear or allow manual input
+     } else if (watchAssignmentId === "" || watchAssignmentId === undefined) { 
+         addResultForm.setValue("assessmentTitle", ""); 
          addResultForm.setValue("meetingNumber", undefined);
      }
   }, [watchAssignmentId, assignments, addResultForm]);
@@ -308,7 +308,7 @@ export default function ResultsPage() {
     } else {
         setFilteredAssignments([]);
     }
-    // editResultForm.setValue("assignmentId", undefined); // Don't reset on edit open, preserve current value
+    
   }, [editWatchClassId, editWatchSubjectId, students, assignments, editResultForm, role]);
 
    useEffect(() => {
@@ -321,18 +321,16 @@ export default function ResultsPage() {
              editResultForm.setValue("meetingNumber", undefined);
          }
      } else if (editWatchAssignmentId === "" || editWatchAssignmentId === undefined) {
-         // If assignmentId is cleared in edit mode, allow manual input.
-         // Don't automatically clear assessmentTitle or meetingNumber if they were already set from the original record
-         // This handles the case where the result was initially manual and now might be linked or unlinked.
+        
      }
   }, [editWatchAssignmentId, assignments, editResultForm]);
 
 
   useEffect(() => {
     if (selectedResult && isEditDialogOpen) {
-      // Initial population of filtered students for edit form
+      
       setFilteredStudents(students.filter(s => s.classId === selectedResult.classId)); 
-      // Initial population of filtered assignments for edit form
+      
       if (selectedResult.classId && selectedResult.subjectId) {
         setFilteredAssignments(assignments.filter(a => a.classId === selectedResult.classId && a.subjectId === selectedResult.subjectId));
       }
@@ -434,10 +432,10 @@ export default function ResultsPage() {
         updatedAt: serverTimestamp(),
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        resultData.meetingNumber = null; // Or deleteField()
+        resultData.meetingNumber = null; 
     }
     if (!data.assignmentId) {
-        resultData.assignmentId = null; // Or deleteField()
+        resultData.assignmentId = null; 
     }
 
 
@@ -537,12 +535,12 @@ export default function ResultsPage() {
     const currentSubjectId = formInstance.watch("subjectId");
     const currentAssignmentId = formInstance.watch("assignmentId");
 
-    // Determine filtered students based on form type
+    
     const studentsForDropdown = dialogType === 'add' 
         ? (watchClassId ? students.filter(s => s.classId === watchClassId) : [])
         : (editWatchClassId ? students.filter(s => s.classId === editWatchClassId) : (role === 'admin' || role === 'guru' ? students : []));
     
-    // Determine filtered assignments
+    
     const assignmentsForDropdown = (currentClassId && currentSubjectId)
         ? assignments.filter(a => a.classId === currentClassId && a.subjectId === currentSubjectId)
         : [];
@@ -589,8 +587,8 @@ export default function ResultsPage() {
                         if (selectedAssignment) {
                             formInstance.setValue("assessmentTitle", selectedAssignment.title, {shouldValidate: true});
                             formInstance.setValue("meetingNumber", selectedAssignment.meetingNumber, {shouldValidate: true});
-                        } else { // manual or cleared
-                            if (dialogType === 'add' || !formInstance.getValues("assessmentTitle")) { // only clear if adding or if title was not pre-filled from edit
+                        } else { 
+                            if (dialogType === 'add' || !formInstance.getValues("assessmentTitle")) { 
                                 formInstance.setValue("assessmentTitle", "", {shouldValidate: true});
                             }
                              if (dialogType === 'add' || !formInstance.getValues("meetingNumber")) {
@@ -722,7 +720,7 @@ export default function ResultsPage() {
                       <DialogDescription>Isi detail nilai siswa.</DialogDescription>
                   </DialogHeader>
                   <Form {...addResultForm}>
-                    <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 pr-2">
                         {renderResultFormFields(addResultForm, 'add')}
                         <DialogFooter>
                         <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
@@ -808,7 +806,7 @@ export default function ResultsPage() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
+      
       {canManageResults && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
             setIsEditDialogOpen(isOpen);
