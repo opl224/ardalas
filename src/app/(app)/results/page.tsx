@@ -69,6 +69,8 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import { Form } from "@/components/ui/form"; // Imported react-hook-form's Form component
+
 
 // Minimal interfaces for dropdowns
 interface ClassMin { id: string; name: string; }
@@ -219,7 +221,7 @@ export default function ResultsPage() {
       const resultsCollectionRef = collection(db, "results");
       let q;
 
-      if (role === 'siswa' && user) {
+      if (role === 'siswa' && user?.uid) {
         q = query(resultsCollectionRef, where("studentId", "==", user.uid), orderBy("dateOfAssessment", "desc"));
       } else if (role === 'orangtua' && user?.linkedStudentId) {
         q = query(resultsCollectionRef, where("studentId", "==", user.linkedStudentId), orderBy("dateOfAssessment", "desc"));
@@ -719,13 +721,15 @@ export default function ResultsPage() {
                       <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
                       <DialogDescription>Isi detail nilai siswa.</DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                      {renderResultFormFields(addResultForm, 'add')}
-                      <DialogFooter>
-                      <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                      <Button type="submit" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
-                      </DialogFooter>
-                  </form>
+                  <Form {...addResultForm}>
+                    <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                        {renderResultFormFields(addResultForm, 'add')}
+                        <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                        <Button type="submit" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
+                        </DialogFooter>
+                    </form>
+                  </Form>
                   </DialogContent>
               </Dialog>
             )}
@@ -816,6 +820,7 @@ export default function ResultsPage() {
                 <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
             </DialogHeader>
             {selectedResult && (
+                <Form {...editResultForm}>
                 <form onSubmit={editResultForm.handleSubmit(handleEditResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <Input type="hidden" {...editResultForm.register("id")} />
                 {renderResultFormFields(editResultForm, 'edit')}
@@ -824,6 +829,7 @@ export default function ResultsPage() {
                     <Button type="submit" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
                 </DialogFooter>
                 </form>
+                </Form>
             )}
             </DialogContent>
         </Dialog>
