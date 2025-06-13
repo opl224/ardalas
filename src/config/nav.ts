@@ -41,10 +41,10 @@ export const navItems: NavItem[] = [
     title: "Pengguna",
     href: "#", // Parent item, no direct link
     icon: Users,
-    roles: ["admin", "guru"], // Diubah: Siswa tidak lagi melihat menu ini
+    roles: ["admin", "guru"], 
     children: [
       { title: "Guru", href: "/teachers", icon: Users, roles: ["admin"] },
-      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru"] }, // Siswa akan mengakses daftar murid kelasnya via /my-class
+      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru"] }, 
       { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin"] },
     ],
   },
@@ -85,9 +85,6 @@ export const navItems: NavItem[] = [
     title: "Pengaturan", 
     href: "/settings", 
     icon: Settings,
-    children: [
-        { title: "Profil", href: "/settings/profile", icon: UserCircle },
-    ]
   }, 
 ];
 

@@ -48,7 +48,7 @@ export function AppSidebar() {
   const router = useRouter();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
 
 
   const toggleSubmenu = (title: string) => {
@@ -109,7 +109,8 @@ export function AppSidebar() {
                 asChild
                 isActive={isActive}
                 className={cn(
-                  "justify-start w-full",
+                  "w-full",
+                  !isMobile && state === 'collapsed' ? "justify-center" : "justify-start",
                   isActive && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
                 )}
                 tooltip={item.title}
@@ -143,8 +144,8 @@ export function AppSidebar() {
       <div className="flex h-16 items-center border-b border-border px-4">
          <AppLogo />
       </div>
-      <SidebarContent className="flex-1"> {/* Removed p-2 and overflow-y-auto */}
-        <ScrollArea className="h-full w-full p-2"> {/* Added ScrollArea and p-2 here */}
+      <SidebarContent className="flex-1"> 
+        <ScrollArea className="h-full w-full p-2"> 
           <SidebarMenu>
             {renderNavItemsRecursive(navItems, pathname, role)}
           </SidebarMenu>
@@ -183,8 +184,8 @@ export function AppSidebar() {
           </div>
           <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
-        <SidebarContent className="flex-1"> {/* Removed p-2 and overflow-y-auto */}
-          <ScrollArea className="h-full w-full p-2"> {/* Added ScrollArea and p-2 here */}
+        <SidebarContent className="flex-1"> 
+          <ScrollArea className="h-full w-full p-2"> 
             <SidebarMenu>
               {renderNavItemsRecursive(navItems, pathname, role)}
             </SidebarMenu>
