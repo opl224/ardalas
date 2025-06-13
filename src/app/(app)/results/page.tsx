@@ -75,7 +75,8 @@ import Link from "next/link";
 
 // Minimal interfaces for dropdowns
 interface ClassMin { id: string; name: string; }
-interface StudentMin { id: string; name: string; classId: string; }
+// StudentMin's id will now be the student's authUid
+interface StudentMin { id: string; name: string; classId: string; className?: string; }
 interface SubjectMin { id: string; name: string; }
 interface AssignmentMin { id: string; title: string; meetingNumber?: number; subjectId: string; classId: string; } 
 
@@ -84,7 +85,7 @@ type AssessmentType = typeof ASSESSMENT_TYPES[number];
 
 interface ResultData {
   id: string;
-  studentId: string;
+  studentId: string; // This will store student's authUid
   studentName: string;
   classId: string;
   className: string;
@@ -109,7 +110,7 @@ interface ResultData {
 
 const baseResultFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
-  studentId: z.string({ required_error: "Pilih siswa." }),
+  studentId: z.string({ required_error: "Pilih siswa." }), // This will be authUid
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
@@ -187,14 +188,24 @@ export default function ResultsPage() {
     }
     setIsLoadingData(true);
     try {
-      const [classesSnapshot, studentsSnapshot, subjectsSnapshot, assignmentsSnapshot] = await Promise.all([
+      const [classesSnapshot, studentsAuthSnapshot, subjectsSnapshot, assignmentsSnapshot] = await Promise.all([
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "students"), orderBy("name", "asc"))), 
+        getDocs(query(collection(db, "users"), where("role", "==", "siswa"), orderBy("name", "asc"))), 
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "assignments"), orderBy("title", "asc"))), 
       ]);
       setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setStudents(studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, classId: doc.data().classId })));
+      
+      setStudents(studentsAuthSnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+            id: docSnap.id, // This is the authUid
+            name: data.name,
+            classId: data.classId,
+            className: data.className,
+        };
+      }));
+
       setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       setAssignments(assignmentsSnapshot.docs.map(doc => ({ 
         id: doc.id, 
@@ -241,19 +252,16 @@ export default function ResultsPage() {
         ...docSnap.data(),
       })) as ResultData[];
 
-      // Fetch submission links for student/parent if results are tied to assignments
       if (studentToQueryId && fetchedResults.length > 0) {
         const assignmentIds = fetchedResults
             .map(r => r.assignmentId)
             .filter((id): id is string => !!id); 
 
         if (assignmentIds.length > 0) {
-            // Firestore 'in' queries are limited to 30 elements. Handle larger sets if necessary.
-            // For now, assuming assignmentIds.length <= 30
             const submissionsQuery = query(
                 collection(db, "assignmentSubmissions"),
-                where("studentId", "==", studentToQueryId),
-                where("assignmentId", "in", assignmentIds)
+                where("studentId", "==", studentToQueryId), // studentToQueryId is authUid here
+                where("assignmentId", "in", assignmentIds.slice(0,30)) // Handle 'in' query limit if necessary
             );
             const submissionsSnapshot = await getDocs(submissionsQuery);
             const submissionsMap = new Map<string, { link: string; notes?: string }>();
@@ -301,16 +309,33 @@ export default function ResultsPage() {
 
 
   useEffect(() => {
-    const currentStudentId = addResultForm.getValues("studentId");
-    let newFilteredStudents: StudentMin[] = [];
+    const currentFormStudentId = addResultForm.getValues("studentId");
+    let newFilteredStudentsList: StudentMin[] = [];
     if (watchClassId) {
-      newFilteredStudents = students.filter(s => s.classId === watchClassId);
+      newFilteredStudentsList = students.filter(s => s.classId === watchClassId);
     }
-    setFilteredStudents(newFilteredStudents);
-    if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
+    setFilteredStudents(newFilteredStudentsList);
+    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId)) {
       addResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, students, addResultForm]);
+
+
+  useEffect(() => {
+    const currentFormStudentId = editResultForm.getValues("studentId");
+    let newFilteredStudentsList: StudentMin[] = [];
+    if (editWatchClassId) {
+        newFilteredStudentsList = students.filter(s => s.classId === editWatchClassId);
+    } else if (role === "admin" || role === "guru") {
+        newFilteredStudentsList = students;
+    }
+    setFilteredStudents(newFilteredStudentsList);
+
+    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId)) {
+        editResultForm.setValue("studentId", undefined, { shouldValidate: true });
+    }
+}, [editWatchClassId, students, editResultForm, role]);
+
 
   useEffect(() => {
     const currentClassIdValue = addResultForm.getValues("classId");
@@ -319,13 +344,12 @@ export default function ResultsPage() {
     } else {
       setFilteredAssignments([]);
     }
-    // Only reset assignmentId if it's not already undefined to avoid unnecessary re-renders/validation triggers
     if (addResultForm.getValues("assignmentId") !== undefined) {
       addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
 
-
+  
   useEffect(() => {
      const selectedAssignment = assignments.find(a => a.id === watchAssignmentId);
      if (selectedAssignment) {
@@ -336,7 +360,6 @@ export default function ResultsPage() {
              addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
      } else if (watchAssignmentId === "" || watchAssignmentId === undefined) { 
-         // Only clear if not editing and not having a pre-filled title
          if (!addResultForm.formState.isDirty || addResultForm.getValues("assessmentTitle") === assignments.find(a=>a.id === addResultForm.getValues("assignmentId"))?.title){
             addResultForm.setValue("assessmentTitle", "", {shouldValidate: true}); 
             addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
@@ -344,20 +367,6 @@ export default function ResultsPage() {
      }
   }, [watchAssignmentId, assignments, addResultForm]);
   
-  useEffect(() => {
-    const currentStudentId = editResultForm.getValues("studentId");
-    let newFilteredStudents: StudentMin[] = [];
-    if (editWatchClassId) {
-      newFilteredStudents = students.filter(s => s.classId === editWatchClassId);
-    } else if (role === "admin" || role === "guru") { 
-      newFilteredStudents = students;
-    }
-    setFilteredStudents(newFilteredStudents);
-
-    if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
-      editResultForm.setValue("studentId", undefined, { shouldValidate: true });
-    }
-  }, [editWatchClassId, students, editResultForm, role]);
 
   useEffect(() => {
     const currentClassIdValue = editResultForm.getValues("classId");
@@ -398,7 +407,7 @@ export default function ResultsPage() {
       editResultForm.reset({
         id: selectedResult.id,
         classId: initialClassId,
-        studentId: selectedResult.studentId,
+        studentId: selectedResult.studentId, // This is authUid
         subjectId: initialSubjectId,
         assessmentType: selectedResult.assessmentType,
         assessmentTitle: selectedResult.assessmentTitle,
@@ -414,12 +423,12 @@ export default function ResultsPage() {
   }, [selectedResult, isEditDialogOpen, editResultForm, students, assignments]);
 
   const getDenormalizedNames = (data: ResultFormValues | EditResultFormValues) => {
-    const student = students.find(s => s.id === data.studentId);
+    const student = students.find(s => s.id === data.studentId); // student.id is authUid here
     const aClass = classes.find(c => c.id === data.classId);
     const subject = subjects.find(s => s.id === data.subjectId);
     return {
       studentName: student?.name,
-      className: aClass?.name,
+      className: aClass?.name || student?.className, // Fallback to student's className if class not in dropdown (edge case)
       subjectName: subject?.name,
     };
   };
@@ -440,7 +449,7 @@ export default function ResultsPage() {
     }
 
     const resultData: any = {
-        ...data,
+        ...data, // data.studentId is authUid
         studentName,
         className,
         subjectName,
@@ -487,7 +496,7 @@ export default function ResultsPage() {
     }
     
     const resultData: any = {
-        ...data,
+        ...data, // data.studentId is authUid
         studentName,
         className,
         subjectName,
@@ -775,31 +784,31 @@ export default function ResultsPage() {
                   setIsAddDialogOpen(isOpen);
                   if (!isOpen) { addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "", meetingNumber: undefined, assignmentId: undefined }); addResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
               }}>
-                  <DialogTrigger asChild>
+                <DialogTrigger asChild>
                   <Button size="sm" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
                   </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
-                    <DialogHeader>
-                        <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
-                        <DialogDescription>Isi detail nilai siswa.</DialogDescription>
-                    </DialogHeader>
-                    <Form {...addResultForm}>
-                        <form
-                            id="addResultDialogForm"
-                            onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)}
-                            className="flex flex-col overflow-hidden flex-1"
-                        >
-                            <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
-                                {renderResultFormFields(addResultForm, 'add')}
-                            </div>
-                            <DialogFooter className="pt-4 border-t">
-                                <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                                <Button type="submit" form="addResultDialogForm" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+                  <DialogHeader>
+                      <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
+                      <DialogDescription>Isi detail nilai siswa.</DialogDescription>
+                  </DialogHeader>
+                  <Form {...addResultForm}>
+                      <form
+                          id="addResultDialogForm"
+                          onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)}
+                          className="flex flex-col overflow-hidden flex-1"
+                      >
+                        <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                            {renderResultFormFields(addResultForm, 'add')}
+                        </div>
+                        <DialogFooter className="pt-4 border-t">
+                            <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                            <Button type="submit" form="addResultDialogForm" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
+                        </DialogFooter>
+                      </form>
+                  </Form>
                 </DialogContent>
               </Dialog>
             )}
@@ -851,10 +860,10 @@ export default function ResultsPage() {
                           )}
                         </TableCell>
                       )}
-                       <TableCell className="max-w-[200px] truncate" title={result.feedback}>{result.feedback || "-"}</TableCell>
+                       <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
                        <TableCell>
-                        { (role === 'siswa' || role === 'orangtua') 
-                            ? (result.createdAt ? format(result.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale }) : '-') 
+                        { (role === 'siswa' || role === 'orangtua') && result.createdAt
+                            ? format(result.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale }) 
                             : format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })
                         }
                       </TableCell>
@@ -908,30 +917,30 @@ export default function ResultsPage() {
             setIsEditDialogOpen(isOpen);
             if (!isOpen) { setSelectedResult(null); editResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
         }}>
-            <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
-              <DialogHeader>
-                  <DialogTitle>Edit Hasil Belajar</DialogTitle>
-                  <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
-              </DialogHeader>
-              {selectedResult && (
-                  <Form {...editResultForm}>
-                    <form
-                        id="editResultDialogForm"
-                        onSubmit={editResultForm.handleSubmit(handleEditResultSubmit)}
-                        className="flex flex-col overflow-hidden flex-1"
-                    >
-                      <Input type="hidden" {...editResultForm.register("id")} />
-                      <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
-                          {renderResultFormFields(editResultForm, 'edit')}
-                      </div>
-                      <DialogFooter className="pt-4 border-t">
-                          <DialogClose asChild><Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setSelectedResult(null);}}>Batal</Button></DialogClose>
-                          <Button type="submit" form="editResultDialogForm" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
-                      </DialogFooter>
-                    </form>
-                  </Form>
-              )}
-            </DialogContent>
+          <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+            <DialogHeader>
+                <DialogTitle>Edit Hasil Belajar</DialogTitle>
+                <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
+            </DialogHeader>
+            {selectedResult && (
+                <Form {...editResultForm}>
+                  <form
+                      id="editResultDialogForm"
+                      onSubmit={editResultForm.handleSubmit(handleEditResultSubmit)}
+                      className="flex flex-col overflow-hidden flex-1"
+                  >
+                    <Input type="hidden" {...editResultForm.register("id")} />
+                    <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                        {renderResultFormFields(editResultForm, 'edit')}
+                    </div>
+                    <DialogFooter className="pt-4 border-t">
+                        <DialogClose asChild><Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setSelectedResult(null);}}>Batal</Button></DialogClose>
+                        <Button type="submit" form="editResultDialogForm" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+            )}
+          </DialogContent>
         </Dialog>
       )}
     </div>
