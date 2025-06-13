@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Loader2, Save, Filter } from "lucide-react";
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Loader2, Save, Filter, Link as LinkIcon } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -70,6 +70,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { Form } from "@/components/ui/form"; 
+import Link from "next/link";
 
 
 // Minimal interfaces for dropdowns
@@ -102,6 +103,8 @@ interface ResultData {
   updatedAt?: Timestamp;
   recordedById?: string;
   recordedByName?: string;
+  studentSubmissionLink?: string; 
+  submissionNotes?: string; 
 }
 
 const baseResultFormSchema = z.object({
@@ -220,11 +223,10 @@ export default function ResultsPage() {
     try {
       const resultsCollectionRef = collection(db, "results");
       let q;
+      const studentToQueryId = role === 'siswa' ? user?.uid : (role === 'orangtua' ? user?.linkedStudentId : null);
 
-      if (role === 'siswa' && user?.uid) {
-        q = query(resultsCollectionRef, where("studentId", "==", user.uid), orderBy("dateOfAssessment", "desc"));
-      } else if (role === 'orangtua' && user?.linkedStudentId) {
-        q = query(resultsCollectionRef, where("studentId", "==", user.linkedStudentId), orderBy("dateOfAssessment", "desc"));
+      if (studentToQueryId) {
+        q = query(resultsCollectionRef, where("studentId", "==", studentToQueryId), orderBy("dateOfAssessment", "desc"));
       } else if (role === 'admin' || role === 'guru') {
         q = query(resultsCollectionRef, orderBy("dateOfAssessment", "desc"), orderBy("createdAt", "desc"));
       } else {
@@ -233,11 +235,46 @@ export default function ResultsPage() {
         return;
       }
       
-      const querySnapshot = await getDocs(q);
-      const fetchedResults = querySnapshot.docs.map(docSnap => ({
+      let fetchedResultsDocs = await getDocs(q);
+      let fetchedResults = fetchedResultsDocs.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
       })) as ResultData[];
+
+      // Fetch submission links for student/parent if results are tied to assignments
+      if (studentToQueryId && fetchedResults.length > 0) {
+        const assignmentIds = fetchedResults
+            .map(r => r.assignmentId)
+            .filter((id): id is string => !!id); 
+
+        if (assignmentIds.length > 0) {
+            // Firestore 'in' queries are limited to 30 elements. Handle larger sets if necessary.
+            // For now, assuming assignmentIds.length <= 30
+            const submissionsQuery = query(
+                collection(db, "assignmentSubmissions"),
+                where("studentId", "==", studentToQueryId),
+                where("assignmentId", "in", assignmentIds)
+            );
+            const submissionsSnapshot = await getDocs(submissionsQuery);
+            const submissionsMap = new Map<string, { link: string; notes?: string }>();
+            submissionsSnapshot.forEach(doc => {
+                const subData = doc.data();
+                submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
+            });
+
+            fetchedResults = fetchedResults.map(result => {
+                if (result.assignmentId && submissionsMap.has(result.assignmentId)) {
+                    const submission = submissionsMap.get(result.assignmentId)!;
+                    return {
+                        ...result,
+                        studentSubmissionLink: submission.link,
+                        submissionNotes: submission.notes,
+                    };
+                }
+                return result;
+            });
+        }
+      }
       setResults(fetchedResults);
     } catch (error) {
       console.error("Error fetching results: ", error);
@@ -268,12 +305,9 @@ export default function ResultsPage() {
     let newFilteredStudents: StudentMin[] = [];
     if (watchClassId) {
       newFilteredStudents = students.filter(s => s.classId === watchClassId);
-      setFilteredStudents(newFilteredStudents);
-      if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
-        addResultForm.setValue("studentId", undefined, { shouldValidate: true });
-      }
-    } else {
-      setFilteredStudents([]);
+    }
+    setFilteredStudents(newFilteredStudents);
+    if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
       addResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, students, addResultForm]);
@@ -285,7 +319,10 @@ export default function ResultsPage() {
     } else {
       setFilteredAssignments([]);
     }
-    addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
+    // Only reset assignmentId if it's not already undefined to avoid unnecessary re-renders/validation triggers
+    if (addResultForm.getValues("assignmentId") !== undefined) {
+      addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
+    }
   }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
 
 
@@ -299,8 +336,11 @@ export default function ResultsPage() {
              addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
      } else if (watchAssignmentId === "" || watchAssignmentId === undefined) { 
-         addResultForm.setValue("assessmentTitle", "", {shouldValidate: true}); 
-         addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
+         // Only clear if not editing and not having a pre-filled title
+         if (!addResultForm.formState.isDirty || addResultForm.getValues("assessmentTitle") === assignments.find(a=>a.id === addResultForm.getValues("assignmentId"))?.title){
+            addResultForm.setValue("assessmentTitle", "", {shouldValidate: true}); 
+            addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
+         }
      }
   }, [watchAssignmentId, assignments, addResultForm]);
   
@@ -309,14 +349,12 @@ export default function ResultsPage() {
     let newFilteredStudents: StudentMin[] = [];
     if (editWatchClassId) {
       newFilteredStudents = students.filter(s => s.classId === editWatchClassId);
-      setFilteredStudents(newFilteredStudents);
-      if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
-        editResultForm.setValue("studentId", undefined, { shouldValidate: true });
-      }
-    } else if (role === "admin" || role === "guru") {
-      setFilteredStudents(students);
-    } else {
-      setFilteredStudents([]);
+    } else if (role === "admin" || role === "guru") { 
+      newFilteredStudents = students;
+    }
+    setFilteredStudents(newFilteredStudents);
+
+    if (currentStudentId && !newFilteredStudents.find(s => s.id === currentStudentId)) {
       editResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
   }, [editWatchClassId, students, editResultForm, role]);
@@ -328,7 +366,6 @@ export default function ResultsPage() {
     } else {
         setFilteredAssignments([]);
     }
-    // Consider if assignmentId should be reset here or handled by initial population in selectedResult useEffect
   }, [editWatchClassId, editWatchSubjectId, assignments, editResultForm]);
 
 
@@ -395,6 +432,9 @@ export default function ResultsPage() {
     }
     const { studentName, className, subjectName } = getDenormalizedNames(data);
     if (!studentName || !className || !subjectName) {
+      addResultForm.setError("studentId", { type: "manual", message: !studentName ? "Siswa tidak valid." : ""});
+      addResultForm.setError("classId", { type: "manual", message: !className ? "Kelas tidak valid." : ""});
+      addResultForm.setError("subjectId", { type: "manual", message: !subjectName ? "Subjek tidak valid." : ""});
       toast({ title: "Data Tidak Lengkap", description: "Pastikan siswa, kelas, dan subjek valid.", variant: "destructive" });
       return;
     }
@@ -439,6 +479,9 @@ export default function ResultsPage() {
     editResultForm.clearErrors();
     const { studentName, className, subjectName } = getDenormalizedNames(data);
     if (!studentName || !className || !subjectName) {
+      editResultForm.setError("studentId", { type: "manual", message: !studentName ? "Siswa tidak valid." : ""});
+      editResultForm.setError("classId", { type: "manual", message: !className ? "Kelas tidak valid." : ""});
+      editResultForm.setError("subjectId", { type: "manual", message: !subjectName ? "Subjek tidak valid." : ""});
       toast({ title: "Data Tidak Lengkap", description: "Pastikan siswa, kelas, dan subjek valid.", variant: "destructive" });
       return;
     }
@@ -560,7 +603,7 @@ export default function ResultsPage() {
 
     
     const studentsForDropdown = dialogType === 'add' 
-        ? filteredStudents // Use state variable for add form
+        ? filteredStudents 
         : (editWatchClassId ? students.filter(s => s.classId === editWatchClassId) : (role === 'admin' || role === 'guru' ? students : []));
     
     
@@ -775,7 +818,9 @@ export default function ResultsPage() {
                     <TableHead>Mapel</TableHead>
                     <TableHead>Asesmen</TableHead>
                     <TableHead>Nilai</TableHead>
-                    <TableHead>Tanggal</TableHead>
+                    {(role === 'siswa' || role === 'orangtua') && <TableHead>Link Pengumpulan & Catatan Siswa</TableHead>}
+                    <TableHead>Feedback Guru</TableHead>
+                    <TableHead>Tanggal {(role === 'siswa' || role === 'orangtua') ? 'Diinput Guru' : 'Asesmen'}</TableHead>
                     {canManageResults && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -790,7 +835,29 @@ export default function ResultsPage() {
                         {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
                       </TableCell>
                       <TableCell>{result.score}{result.maxScore && result.maxScore !== 100 ? `/${result.maxScore}` : ''} {result.grade && `(${result.grade})`}</TableCell>
-                      <TableCell>{format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                      {(role === 'siswa' || role === 'orangtua') && (
+                        <TableCell>
+                          {result.studentSubmissionLink ? (
+                            <Button variant="link" asChild className="p-0 h-auto text-sm">
+                              <Link href={result.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
+                                <LinkIcon className="mr-1 h-3 w-3" />Lihat Pengumpulan
+                              </Link>
+                            </Button>
+                          ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">Tidak ada pengumpulan</span> : "-")}
+                          {result.submissionNotes && (
+                            <p className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate" title={result.submissionNotes}>
+                              Catatan: {result.submissionNotes}
+                            </p>
+                          )}
+                        </TableCell>
+                      )}
+                       <TableCell className="max-w-[200px] truncate" title={result.feedback}>{result.feedback || "-"}</TableCell>
+                       <TableCell>
+                        { (role === 'siswa' || role === 'orangtua') 
+                            ? (result.createdAt ? format(result.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale }) : '-') 
+                            : format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })
+                        }
+                      </TableCell>
                       {canManageResults && (
                         <TableCell className="text-right space-x-2">
                             <Button variant="outline" size="icon" onClick={() => openEditDialog(result)} aria-label={`Edit hasil ${result.studentName}`}>
@@ -858,7 +925,7 @@ export default function ResultsPage() {
                           {renderResultFormFields(editResultForm, 'edit')}
                       </div>
                       <DialogFooter className="pt-4 border-t">
-                          <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                          <DialogClose asChild><Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setSelectedResult(null);}}>Batal</Button></DialogClose>
                           <Button type="submit" form="editResultDialogForm" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
                       </DialogFooter>
                     </form>
