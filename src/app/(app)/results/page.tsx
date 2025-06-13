@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Loader2, Save } from "lucide-react";
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Loader2, Save, Filter } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -91,7 +91,7 @@ interface ResultData {
   score: number;
   maxScore?: number;
   grade?: string;
-  dateOfAssessment: Timestamp; // Was JS Date, changed to Timestamp for Firestore consistency
+  dateOfAssessment: Timestamp; 
   feedback?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -105,7 +105,7 @@ const baseResultFormSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
-  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), // Allow up to 1000 for flexibility
+  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), 
   maxScore: z.coerce.number().min(1, "Nilai maks. minimal 1.").optional(),
   grade: z.string().max(5, "Grade maksimal 5 karakter.").optional(),
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
@@ -140,6 +140,8 @@ export default function ResultsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<ResultData | null>(null);
+  const [selectedAssessmentTypeFilter, setSelectedAssessmentTypeFilter] = useState<AssessmentType | "all">("all");
+
 
   const { toast } = useToast();
 
@@ -173,7 +175,7 @@ export default function ResultsPage() {
     try {
       const [classesSnapshot, studentsSnapshot, subjectsSnapshot] = await Promise.all([
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "students"), orderBy("name", "asc"))),
+        getDocs(query(collection(db, "students"), orderBy("name", "asc"))), // Fetch all students for admin/guru
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
       ]);
       setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
@@ -215,7 +217,7 @@ export default function ResultsPage() {
       const fetchedResults = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
-      })) as ResultData[]; // Firestore data is already ResultData like (date is Timestamp)
+      })) as ResultData[];
       setResults(fetchedResults);
     } catch (error) {
       console.error("Error fetching results: ", error);
@@ -227,7 +229,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    fetchDropdownData(); // Call this for admin/guru or if needed for specific views
+    fetchDropdownData(); 
     fetchResults();
   }, [authLoading, user, role]);
 
@@ -248,7 +250,7 @@ export default function ResultsPage() {
     if (editWatchClassId) {
       setFilteredStudents(students.filter(s => s.classId === editWatchClassId));
     } else if (role === "admin" || role === "guru") { 
-      setFilteredStudents(students); // Show all students if no class is selected in edit form for admin/guru
+      setFilteredStudents(students); 
     } else {
         setFilteredStudents([]);
     }
@@ -268,7 +270,7 @@ export default function ResultsPage() {
         score: selectedResult.score,
         maxScore: selectedResult.maxScore || 100,
         grade: selectedResult.grade || "",
-        dateOfAssessment: selectedResult.dateOfAssessment.toDate(), // Convert Timestamp to Date for form
+        dateOfAssessment: selectedResult.dateOfAssessment.toDate(), 
         feedback: selectedResult.feedback || "",
       });
     }
@@ -341,7 +343,7 @@ export default function ResultsPage() {
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
         maxScore: data.maxScore || 100,
-        recordedById: user.uid, // Optionally update who last recorded it
+        recordedById: user.uid, 
         recordedByName: user.displayName || user.email,
         updatedAt: serverTimestamp(),
       });
@@ -378,6 +380,14 @@ export default function ResultsPage() {
 
   const canManageResults = role === "admin" || role === "guru";
 
+  const filteredResults = useMemo(() => {
+    if (selectedAssessmentTypeFilter === "all") {
+      return results;
+    }
+    return results.filter(result => result.assessmentType === selectedAssessmentTypeFilter);
+  }, [results, selectedAssessmentTypeFilter]);
+
+
   if (authLoading || isLoadingData) {
     return (
       <div className="space-y-6">
@@ -394,7 +404,7 @@ export default function ResultsPage() {
     );
   }
 
-  if (!role || !["admin", "guru", "siswa", "orangtua"].includes(role)) { // Updated condition
+  if (!role || !["admin", "guru", "siswa", "orangtua"].includes(role)) { 
     return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold font-headline">Hasil Belajar</h1>
@@ -436,120 +446,137 @@ export default function ResultsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-2 md:space-y-0 pb-4">
           <CardTitle className="flex items-center gap-2 text-xl">
             <BarChart3 className="h-6 w-6 text-primary" />
             <span>Daftar Hasil Belajar</span>
           </CardTitle>
-          {canManageResults && (
-            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                setIsAddDialogOpen(isOpen);
-                if (!isOpen) { addResultForm.reset({ dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "" }); addResultForm.clearErrors(); setFilteredStudents([]); }
-            }}>
-                <DialogTrigger asChild>
-                <Button size="sm" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
-                </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
-                    <DialogDescription>Isi detail nilai siswa.</DialogDescription>
-                </DialogHeader>
-                <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                    {/* Form Fields */}
-                    <div>
-                    <Label htmlFor="add-result-classId">Kelas</Label>
-                    <Select onValueChange={(value) => {addResultForm.setValue("classId", value, { shouldValidate: true }); addResultForm.setValue("studentId", undefined);}} defaultValue={addResultForm.getValues("classId")}>
-                        <SelectTrigger id="add-result-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                        <SelectContent>
-                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    {addResultForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.classId.message}</p>}
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-studentId">Siswa</Label>
-                    <Select onValueChange={(value) => addResultForm.setValue("studentId", value, { shouldValidate: true })} value={addResultForm.getValues("studentId") || undefined} disabled={!watchClassId || filteredStudents.length === 0}>
-                        <SelectTrigger id="add-result-studentId" className="mt-1"><SelectValue placeholder={!watchClassId ? "Pilih kelas dulu" : (filteredStudents.length === 0 ? "Tidak ada siswa di kelas ini" : "Pilih siswa")} /></SelectTrigger>
-                        <SelectContent>
-                        {filteredStudents.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    {addResultForm.formState.errors.studentId && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.studentId.message}</p>}
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-subjectId">Mata Pelajaran</Label>
-                    <Select onValueChange={(value) => addResultForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addResultForm.getValues("subjectId")}>
-                        <SelectTrigger id="add-result-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
-                        <SelectContent>
-                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    {addResultForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.subjectId.message}</p>}
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-assessmentType">Tipe Asesmen</Label>
-                    <Select onValueChange={(value) => addResultForm.setValue("assessmentType", value as AssessmentType, { shouldValidate: true })} defaultValue={addResultForm.getValues("assessmentType")}>
-                        <SelectTrigger id="add-result-assessmentType" className="mt-1"><SelectValue placeholder="Pilih tipe asesmen" /></SelectTrigger>
-                        <SelectContent>
-                        {ASSESSMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    {addResultForm.formState.errors.assessmentType && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.assessmentType.message}</p>}
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-assessmentTitle">Judul/Nama Asesmen</Label>
-                    <Input id="add-result-assessmentTitle" {...addResultForm.register("assessmentTitle")} className="mt-1" />
-                    {addResultForm.formState.errors.assessmentTitle && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.assessmentTitle.message}</p>}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="add-result-score">Nilai</Label>
-                            <Input id="add-result-score" type="number" {...addResultForm.register("score")} className="mt-1" />
-                            {addResultForm.formState.errors.score && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.score.message}</p>}
-                        </div>
-                        <div>
-                            <Label htmlFor="add-result-maxScore">Nilai Maks. (Opsional)</Label>
-                            <Input id="add-result-maxScore" type="number" {...addResultForm.register("maxScore")} className="mt-1" placeholder="100"/>
-                            {addResultForm.formState.errors.maxScore && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.maxScore.message}</p>}
-                        </div>
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-grade">Grade (Opsional)</Label>
-                    <Input id="add-result-grade" {...addResultForm.register("grade")} className="mt-1" placeholder="A, B+, C, dll." />
-                    {addResultForm.formState.errors.grade && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.grade.message}</p>}
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-dateOfAssessment">Tanggal Asesmen</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {addResultForm.watch("dateOfAssessment") ? format(addResultForm.watch("dateOfAssessment"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addResultForm.watch("dateOfAssessment")} onSelect={(date) => addResultForm.setValue("dateOfAssessment", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent>
-                    </Popover>
-                    {addResultForm.formState.errors.dateOfAssessment && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.dateOfAssessment.message}</p>}
-                    </div>
-                    <div>
-                    <Label htmlFor="add-result-feedback">Umpan Balik (Opsional)</Label>
-                    <Textarea id="add-result-feedback" {...addResultForm.register("feedback")} className="mt-1" />
-                    </div>
-                    <DialogFooter>
-                    <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                    <Button type="submit" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
-                    </DialogFooter>
-                </form>
-                </DialogContent>
-            </Dialog>
-          )}
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <Select
+              value={selectedAssessmentTypeFilter}
+              onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+            >
+              <SelectTrigger className="w-full md:w-[200px]">
+                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filter Tipe Asesmen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Tipe</SelectItem>
+                {ASSESSMENT_TYPES.map(type => (
+                  <SelectItem key={type} value={type}>{type}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {canManageResults && (
+              <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                  setIsAddDialogOpen(isOpen);
+                  if (!isOpen) { addResultForm.reset({ dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "" }); addResultForm.clearErrors(); setFilteredStudents([]); }
+              }}>
+                  <DialogTrigger asChild>
+                  <Button size="sm" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
+                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
+                  </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                      <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
+                      <DialogDescription>Isi detail nilai siswa.</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                      {/* Form Fields */}
+                      <div>
+                      <Label htmlFor="add-result-classId">Kelas</Label>
+                      <Select onValueChange={(value) => {addResultForm.setValue("classId", value, { shouldValidate: true }); addResultForm.setValue("studentId", undefined);}} defaultValue={addResultForm.getValues("classId")}>
+                          <SelectTrigger id="add-result-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                          <SelectContent>
+                          {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      {addResultForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.classId.message}</p>}
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-studentId">Siswa</Label>
+                      <Select onValueChange={(value) => addResultForm.setValue("studentId", value, { shouldValidate: true })} value={addResultForm.getValues("studentId") || undefined} disabled={!watchClassId || filteredStudents.length === 0}>
+                          <SelectTrigger id="add-result-studentId" className="mt-1"><SelectValue placeholder={!watchClassId ? "Pilih kelas dulu" : (filteredStudents.length === 0 ? "Tidak ada siswa di kelas ini" : "Pilih siswa")} /></SelectTrigger>
+                          <SelectContent>
+                          {filteredStudents.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      {addResultForm.formState.errors.studentId && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.studentId.message}</p>}
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-subjectId">Mata Pelajaran</Label>
+                      <Select onValueChange={(value) => addResultForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addResultForm.getValues("subjectId")}>
+                          <SelectTrigger id="add-result-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                          <SelectContent>
+                          {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      {addResultForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.subjectId.message}</p>}
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-assessmentType">Tipe Asesmen</Label>
+                      <Select onValueChange={(value) => addResultForm.setValue("assessmentType", value as AssessmentType, { shouldValidate: true })} defaultValue={addResultForm.getValues("assessmentType")}>
+                          <SelectTrigger id="add-result-assessmentType" className="mt-1"><SelectValue placeholder="Pilih tipe asesmen" /></SelectTrigger>
+                          <SelectContent>
+                          {ASSESSMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      {addResultForm.formState.errors.assessmentType && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.assessmentType.message}</p>}
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-assessmentTitle">Judul/Nama Asesmen</Label>
+                      <Input id="add-result-assessmentTitle" {...addResultForm.register("assessmentTitle")} className="mt-1" />
+                      {addResultForm.formState.errors.assessmentTitle && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.assessmentTitle.message}</p>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <Label htmlFor="add-result-score">Nilai</Label>
+                              <Input id="add-result-score" type="number" {...addResultForm.register("score")} className="mt-1" />
+                              {addResultForm.formState.errors.score && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.score.message}</p>}
+                          </div>
+                          <div>
+                              <Label htmlFor="add-result-maxScore">Nilai Maks. (Opsional)</Label>
+                              <Input id="add-result-maxScore" type="number" {...addResultForm.register("maxScore")} className="mt-1" placeholder="100"/>
+                              {addResultForm.formState.errors.maxScore && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.maxScore.message}</p>}
+                          </div>
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-grade">Grade (Opsional)</Label>
+                      <Input id="add-result-grade" {...addResultForm.register("grade")} className="mt-1" placeholder="A, B+, C, dll." />
+                      {addResultForm.formState.errors.grade && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.grade.message}</p>}
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-dateOfAssessment">Tanggal Asesmen</Label>
+                      <Popover>
+                          <PopoverTrigger asChild>
+                          <Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {addResultForm.watch("dateOfAssessment") ? format(addResultForm.watch("dateOfAssessment"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
+                          </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addResultForm.watch("dateOfAssessment")} onSelect={(date) => addResultForm.setValue("dateOfAssessment", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent>
+                      </Popover>
+                      {addResultForm.formState.errors.dateOfAssessment && <p className="text-sm text-destructive mt-1">{addResultForm.formState.errors.dateOfAssessment.message}</p>}
+                      </div>
+                      <div>
+                      <Label htmlFor="add-result-feedback">Umpan Balik (Opsional)</Label>
+                      <Textarea id="add-result-feedback" {...addResultForm.register("feedback")} className="mt-1" />
+                      </div>
+                      <DialogFooter>
+                      <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                      <Button type="submit" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
+                      </DialogFooter>
+                  </form>
+                  </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoadingResults ? (
             <div className="space-y-2 mt-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : results.length > 0 ? (
+          ) : filteredResults.length > 0 ? (
             <div className="overflow-x-auto mt-4">
               <Table>
                 <TableHeader>
@@ -564,7 +591,7 @@ export default function ResultsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {results.map((result) => (
+                  {filteredResults.map((result) => (
                     <TableRow key={result.id}>
                       {canManageResults && <TableCell className="font-medium">{result.studentName}</TableCell>}
                       {canManageResults && <TableCell>{result.className}</TableCell>}
@@ -607,7 +634,9 @@ export default function ResultsPage() {
             </div>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." : "Belum ada data hasil belajar."}
+                {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." : 
+                 selectedAssessmentTypeFilter !== "all" ? `Tidak ada hasil belajar untuk tipe asesmen "${selectedAssessmentTypeFilter}". Coba filter lain.` :
+                 "Belum ada data hasil belajar."}
             </div>
           )}
         </CardContent>
@@ -719,9 +748,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-    
-
-    
-
-    
