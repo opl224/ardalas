@@ -714,15 +714,21 @@ export default function ResultsPage() {
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
                   </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-lg">
+                  <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
                   <DialogHeader>
                       <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
                       <DialogDescription>Isi detail nilai siswa.</DialogDescription>
                   </DialogHeader>
                   <Form {...addResultForm}>
-                    <form onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)} className="space-y-4 py-4 pr-2">
-                        {renderResultFormFields(addResultForm, 'add')}
-                        <DialogFooter>
+                    <form
+                        id="addResultDialogForm"
+                        onSubmit={addResultForm.handleSubmit(handleAddResultSubmit)}
+                        className="flex flex-col overflow-hidden flex-1"
+                    >
+                        <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                            {renderResultFormFields(addResultForm, 'add')}
+                        </div>
+                        <DialogFooter className="pt-4 border-t">
                         <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                         <Button type="submit" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
                         </DialogFooter>
@@ -812,17 +818,23 @@ export default function ResultsPage() {
             setIsEditDialogOpen(isOpen);
             if (!isOpen) { setSelectedResult(null); editResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
         }}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
             <DialogHeader>
                 <DialogTitle>Edit Hasil Belajar</DialogTitle>
                 <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
             </DialogHeader>
             {selectedResult && (
                 <Form {...editResultForm}>
-                <form onSubmit={editResultForm.handleSubmit(handleEditResultSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <form
+                    id="editResultDialogForm"
+                    onSubmit={editResultForm.handleSubmit(handleEditResultSubmit)}
+                    className="flex flex-col overflow-hidden flex-1"
+                >
                 <Input type="hidden" {...editResultForm.register("id")} />
-                {renderResultFormFields(editResultForm, 'edit')}
-                <DialogFooter>
+                <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                    {renderResultFormFields(editResultForm, 'edit')}
+                </div>
+                <DialogFooter className="pt-4 border-t">
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                     <Button type="submit" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
                 </DialogFooter>
