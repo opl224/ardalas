@@ -91,6 +91,7 @@ interface AssignmentData {
   dueDate: Timestamp; 
   description?: string;
   fileURL?: string; 
+  meetingNumber?: number; // Added meetingNumber
   createdAt?: Timestamp;
   // For student view
   submissionStatus?: "Belum Dikerjakan" | "Sudah Dikerjakan" | "Terlambat";
@@ -123,6 +124,7 @@ const assignmentFormSchema = z.object({
   dueDate: z.date({ required_error: "Batas waktu harus diisi." }),
   description: z.string().optional(),
   fileURL: z.string().url({ message: "Format URL file tidak valid." }).optional().or(z.literal("")),
+  meetingNumber: z.coerce.number().positive("Pertemuan harus angka positif.").optional(),
 });
 type AssignmentFormValues = z.infer<typeof assignmentFormSchema>;
 
@@ -166,7 +168,7 @@ export default function AssignmentsPage() {
 
   const addAssignmentForm = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentFormSchema),
-    defaultValues: { title: "", subjectId: undefined, classId: undefined, teacherId: undefined, dueDate: new Date(), description: "", fileURL: "" },
+    defaultValues: { title: "", subjectId: undefined, classId: undefined, teacherId: undefined, dueDate: new Date(), description: "", fileURL: "", meetingNumber: undefined },
   });
 
   const editAssignmentForm = useForm<EditAssignmentFormValues>({ resolver: zodResolver(editAssignmentFormSchema) });
@@ -183,17 +185,17 @@ export default function AssignmentsPage() {
     // Only needed for teacher/admin
     if (!isTeacherOrAdminRole) return;
     try {
-      const [subjectsSnapshot, classesSnapshot, teachersSnapshot, studentsSnapshot] = await Promise.all([
+      const [subjectsSnapshot, classesSnapshot, teachersSnapshot, usersSnapshot] = await Promise.all([
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
-        getDocs(collection(db, "users")) // Fetch all users to count students for classes
+        getDocs(collection(db, "users")) 
       ]);
       setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       
       const classData = classesSnapshot.docs.map(doc => {
         const classId = doc.id;
-        const studentCount = studentsSnapshot.docs.filter(sDoc => sDoc.data().role === "siswa" && sDoc.data().classId === classId).length;
+        const studentCount = usersSnapshot.docs.filter(sDoc => sDoc.data().role === "siswa" && sDoc.data().classId === classId).length;
         return { id: classId, name: doc.data().name, totalStudents: studentCount };
       });
       setClasses(classData.map(c => ({id: c.id, name: c.name}))); 
@@ -237,6 +239,7 @@ export default function AssignmentsPage() {
           dueDate: data.dueDate, 
           description: data.description,
           fileURL: data.fileURL,
+          meetingNumber: data.meetingNumber,
           createdAt: data.createdAt,
         };
       });
@@ -338,6 +341,7 @@ export default function AssignmentsPage() {
         dueDate: selectedAssignment.dueDate.toDate(),
         description: selectedAssignment.description || "",
         fileURL: selectedAssignment.fileURL || "",
+        meetingNumber: selectedAssignment.meetingNumber || undefined,
       });
     }
   }, [selectedAssignment, isEditDialogOpen, editAssignmentForm]);
@@ -362,15 +366,31 @@ export default function AssignmentsPage() {
     }
 
     try {
-      const assignmentData = { ...data, dueDate: Timestamp.fromDate(data.dueDate), subjectName, className, teacherName, createdAt: serverTimestamp() };
+      const assignmentData:any = { 
+        ...data, 
+        dueDate: Timestamp.fromDate(data.dueDate), 
+        subjectName, 
+        className, 
+        teacherName, 
+        createdAt: serverTimestamp() 
+      };
+      if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber) ) {
+        delete assignmentData.meetingNumber;
+      }
+
+
       const newAssignmentRef = await addDoc(collection(db, "assignments"), assignmentData);
       toast({ title: "Tugas Ditambahkan" });
       
-      // Create notifications
       const batch = writeBatch(db);
+      let descriptionText = data.description?.substring(0, 50) + (data.description && data.description.length > 50 ? "..." : "") || `Batas waktu: ${format(data.dueDate, "dd MMM yyyy, HH:mm", {locale: indonesiaLocale})}`;
+      if(data.meetingNumber) {
+        descriptionText += ` (Pertemuan ${data.meetingNumber})`;
+      }
+
       const notificationBase = {
         title: `Tugas Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
-        description: data.description?.substring(0, 50) + (data.description && data.description.length > 50 ? "..." : "") || `Batas waktu: ${format(data.dueDate, "dd MMM yyyy, HH:mm", {locale: indonesiaLocale})}`,
+        description: descriptionText,
         href: `/assignments`, 
         read: false,
         createdAt: serverTimestamp(),
@@ -392,7 +412,7 @@ export default function AssignmentsPage() {
       await batch.commit();
       
       setIsAddDialogOpen(false);
-      addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "" });
+      addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined });
       fetchAssignments();
     } catch (error: any) {
       console.error("Error adding assignment or notifications:", error);
@@ -409,7 +429,18 @@ export default function AssignmentsPage() {
     }
     try {
       const assignmentDocRef = doc(db, "assignments", data.id);
-      await updateDoc(assignmentDocRef, { ...data,  dueDate: Timestamp.fromDate(data.dueDate), subjectName, className, teacherName });
+      const updateData: any = { 
+          ...data,  
+          dueDate: Timestamp.fromDate(data.dueDate), 
+          subjectName, 
+          className, 
+          teacherName 
+      };
+      if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
+        updateData.meetingNumber = null; // Or deleteField() if you want to remove it completely
+      }
+      
+      await updateDoc(assignmentDocRef, updateData);
       toast({ title: "Tugas Diperbarui" });
       setIsEditDialogOpen(false);
       setSelectedAssignment(null);
@@ -526,7 +557,7 @@ export default function AssignmentsPage() {
           {isTeacherOrAdminRole && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
-              if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "" }); addAssignmentForm.clearErrors(); }
+              if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined }); addAssignmentForm.clearErrors(); }
             }}>
               <DialogTrigger asChild>
                 <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchDropdownData(); }}>
@@ -541,6 +572,7 @@ export default function AssignmentsPage() {
                   <div><Label htmlFor="add-assignment-classId">Kelas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
                   <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
                   <div><Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addAssignmentForm.watch("dueDate")} onSelect={(date) => addAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent></Popover>{addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+                  <div><Label htmlFor="add-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="add-assignment-meetingNumber" type="number" {...addAssignmentForm.register("meetingNumber")} className="mt-1" placeholder="Contoh: 3" />{addAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
                   <div><Label htmlFor="add-assignment-description">Deskripsi Tugas</Label><Textarea id="add-assignment-description" {...addAssignmentForm.register("description")} className="mt-1" placeholder="Jelaskan detail tugas di sini..." /></div>
                   <div><Label htmlFor="add-assignment-fileURL">URL File Tugas (Opsional)</Label><Input id="add-assignment-fileURL" {...addAssignmentForm.register("fileURL")} className="mt-1" placeholder="https://contoh.com/file_tugas.pdf" />{addAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.fileURL.message}</p>}</div>
                   <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addAssignmentForm.formState.isSubmitting}>{addAssignmentForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Tugas"}</Button></DialogFooter>
@@ -562,6 +594,7 @@ export default function AssignmentsPage() {
                     {isStudentRole && <TableHead>Guru</TableHead>}
                     {!isStudentRole && <TableHead>Kelas</TableHead>}
                     {!isStudentRole && <TableHead>Guru</TableHead>}
+                    <TableHead>Pertemuan</TableHead>
                     <TableHead>Batas Waktu</TableHead>
                     {isStudentRole && <TableHead>File Tugas</TableHead>}
                     {isStudentRole && <TableHead>Status</TableHead>}
@@ -577,6 +610,7 @@ export default function AssignmentsPage() {
                       {isStudentRole && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
                       {!isStudentRole && <TableCell>{assignment.className || assignment.classId}</TableCell>}
                       {!isStudentRole && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      <TableCell>{assignment.meetingNumber || "-"}</TableCell>
                       <TableCell className={cn(isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
                         {format(assignment.dueDate.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
                       </TableCell>
@@ -660,6 +694,7 @@ export default function AssignmentsPage() {
               <div><Label htmlFor="edit-assignment-classId">Kelas</Label><Select onValueChange={(value) => editAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("classId")}><SelectTrigger id="edit-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.classId.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-teacherId">Guru</Label><Select onValueChange={(value) => editAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("teacherId")}><SelectTrigger id="edit-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.teacherId.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-dueDate">Batas Waktu</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{editAssignmentForm.watch("dueDate") ? format(editAssignmentForm.watch("dueDate"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={editAssignmentForm.watch("dueDate")} onSelect={(date) => editAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent></Popover>{editAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+              <div><Label htmlFor="edit-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="edit-assignment-meetingNumber" type="number" {...editAssignmentForm.register("meetingNumber")} className="mt-1" />{editAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-description">Deskripsi</Label><Textarea id="edit-assignment-description" {...editAssignmentForm.register("description")} className="mt-1" /></div>
               <div><Label htmlFor="edit-assignment-fileURL">URL File</Label><Input id="edit-assignment-fileURL" {...editAssignmentForm.register("fileURL")} className="mt-1" />{editAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.fileURL.message}</p>}</div>
               <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={editAssignmentForm.formState.isSubmitting}>{editAssignmentForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button></DialogFooter>
@@ -676,6 +711,7 @@ export default function AssignmentsPage() {
               <DialogDescription>
                 <div>Mata Pelajaran: {selectedAssignmentForSubmission.subjectName}</div>
                 <div>Batas Waktu: {format(selectedAssignmentForSubmission.dueDate.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</div>
+                {selectedAssignmentForSubmission.meetingNumber && <div>Pertemuan Ke-: {selectedAssignmentForSubmission.meetingNumber}</div>}
                 {selectedAssignmentForSubmission.description && <div className="mt-2 whitespace-pre-line">{selectedAssignmentForSubmission.description}</div>}
                 {selectedAssignmentForSubmission.fileURL && (
                     <Button variant="link" asChild className="p-0 h-auto mt-2">
