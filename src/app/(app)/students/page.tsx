@@ -59,7 +59,7 @@ import {
   Timestamp,
   query,
   orderBy,
-  where // Added where import
+  where 
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
@@ -156,7 +156,6 @@ export default function StudentsPage() {
       } else if (authRole === 'admin' || authRole === 'guru') {
         studentsQuery = query(studentsCollectionRef, orderBy("name", "asc"));
       } else {
-        // Not admin, guru, or student with classId -> show no students, or handle as per app logic
         setStudents([]);
         setIsLoadingStudents(false);
         return;
@@ -185,12 +184,11 @@ export default function StudentsPage() {
   };
 
   useEffect(() => {
-    // Fetch classes if admin/guru, or if student (to ensure their class name is up-to-date for display in forms)
     if(authRole === 'admin' || authRole === 'guru' || authRole === 'siswa'){
         fetchClassesForDropdown(); 
     }
     fetchStudents();
-  }, [authRole, authUser, authLoading]); // Re-fetch if auth state changes
+  }, [authRole, authUser, authLoading]); 
 
   useEffect(() => {
     if (selectedStudent && isEditStudentDialogOpen) {
@@ -218,7 +216,7 @@ export default function StudentsPage() {
       studentClassId = authUser.classId;
       studentClassName = authUser.className;
       if (data.classId !== studentClassId) {
-          data.classId = studentClassId; // Ensure form data matches auth user's class
+          data.classId = studentClassId; 
       }
     } else { 
       const selectedClassObj = allClasses.find(c => c.id === data.classId);
@@ -425,21 +423,18 @@ export default function StudentsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-6 w-6 text-primary" />
-            <span>Daftar Murid</span>
+            <span>Daftar Murid {isLoadingStudents ? '' : `(${students.length} siswa)`}</span>
           </CardTitle>
-          { (authRole === 'admin' || authRole === 'guru' || (authRole === 'siswa' && authUser?.classId)) && ( 
+          { (authRole === 'admin' || authRole === 'guru') && ( 
             <Dialog 
               open={isAddStudentDialogOpen} 
               onOpenChange={(isOpen) => {
                 setIsAddStudentDialogOpen(isOpen);
                 if (!isOpen) {
-                  addStudentForm.reset({ name: "", nis: "", email: "", classId: authRole === 'siswa' ? authUser?.classId : undefined });
+                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
                   addStudentForm.clearErrors();
                 } else {
                   if (allClasses.length === 0 && !isLoadingClasses && (authRole === 'admin' || authRole === 'guru')) fetchClassesForDropdown();
-                  if (authRole === 'siswa' && authUser?.classId) {
-                    addStudentForm.setValue("classId", authUser.classId, { shouldValidate: true });
-                  }
                 }
               }}
             >
@@ -453,7 +448,6 @@ export default function StudentsPage() {
                   <DialogTitle>Tambah Murid Baru</DialogTitle>
                   <DialogDescription>
                     Isi detail murid untuk menambahkan data baru.
-                    {authRole === 'siswa' && authUser?.className && ` Murid akan ditambahkan ke kelas ${authUser.className}.`}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} className="space-y-4 py-4">
