@@ -66,10 +66,12 @@ import {
   orderBy,
   where,
   writeBatch,
+  Query as FirebaseQuery, // Import Query type
+  DocumentData, // Import DocumentData type
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { Form } from "@/components/ui/form"; 
+import { Form } from "@/components/ui/form";
 import Link from "next/link";
 
 
@@ -78,7 +80,7 @@ interface ClassMin { id: string; name: string; }
 // StudentMin's id will now be the student's authUid
 interface StudentMin { id: string; name: string; classId: string; className?: string; }
 interface SubjectMin { id: string; name: string; }
-interface AssignmentMin { id: string; title: string; meetingNumber?: number; subjectId: string; classId: string; } 
+interface AssignmentMin { id: string; title: string; meetingNumber?: number; subjectId: string; classId: string; }
 
 const ASSESSMENT_TYPES = ["UTS", "UAS", "Tugas Harian", "Kuis", "Proyek", "Praktikum", "Lainnya"] as const;
 type AssessmentType = typeof ASSESSMENT_TYPES[number];
@@ -96,16 +98,16 @@ interface ResultData {
   score: number;
   maxScore?: number;
   grade?: string;
-  dateOfAssessment: Timestamp; 
+  dateOfAssessment: Timestamp;
   feedback?: string;
-  assignmentId?: string; 
-  meetingNumber?: number; 
+  assignmentId?: string;
+  meetingNumber?: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   recordedById?: string;
   recordedByName?: string;
-  studentSubmissionLink?: string; 
-  submissionNotes?: string; 
+  studentSubmissionLink?: string;
+  submissionNotes?: string;
 }
 
 const baseResultFormSchema = z.object({
@@ -114,7 +116,7 @@ const baseResultFormSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
-  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), 
+  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."),
   maxScore: z.coerce.number().min(1, "Nilai maks. minimal 1.").optional(),
   grade: z.string().max(5, "Grade maksimal 5 karakter.").optional(),
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
@@ -142,13 +144,13 @@ export default function ResultsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const [results, setResults] = useState<ResultData[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
-  const [students, setStudents] = useState<StudentMin[]>([]); 
+  const [students, setStudents] = useState<StudentMin[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<StudentMin[]>([]);
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentMin[]>([]); 
-  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]); 
+  const [assignments, setAssignments] = useState<AssignmentMin[]>([]);
+  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]);
 
-  const [isLoadingData, setIsLoadingData] = useState(true); 
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -180,7 +182,7 @@ export default function ResultsPage() {
     resolver: zodResolver(editResultFormSchema),
   });
 
-  
+
   const fetchDropdownData = async () => {
     if (role !== "admin" && role !== "guru") {
         setIsLoadingData(false);
@@ -190,12 +192,12 @@ export default function ResultsPage() {
     try {
       const [classesSnapshot, studentsAuthSnapshot, subjectsSnapshot, assignmentsSnapshot] = await Promise.all([
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "users"), where("role", "==", "siswa"), orderBy("name", "asc"))), 
+        getDocs(query(collection(db, "users"), where("role", "==", "siswa"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "assignments"), orderBy("title", "asc"))), 
+        getDocs(query(collection(db, "assignments"), orderBy("title", "asc"))),
       ]);
       setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      
+
       setStudents(studentsAuthSnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
@@ -207,9 +209,9 @@ export default function ResultsPage() {
       }));
 
       setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setAssignments(assignmentsSnapshot.docs.map(doc => ({ 
-        id: doc.id, 
-        title: doc.data().title, 
+      setAssignments(assignmentsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        title: doc.data().title,
         meetingNumber: doc.data().meetingNumber,
         subjectId: doc.data().subjectId,
         classId: doc.data().classId,
@@ -223,52 +225,69 @@ export default function ResultsPage() {
     }
   };
 
-  
+
   const fetchResults = async () => {
-    if (!user && !authLoading) {
-        setIsLoadingResults(false);
+    // Ensure user and role are available from AuthContext
+    if (!user || !role) {
         setResults([]);
+        setIsLoadingResults(false);
         return;
     }
+
     setIsLoadingResults(true);
     try {
       const resultsCollectionRef = collection(db, "results");
-      let q;
-      const studentToQueryId = role === 'siswa' ? user?.uid : (role === 'orangtua' ? user?.linkedStudentId : null);
+      let q: FirebaseQuery<DocumentData, DocumentData> | null = null;
 
-      if (studentToQueryId) {
-        q = query(resultsCollectionRef, where("studentId", "==", studentToQueryId), orderBy("dateOfAssessment", "desc"));
+      if (role === 'siswa' && user.uid) {
+        q = query(resultsCollectionRef, where("studentId", "==", user.uid), orderBy("dateOfAssessment", "desc"));
+      } else if (role === 'orangtua' && user.linkedStudentId) {
+        q = query(resultsCollectionRef, where("studentId", "==", user.linkedStudentId), orderBy("dateOfAssessment", "desc"));
       } else if (role === 'admin' || role === 'guru') {
         q = query(resultsCollectionRef, orderBy("dateOfAssessment", "desc"), orderBy("createdAt", "desc"));
-      } else {
+      }
+
+      if (!q) {
         setResults([]);
         setIsLoadingResults(false);
         return;
       }
-      
+
       let fetchedResultsDocs = await getDocs(q);
       let fetchedResults = fetchedResultsDocs.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
       })) as ResultData[];
 
+      // Fetch submission links for student/parent view
+      const studentToQueryId = role === 'siswa' ? user.uid : (role === 'orangtua' ? user.linkedStudentId : null);
       if (studentToQueryId && fetchedResults.length > 0) {
         const assignmentIds = fetchedResults
             .map(r => r.assignmentId)
-            .filter((id): id is string => !!id); 
+            .filter((id): id is string => !!id);
 
         if (assignmentIds.length > 0) {
-            const submissionsQuery = query(
-                collection(db, "assignmentSubmissions"),
-                where("studentId", "==", studentToQueryId), // studentToQueryId is authUid here
-                where("assignmentId", "in", assignmentIds.slice(0,30)) // Handle 'in' query limit if necessary
-            );
-            const submissionsSnapshot = await getDocs(submissionsQuery);
+            // Firestore 'in' query limit is 30
+            const submissionQueries = [];
+            for (let i = 0; i < assignmentIds.length; i += 30) {
+                const chunk = assignmentIds.slice(i, i + 30);
+                submissionQueries.push(
+                    getDocs(query(
+                        collection(db, "assignmentSubmissions"),
+                        where("studentId", "==", studentToQueryId),
+                        where("assignmentId", "in", chunk)
+                    ))
+                );
+            }
+            const submissionsSnapshots = await Promise.all(submissionQueries);
             const submissionsMap = new Map<string, { link: string; notes?: string }>();
-            submissionsSnapshot.forEach(doc => {
-                const subData = doc.data();
-                submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
+            submissionsSnapshots.forEach(snapshot => {
+                snapshot.forEach(doc => {
+                    const subData = doc.data();
+                    submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
+                });
             });
+
 
             fetchedResults = fetchedResults.map(result => {
                 if (result.assignmentId && submissionsMap.has(result.assignmentId)) {
@@ -292,11 +311,41 @@ export default function ResultsPage() {
     }
   };
 
-  useEffect(() => {
-    if (authLoading) return;
-    fetchDropdownData(); 
-    fetchResults();
-  }, [authLoading, user?.uid, user?.linkedStudentId, role]);
+ useEffect(() => {
+    if (authLoading) {
+      setIsLoadingData(true); // For dropdowns, if applicable by role
+      setIsLoadingResults(true); // For results table
+      return;
+    }
+
+    if (!user) {
+      setResults([]);
+      setStudents([]);
+      setFilteredStudents([]);
+      setAssignments([]);
+      setFilteredAssignments([]);
+      setIsLoadingData(false);
+      setIsLoadingResults(false);
+      return;
+    }
+
+    // Define an async function to orchestrate data fetching
+    const loadAllData = async () => {
+      // Reset loading states at the beginning of a new data fetch cycle
+      setIsLoadingData(true);
+      setIsLoadingResults(true);
+
+      if (role === "admin" || role === "guru") {
+        await fetchDropdownData(); // This sets setIsLoadingData(false) internally
+      } else {
+        setIsLoadingData(false); // For other roles, dropdown data might not be fetched
+      }
+      await fetchResults(); // This sets setIsLoadingResults(false) internally
+    };
+
+    loadAllData();
+
+  }, [authLoading, user, role]); // Depend on user object and role
 
 
   const watchClassId = addResultForm.watch("classId");
@@ -315,8 +364,11 @@ export default function ResultsPage() {
       newFilteredStudentsList = students.filter(s => s.classId === watchClassId);
     }
     setFilteredStudents(newFilteredStudentsList);
-    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId)) {
+
+    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) && watchClassId) {
       addResultForm.setValue("studentId", undefined, { shouldValidate: true });
+    } else if (!watchClassId) {
+        addResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, students, addResultForm]);
 
@@ -324,14 +376,21 @@ export default function ResultsPage() {
   useEffect(() => {
     const currentFormStudentId = editResultForm.getValues("studentId");
     let newFilteredStudentsList: StudentMin[] = [];
+
     if (editWatchClassId) {
         newFilteredStudentsList = students.filter(s => s.classId === editWatchClassId);
     } else if (role === "admin" || role === "guru") {
+        // For admin/guru, if no class is selected in edit mode, potentially show all students or handle as needed.
+        // For now, keeping it consistent: if class is cleared, student list is based on available students.
+        // If editing an existing record, classId will be pre-filled.
         newFilteredStudentsList = students;
     }
     setFilteredStudents(newFilteredStudentsList);
 
-    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId)) {
+    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) && editWatchClassId) {
+        editResultForm.setValue("studentId", undefined, { shouldValidate: true });
+    } else if (!editWatchClassId && (role === "admin" || role === "guru")) {
+         // If class is cleared by admin/guru in edit, clear student selection.
         editResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
 }, [editWatchClassId, students, editResultForm, role]);
@@ -344,12 +403,12 @@ export default function ResultsPage() {
     } else {
       setFilteredAssignments([]);
     }
-    if (addResultForm.getValues("assignmentId") !== undefined) {
+    if (addResultForm.getValues("assignmentId") !== undefined) { // Reset assignment if class/subject changes
       addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
 
-  
+
   useEffect(() => {
      const selectedAssignment = assignments.find(a => a.id === watchAssignmentId);
      if (selectedAssignment) {
@@ -359,14 +418,21 @@ export default function ResultsPage() {
          } else {
              addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
-     } else if (watchAssignmentId === "" || watchAssignmentId === undefined) { 
-         if (!addResultForm.formState.isDirty || addResultForm.getValues("assessmentTitle") === assignments.find(a=>a.id === addResultForm.getValues("assignmentId"))?.title){
-            addResultForm.setValue("assessmentTitle", "", {shouldValidate: true}); 
+     } else if (watchAssignmentId === "" || watchAssignmentId === undefined) {
+         // Only clear if the title was previously from an assignment
+         const currentTitle = addResultForm.getValues("assessmentTitle");
+         const previousAssignmentId = addResultForm.formState.defaultValues?.assignmentId; // This might not be the 'actual' previous
+         const wasTitleFromAssignment = assignments.some(a => a.id === previousAssignmentId && a.title === currentTitle);
+
+         if (!addResultForm.formState.dirtyFields.assessmentTitle && (wasTitleFromAssignment || !currentTitle) ) {
+            addResultForm.setValue("assessmentTitle", "", {shouldValidate: true});
+         }
+         if (!addResultForm.formState.dirtyFields.meetingNumber) {
             addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
      }
   }, [watchAssignmentId, assignments, addResultForm]);
-  
+
 
   useEffect(() => {
     const currentClassIdValue = editResultForm.getValues("classId");
@@ -399,7 +465,7 @@ export default function ResultsPage() {
       if (initialClassId) {
         setFilteredStudents(students.filter(s => s.classId === initialClassId));
       }
-      
+
       if (initialClassId && initialSubjectId) {
         setFilteredAssignments(assignments.filter(a => a.classId === initialClassId && a.subjectId === initialSubjectId));
       }
@@ -414,7 +480,7 @@ export default function ResultsPage() {
         score: selectedResult.score,
         maxScore: selectedResult.maxScore || 100,
         grade: selectedResult.grade || "",
-        dateOfAssessment: selectedResult.dateOfAssessment.toDate(), 
+        dateOfAssessment: selectedResult.dateOfAssessment.toDate(),
         feedback: selectedResult.feedback || "",
         assignmentId: selectedResult.assignmentId || undefined,
         meetingNumber: selectedResult.meetingNumber || undefined,
@@ -494,7 +560,7 @@ export default function ResultsPage() {
       toast({ title: "Data Tidak Lengkap", description: "Pastikan siswa, kelas, dan subjek valid.", variant: "destructive" });
       return;
     }
-    
+
     const resultData: any = {
         ...data, // data.studentId is authUid
         studentName,
@@ -502,15 +568,15 @@ export default function ResultsPage() {
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
         maxScore: data.maxScore || 100,
-        recordedById: user.uid, 
-        recordedByName: user.displayName || user.email,
+        // recordedById: user.uid, // Keep original recorder, or update if policy changes
+        // recordedByName: user.displayName || user.email,
         updatedAt: serverTimestamp(),
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        resultData.meetingNumber = null; 
+        resultData.meetingNumber = null;
     }
     if (!data.assignmentId) {
-        resultData.assignmentId = null; 
+        resultData.assignmentId = null;
     }
 
 
@@ -538,7 +604,7 @@ export default function ResultsPage() {
       toast({ title: "Gagal Menghapus Hasil Belajar", variant: "destructive" });
     }
   };
-  
+
   const openEditDialog = (result: ResultData) => {
     setSelectedResult(result);
     setIsEditDialogOpen(true);
@@ -558,7 +624,7 @@ export default function ResultsPage() {
   }, [results, selectedAssessmentTypeFilter]);
 
 
-  if (authLoading || isLoadingData) {
+  if (authLoading || (isLoadingData && (role === "admin" || role === "guru"))) {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Manajemen Hasil Belajar</h1>
@@ -566,7 +632,7 @@ export default function ResultsPage() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-center p-8">
               <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
-              Memuat data...
+              Memuat data pendukung...
             </div>
           </CardContent>
         </Card>
@@ -574,7 +640,7 @@ export default function ResultsPage() {
     );
   }
 
-  if (!role || !["admin", "guru", "siswa", "orangtua"].includes(role)) { 
+  if (!role || !["admin", "guru", "siswa", "orangtua"].includes(role)) {
     return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold font-headline">Hasil Belajar</h1>
@@ -590,7 +656,7 @@ export default function ResultsPage() {
         </div>
     );
   }
-  
+
   let pageTitle = "Manajemen Hasil Belajar";
   let pageDescription = "Catat, lihat, dan kelola nilai serta rapor siswa.";
   if (role === "siswa") {
@@ -610,12 +676,12 @@ export default function ResultsPage() {
     const currentSubjectId = formInstance.watch("subjectId");
     const currentAssignmentId = formInstance.watch("assignmentId");
 
-    
-    const studentsForDropdown = dialogType === 'add' 
-        ? filteredStudents 
+
+    const studentsForDropdown = dialogType === 'add'
+        ? filteredStudents
         : (editWatchClassId ? students.filter(s => s.classId === editWatchClassId) : (role === 'admin' || role === 'guru' ? students : []));
-    
-    
+
+
     const assignmentsForDropdown = (currentClassId && currentSubjectId)
         ? assignments.filter(a => a.classId === currentClassId && a.subjectId === currentSubjectId)
         : [];
@@ -662,11 +728,11 @@ export default function ResultsPage() {
                         if (selectedAssignment) {
                             formInstance.setValue("assessmentTitle", selectedAssignment.title, {shouldValidate: true});
                             formInstance.setValue("meetingNumber", selectedAssignment.meetingNumber, {shouldValidate: true});
-                        } else { 
-                            if (dialogType === 'add' || !formInstance.getValues("assessmentTitle")) { 
+                        } else {
+                            if (!formInstance.formState.dirtyFields.assessmentTitle) {
                                 formInstance.setValue("assessmentTitle", "", {shouldValidate: true});
                             }
-                             if (dialogType === 'add' || !formInstance.getValues("meetingNumber")) {
+                             if (!formInstance.formState.dirtyFields.meetingNumber) {
                                 formInstance.setValue("meetingNumber", undefined, {shouldValidate: true});
                             }
                         }
@@ -711,7 +777,7 @@ export default function ResultsPage() {
                 </Select>
                 {formInstance.formState.errors.assessmentType && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.assessmentType.message}</p>}
             </div>
-           
+
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor={`${dialogType}-result-score`}>Nilai</Label>
@@ -863,7 +929,7 @@ export default function ResultsPage() {
                        <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
                        <TableCell>
                         { (role === 'siswa' || role === 'orangtua') && result.createdAt
-                            ? format(result.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale }) 
+                            ? format(result.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })
                             : format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })
                         }
                       </TableCell>
@@ -902,8 +968,8 @@ export default function ResultsPage() {
             </div>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." : 
-                 role === 'siswa' && !user?.uid ? "Tidak dapat memuat data siswa. Silakan coba lagi." :
+                {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
+                 (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." : // Added check for !user
                  selectedAssessmentTypeFilter !== "all" ? `Tidak ada hasil belajar untuk tipe asesmen "${selectedAssessmentTypeFilter}". Coba filter lain.` :
                  "Belum ada data hasil belajar yang sesuai."}
             </div>
@@ -911,7 +977,7 @@ export default function ResultsPage() {
         </CardContent>
       </Card>
 
-      
+
       {canManageResults && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
             setIsEditDialogOpen(isOpen);
@@ -947,3 +1013,5 @@ export default function ResultsPage() {
   );
 }
 
+
+    
