@@ -59,7 +59,8 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  where
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
