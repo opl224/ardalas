@@ -218,6 +218,7 @@ export default function AssignmentsPage() {
 
   const isStudentRole = role === "siswa";
   const isTeacherOrAdminRole = role === "guru" || role === "admin";
+  const isParentRole = role === "orangtua";
 
   const fetchDropdownData = async () => {
     if (!isTeacherOrAdminRole) return;
@@ -252,14 +253,29 @@ export default function AssignmentsPage() {
       }
 
       let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
+      let studentToQueryId = null;
 
-      if (isStudentRole && user?.classId && user.classId.trim() !== "") {
-        assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
-      } else if (isStudentRole && (!user?.classId || user.classId.trim() === "")) {
-        setAssignments([]);
-        setIsLoading(false);
-        return;
+      if (isStudentRole && user?.uid) {
+        studentToQueryId = user.uid;
+        if (user.classId && user.classId.trim() !== "") {
+          assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
+        } else {
+          setAssignments([]); setIsLoading(false); return;
+        }
+      } else if (isParentRole && user?.linkedStudentId) {
+        studentToQueryId = user.linkedStudentId;
+         if (user.linkedStudentClassId && user.linkedStudentClassId.trim() !== "") { // Assuming parent user object might have linkedStudentClassId
+          assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.linkedStudentClassId), orderBy("dueDate", "desc"));
+        } else {
+          // If parent isn't linked to a student with a class, or if linkedStudentClassId isn't available,
+          // they might not see any assignments. Or fetch all if that's the desired behavior.
+          // For now, assume they need a class context.
+          setAssignments([]); setIsLoading(false); return;
+        }
+      } else if (isStudentRole && (!user?.uid || !user?.classId)) {
+         setAssignments([]); setIsLoading(false); return;
       }
+
 
       const querySnapshot = await getDocs(assignmentsQuery);
       let fetchedAssignments: AssignmentData[] = querySnapshot.docs.map(docSnap => {
@@ -281,8 +297,8 @@ export default function AssignmentsPage() {
         };
       });
 
-      if (isStudentRole && user && user.uid && fetchedAssignments.length > 0) {
-        const submissionsSnapshot = await getDocs(query(collection(db, "assignmentSubmissions"), where("studentId", "==", user.uid)));
+      if (studentToQueryId && fetchedAssignments.length > 0) {
+        const submissionsSnapshot = await getDocs(query(collection(db, "assignmentSubmissions"), where("studentId", "==", studentToQueryId)));
         const userSubs = new Map<string, AssignmentSubmission>();
         submissionsSnapshot.forEach(doc => {
           const subData = doc.data() as AssignmentSubmission;
@@ -290,17 +306,16 @@ export default function AssignmentsPage() {
         });
         setStudentSubmissions(userSubs);
 
-        // Fetch results related to these assignments for the student
         const assignmentIdsForResultsQuery = fetchedAssignments.map(a => a.id);
         const assignmentResultsMap = new Map<string, FetchedResultData>();
-        if (assignmentIdsForResultsQuery.length > 0 && user.uid) {
+        if (assignmentIdsForResultsQuery.length > 0) {
           const resultsQueries = [];
           for (let i = 0; i < assignmentIdsForResultsQuery.length; i += 30) {
             const chunk = assignmentIdsForResultsQuery.slice(i, i + 30);
             resultsQueries.push(
               getDocs(query(
                 collection(db, "results"),
-                where("studentId", "==", user.uid),
+                where("studentId", "==", studentToQueryId),
                 where("assignmentId", "in", chunk)
               ))
             );
@@ -383,25 +398,29 @@ export default function AssignmentsPage() {
       return;
     }
 
-    if (isStudentRole) {
-      if (user.classId && user.classId.trim() !== "" && user.uid) { // Added user.uid check
+    // Consolidate fetching logic
+    if ((isStudentRole && user.uid && user.classId) || 
+        (isParentRole && user.linkedStudentId && user.linkedStudentClassId) || 
+        isTeacherOrAdminRole) {
         fetchAssignments();
-      } else {
-        toast({
-          title: "Tidak Terdaftar di Kelas atau Data Pengguna Tidak Lengkap",
-          description: "Tugas tidak dapat ditampilkan. Pastikan Anda terdaftar di kelas dan ID pengguna Anda valid.",
-          variant: "destructive",
-        });
+    } else {
+        if (isStudentRole && !user.classId) {
+            toast({
+                title: "Tidak Terdaftar di Kelas",
+                description: "Tugas tidak dapat ditampilkan. Pastikan Anda terdaftar di kelas.",
+                variant: "destructive",
+            });
+        } else if (isParentRole && !user.linkedStudentClassId) {
+             toast({
+                title: "Data Kelas Anak Tidak Ditemukan",
+                description: "Tidak dapat menampilkan tugas karena data kelas anak tidak ditemukan.",
+                variant: "destructive",
+            });
+        }
         setAssignments([]);
         setIsLoading(false);
-      }
-    } else if (isTeacherOrAdminRole) {
-      fetchAssignments();
-    } else {
-      setAssignments([]);
-      setIsLoading(false);
     }
-  }, [authLoading, user, role, user?.classId, user?.uid]);
+  }, [authLoading, user, role]);
 
 
   useEffect(() => {
@@ -624,7 +643,7 @@ export default function AssignmentsPage() {
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Tugas</h1>
         <p className="text-muted-foreground">
-          {isStudentRole ? "Lihat dan kerjakan tugas Anda." : "Kelola pemberian tugas, pengumpulan, dan penilaian."}
+          {isStudentRole ? "Lihat dan kerjakan tugas Anda." : isParentRole ? "Lihat tugas anak Anda." : "Kelola pemberian tugas, pengumpulan, dan penilaian."}
         </p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
@@ -633,32 +652,41 @@ export default function AssignmentsPage() {
             <ClipboardCheck className="h-6 w-6 text-primary" />
             <span>Daftar Tugas</span>
           </CardTitle>
-          {isTeacherOrAdminRole && (
-            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-              setIsAddDialogOpen(isOpen);
-              if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined }); addAssignmentForm.clearErrors(); }
-            }}>
-              <DialogTrigger asChild>
-                <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchDropdownData(); }}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Tugas
+          <div className="flex items-center gap-2">
+            {(isStudentRole || isParentRole) && (
+                 <Button size="sm" asChild>
+                    <NextLink href="/results">
+                        <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Belajar
+                    </NextLink>
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader><DialogTitle>Tambah Tugas Baru</DialogTitle><DialogDescription>Isi detail tugas.</DialogDescription></DialogHeader>
-                <form onSubmit={addAssignmentForm.handleSubmit(handleAddAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  <div><Label htmlFor="add-assignment-title">Judul Tugas</Label><Input id="add-assignment-title" {...addAssignmentForm.register("title")} className="mt-1" />{addAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.title.message}</p>}</div>
-                  <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
-                  <div><Label htmlFor="add-assignment-classId">Kelas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
-                  <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
-                  <div><Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addAssignmentForm.watch("dueDate")} onSelect={(date) => addAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent></Popover>{addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}</div>
-                  <div><Label htmlFor="add-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="add-assignment-meetingNumber" type="number" {...addAssignmentForm.register("meetingNumber")} className="mt-1" placeholder="Contoh: 3" />{addAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
-                  <div><Label htmlFor="add-assignment-description">Deskripsi Tugas</Label><Textarea id="add-assignment-description" {...addAssignmentForm.register("description")} className="mt-1" placeholder="Jelaskan detail tugas di sini..." /></div>
-                  <div><Label htmlFor="add-assignment-fileURL">URL File Tugas (Opsional)</Label><Input id="add-assignment-fileURL" {...addAssignmentForm.register("fileURL")} className="mt-1" placeholder="https://contoh.com/file_tugas.pdf" />{addAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.fileURL.message}</p>}</div>
-                  <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addAssignmentForm.formState.isSubmitting}>{addAssignmentForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Tugas"}</Button></DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+            )}
+            {isTeacherOrAdminRole && (
+              <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                setIsAddDialogOpen(isOpen);
+                if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined }); addAssignmentForm.clearErrors(); }
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchDropdownData(); }}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Tambah Tugas
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader><DialogTitle>Tambah Tugas Baru</DialogTitle><DialogDescription>Isi detail tugas.</DialogDescription></DialogHeader>
+                  <form onSubmit={addAssignmentForm.handleSubmit(handleAddAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div><Label htmlFor="add-assignment-title">Judul Tugas</Label><Input id="add-assignment-title" {...addAssignmentForm.register("title")} className="mt-1" />{addAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.title.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-classId">Kelas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addAssignmentForm.watch("dueDate")} onSelect={(date) => addAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent></Popover>{addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="add-assignment-meetingNumber" type="number" {...addAssignmentForm.register("meetingNumber")} className="mt-1" placeholder="Contoh: 3" />{addAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-description">Deskripsi Tugas</Label><Textarea id="add-assignment-description" {...addAssignmentForm.register("description")} className="mt-1" placeholder="Jelaskan detail tugas di sini..." /></div>
+                    <div><Label htmlFor="add-assignment-fileURL">URL File Tugas (Opsional)</Label><Input id="add-assignment-fileURL" {...addAssignmentForm.register("fileURL")} className="mt-1" placeholder="https://contoh.com/file_tugas.pdf" />{addAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.fileURL.message}</p>}</div>
+                    <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addAssignmentForm.formState.isSubmitting}>{addAssignmentForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Tugas"}</Button></DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -670,13 +698,13 @@ export default function AssignmentsPage() {
                   <TableRow>
                     <TableHead>Judul Tugas</TableHead>
                     <TableHead>Mata Pelajaran</TableHead>
-                    {isStudentRole && <TableHead>Guru</TableHead>}
-                    {!isStudentRole && <TableHead>Kelas</TableHead>}
-                    {!isStudentRole && <TableHead>Guru</TableHead>}
+                    {(isStudentRole || isParentRole) && <TableHead>Guru</TableHead>}
+                    {!isStudentRole && !isParentRole && <TableHead>Kelas</TableHead>}
+                    {!isStudentRole && !isParentRole && <TableHead>Guru</TableHead>}
                     <TableHead>Pertemuan</TableHead>
                     <TableHead>Batas Waktu</TableHead>
-                    {isStudentRole && <TableHead>File Tugas</TableHead>}
-                    {isStudentRole && <TableHead>Status</TableHead>}
+                    {(isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
+                    {(isStudentRole || isParentRole) && <TableHead>Status</TableHead>}
                     {isTeacherOrAdminRole && <TableHead>Pengumpulan</TableHead>}
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
@@ -686,15 +714,15 @@ export default function AssignmentsPage() {
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium">{assignment.title}</TableCell>
                       <TableCell>{assignment.subjectName || assignment.subjectId}</TableCell>
-                      {isStudentRole && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
-                      {!isStudentRole && <TableCell>{assignment.className || assignment.classId}</TableCell>}
-                      {!isStudentRole && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      {(isStudentRole || isParentRole) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      {!isStudentRole && !isParentRole && <TableCell>{assignment.className || assignment.classId}</TableCell>}
+                      {!isStudentRole && !isParentRole && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
                       <TableCell>{assignment.meetingNumber || "-"}</TableCell>
                       <TableCell className={cn(isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
                         {format(assignment.dueDate.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
                       </TableCell>
 
-                      {isStudentRole && (
+                      {(isStudentRole || isParentRole) && (
                         <>
                           <TableCell>
                             {assignment.fileURL ? (
@@ -759,6 +787,11 @@ export default function AssignmentsPage() {
                            )}
                           </div>
                         )}
+                         {isParentRole && assignment.result && (
+                             <Button variant="secondary" size="sm" onClick={() => handleOpenViewResultDialog(assignment)}>
+                                <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Anak
+                             </Button>
+                           )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -875,7 +908,7 @@ export default function AssignmentsPage() {
         </Dialog>
        )}
 
-      {isStudentRole && selectedAssignmentForViewingResult && selectedAssignmentForViewingResult.result && (
+      {(isStudentRole || isParentRole) && selectedAssignmentForViewingResult && selectedAssignmentForViewingResult.result && (
         <Dialog open={isViewResultDialogOpen} onOpenChange={(isOpen) => { setIsViewResultDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForViewingResult(null); }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
