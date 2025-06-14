@@ -31,13 +31,13 @@ import { id as indonesiaLocale } from "date-fns/locale";
 interface MyGradeEntry {
   assignmentId: string;
   assignmentTitle: string;
-  subjectName?: string; // Optional: if you want to show subject too
+  subjectName?: string; 
   submissionLink?: string;
   teacherFeedback?: string;
   score?: number;
   maxScore?: number;
   grade?: string;
-  dateOfAssessment?: Timestamp; // When the result was recorded
+  dateOfAssessment?: Timestamp; 
 }
 
 export default function MyGradesPage() {
@@ -83,7 +83,6 @@ export default function MyGradesPage() {
         // 2. Fetch all results for the student for these assignments
         const resultsMap = new Map<string, any>();
         if (assignmentIds.length > 0) {
-            // Firestore 'in' queries are limited to 30 elements per query.
             const resultsPromises = [];
             for (let i = 0; i < assignmentIds.length; i += 30) {
                 const chunk = assignmentIds.slice(i, i + 30);
@@ -125,7 +124,7 @@ export default function MyGradesPage() {
              submissionsSnapshots.forEach(snapshot => {
                 snapshot.forEach(doc => {
                     const submissionData = doc.data();
-                    if (submissionData.assignmentId) {
+                    if (submissionData.assignmentId) { 
                        submissionsMap.set(submissionData.assignmentId, { id: doc.id, ...submissionData });
                     }
                 });
@@ -148,7 +147,7 @@ export default function MyGradesPage() {
             grade: result?.grade,
             dateOfAssessment: result?.dateOfAssessment,
           };
-        }).filter(entry => entry.score !== undefined || entry.submissionLink !== undefined); // Only show if there's a submission or a grade
+        }).filter(entry => entry.score !== undefined || entry.submissionLink !== undefined); 
 
         setGrades(combinedGrades);
 
@@ -289,3 +288,4 @@ export default function MyGradesPage() {
     </div>
   );
 }
+
