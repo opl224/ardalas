@@ -282,13 +282,30 @@ export default function UserAdministrationPage() {
       fetchUsers();
     } catch (error) {
       const firebaseError = error as FirebaseError;
-      let errorMessage = "Gagal menambahkan pengguna.";
+      console.error("Error adding user:", firebaseError); // Log first
+
       if (firebaseError.code === "auth/email-already-in-use") {
-        errorMessage = "Email ini sudah terdaftar.";
-        addUserForm.setError("email", { type: "manual", message: errorMessage });
+        const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
+        addUserForm.setError("email", { type: "manual", message: specificMessage });
+        toast({ 
+            title: "Email Sudah Ada", 
+            description: specificMessage, 
+            variant: "destructive" 
+        });
+      } else {
+        // Handle other potential Firebase errors or generic errors
+        let generalErrorMessage = "Gagal menambahkan pengguna. Silakan coba lagi.";
+        // Example: You could add more specific firebaseError.code checks here if needed
+        // if (firebaseError.code === "auth/weak-password") {
+        //   generalErrorMessage = "Password terlalu lemah. Gunakan minimal 6 karakter.";
+        //   addUserForm.setError("password", { type: "manual", message: generalErrorMessage });
+        // }
+        toast({ 
+            title: "Gagal Menambahkan Pengguna", 
+            description: generalErrorMessage, 
+            variant: "destructive" 
+        });
       }
-      console.error("Error adding user:", firebaseError);
-      toast({ title: "Gagal Menambahkan Pengguna", description: errorMessage, variant: "destructive" });
     }
   };
 
@@ -625,6 +642,3 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
-
-
-    
