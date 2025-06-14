@@ -62,7 +62,7 @@ interface DashboardStats {
   adminTotalStudents: number;
   adminTotalTeachers: number;
   adminTotalSubjects: number;
-  adminTotalClasses: number;
+  adminTotalClasses: number; // Added for admin
   // Teacher specific
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     adminTotalStudents: 0,
     adminTotalTeachers: 0,
     adminTotalSubjects: 0,
-    adminTotalClasses: 0,
+    adminTotalClasses: 0, // Initialized for admin
     teacherTotalStudentsTaught: 0,
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
@@ -89,7 +89,7 @@ export default function DashboardPage() {
       if (!user || !role) {
         setLoadingStats(false);
         setLoadingAnnouncements(false);
-        setStats({ // Reset stats if no user/role
+        setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
         });
@@ -103,34 +103,30 @@ export default function DashboardPage() {
       const statsUpdate: Partial<DashboardStats> = {};
 
       try {
-        // Fetch Stats
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
           const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
           const subjectsQuery = collection(db, "subjects");
-          const classesQuery = collection(db, "classes");
+          const classesQuery = collection(db, "classes"); // Query for classes
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
             getDocs(subjectsQuery),
-            getDocs(classesQuery),
+            getDocs(classesQuery), // Fetch classes
           ]);
 
           statsUpdate.adminTotalStudents = studentSnap.size;
           statsUpdate.adminTotalTeachers = teacherUserSnap.size;
           statsUpdate.adminTotalSubjects = subjectSnap.size;
-          statsUpdate.adminTotalClasses = classSnap.size;
+          statsUpdate.adminTotalClasses = classSnap.size; // Assign class count
 
-        } else if (role === 'guru' && user.uid && user.email) {
-            // Step 1: Find teacher profile in 'teachers' collection using email from Auth user
+        } else if (role === 'guru' && user.email) { // Ensure user.email exists
             const teacherProfileQuery = query(collection(db, "teachers"), where("email", "==", user.email), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
             if (!teacherProfileSnapshot.empty) {
                 const teacherProfileDocId = teacherProfileSnapshot.docs[0].id;
-
-                // Step 2: Query lessons using the found teacherProfileDocId
                 const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileDocId));
                 const lessonsSnapshot = await getDocs(lessonsQuery);
               
@@ -146,11 +142,10 @@ export default function DashboardPage() {
                 statsUpdate.teacherTotalClassesTaught = taughtClassIds.size;
                 statsUpdate.teacherTotalSubjectsTaught = taughtSubjectIds.size;
 
-                // Step 3: Count unique students taught
                 if (taughtClassIds.size > 0) {
                     const studentClassesArray = Array.from(taughtClassIds);
                     const allStudentIds = new Set<string>();
-                    const CHUNK_SIZE = 30; // Firestore 'in' query limit (actually 30 in v9, but 10 was for older versions)
+                    const CHUNK_SIZE = 30; 
 
                     for (let i = 0; i < studentClassesArray.length; i += CHUNK_SIZE) {
                         const chunk = studentClassesArray.slice(i, i + CHUNK_SIZE);
@@ -169,13 +164,13 @@ export default function DashboardPage() {
                     statsUpdate.teacherTotalStudentsTaught = 0;
                 }
             } else {
-                // Teacher profile not found in 'teachers' collection by email
+                // Teacher profile not found in 'teachers' collection by email, set stats to 0
                 statsUpdate.teacherTotalStudentsTaught = 0;
                 statsUpdate.teacherTotalClassesTaught = 0;
                 statsUpdate.teacherTotalSubjectsTaught = 0;
             }
         } else {
-             // Default to 0 if role is not admin or guru, or required user info is missing
+            // Default to 0 if role is not admin or guru, or required user info (like email for guru) is missing
             statsUpdate.teacherTotalStudentsTaught = 0;
             statsUpdate.teacherTotalClassesTaught = 0;
             statsUpdate.teacherTotalSubjectsTaught = 0;
@@ -193,34 +188,30 @@ export default function DashboardPage() {
         setLoadingStats(false);
       }
 
-      // Fetch Recent Announcements
       try {
         const announcementsRef = collection(db, "announcements");
-        let announcementsQuery;
-        // Basic filtering for announcements (can be made more sophisticated)
+        let announcementsQueryInstance;
+        
         if (role && user?.classId && (role === 'siswa' || role === 'orangtua')) {
-           announcementsQuery = query(
+           announcementsQueryInstance = query(
             announcementsRef,
-            // Example: target all, or target specific role, or target specific class (if applicable)
-            // This requires announcements to have 'targetAudience' (array of roles) 
-            // and potentially 'targetClassIds' (array of class IDs)
-            where("targetAudience", "array-contains-any", [role, "semua", user.classId]), // Simplistic example
+            where("targetAudience", "array-contains-any", [role, "semua", user.classId]), 
             orderBy("date", "desc"),
             limit(3)
           );
         } else if (role === 'guru' && user?.uid) {
-           announcementsQuery = query(
+           announcementsQueryInstance = query(
             announcementsRef,
-             where("targetAudience", "array-contains", "guru"), // or "array-contains-any" with "semua"
+             where("targetAudience", "array-contains", "guru"), 
             orderBy("date", "desc"),
             limit(3)
           );
         }
-        else { // Admin or other general cases
-         announcementsQuery = query(announcementsRef, orderBy("date", "desc"), limit(3));
+        else { 
+         announcementsQueryInstance = query(announcementsRef, orderBy("date", "desc"), limit(3));
         }
 
-        const querySnapshot = await getDocs(announcementsQuery);
+        const querySnapshot = await getDocs(announcementsQueryInstance);
         const fetchedAnnouncements = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -235,7 +226,7 @@ export default function DashboardPage() {
     
     fetchAllData();
 
-  }, [user, role]); // Re-run if user or role changes
+  }, [user, role]);
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -258,12 +249,11 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Platform manajemen informasi sekolah Anda.</p>
       </div>
 
-      {/* Stats Section */}
       {role === 'admin' && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
+            <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/admin/user-administration" />
             <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/admin/user-administration" />
             <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
             <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
@@ -282,8 +272,6 @@ export default function DashboardPage() {
         </section>
       )}
 
-
-      {/* Quick Access Links */}
       <section>
         <h2 className="text-2xl font-semibold mb-4 font-headline">Akses Cepat</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -306,7 +294,6 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {/* Recent Announcements */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-semibold font-headline">Pengumuman Terbaru</h2>
