@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School } from "lucide-react";
+import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle } from "lucide-react";
 import { useState, useEffect, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -282,7 +282,7 @@ export default function UserAdministrationPage() {
       fetchUsers();
     } catch (error) {
       const firebaseError = error as FirebaseError;
-      console.error("Error adding user:", firebaseError); // Log first
+      console.error("Error adding user:", firebaseError); 
 
       if (firebaseError.code === "auth/email-already-in-use") {
         const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
@@ -293,13 +293,7 @@ export default function UserAdministrationPage() {
             variant: "destructive" 
         });
       } else {
-        // Handle other potential Firebase errors or generic errors
         let generalErrorMessage = "Gagal menambahkan pengguna. Silakan coba lagi.";
-        // Example: You could add more specific firebaseError.code checks here if needed
-        // if (firebaseError.code === "auth/weak-password") {
-        //   generalErrorMessage = "Password terlalu lemah. Gunakan minimal 6 karakter.";
-        //   addUserForm.setError("password", { type: "manual", message: generalErrorMessage });
-        // }
         toast({ 
             title: "Gagal Menambahkan Pengguna", 
             description: generalErrorMessage, 
@@ -350,9 +344,6 @@ export default function UserAdministrationPage() {
   const handleDeleteUser = async (userId: string, userName?: string) => {
     try {
       await deleteDoc(doc(db, "users", userId));
-      // Note: Deleting user from Firebase Auth is a separate, more complex operation
-      // usually handled by a Cloud Function for security reasons (requires admin privileges).
-      // This function only deletes the Firestore user document.
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
       setSelectedUser(null);
       fetchUsers();
@@ -377,14 +368,19 @@ export default function UserAdministrationPage() {
   }
 
   const renderClassAssignmentField = (formInstance: typeof addUserForm | typeof editUserForm, currentRole: Role | undefined) => {
+    const noClassesAvailable = !isLoadingClasses && allClasses.length === 0;
+    
     if (currentRole === 'guru') {
       return (
         <div>
           <Label>Kelas yang Ditugaskan</Label>
           {isLoadingClasses ? (
             <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
-          ) : allClasses.length === 0 ? (
-            <p className="text-sm text-muted-foreground mt-1">Tidak ada kelas tersedia.</p>
+          ) : noClassesAvailable ? (
+            <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              <span>Tidak ada kelas tersedia. Tambah data kelas terlebih dahulu.</span>
+            </div>
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
               {allClasses.map((cls) => (
@@ -423,6 +419,12 @@ export default function UserAdministrationPage() {
       return (
          <div>
             <Label htmlFor="classId">Kelas Siswa</Label>
+            {noClassesAvailable && (
+                 <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <span>Tidak ada kelas tersedia. Tambah data kelas terlebih dahulu.</span>
+                </div>
+            )}
             <Controller
                 name="classId"
                 control={formInstance.control}
@@ -430,10 +432,10 @@ export default function UserAdministrationPage() {
                     <Select
                         onValueChange={(value) => { field.onChange(value); formInstance.trigger("classId");}}
                         value={field.value || undefined}
-                        disabled={isLoadingClasses}
+                        disabled={isLoadingClasses || noClassesAvailable}
                     >
                         <SelectTrigger id="classId" className="mt-1">
-                            <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : "Pilih kelas"} />
+                            <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas" : "Pilih kelas")} />
                         </SelectTrigger>
                         <SelectContent>
                             {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
@@ -642,3 +644,6 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
+
+    
