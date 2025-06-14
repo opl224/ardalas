@@ -69,8 +69,8 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Ujian", href: "/exams", icon: FileText, roles: ["admin", "guru", "siswa", "orangtua"] },
       { title: "Tugas", href: "/assignments", icon: ClipboardCheck, roles: ["admin", "guru", "siswa", "orangtua"] },
-      { title: "Nilai Tugas Saya", href: "/my-grades", icon: GraduationCap, roles: ["siswa", "orangtua"]},
-      { title: "Input Hasil Belajar", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
+      { title: "Nilai Tugas", href: "/my-grades", icon: GraduationCap, roles: ["siswa", "orangtua"]},
+      { title: "Hasil", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
     ],
   },
   {

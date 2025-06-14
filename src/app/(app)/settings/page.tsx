@@ -51,16 +51,16 @@ export default function SettingsPage() {
 
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          {/* <CardTitle className="flex items-center gap-2">
             <SettingsIcon className="h-6 w-6 text-primary" />
             <span>Preferensi Akun</span>
           </CardTitle>
           <CardDescription>
             Atur berbagai aspek akun Anda untuk pengalaman yang lebih personal.
-          </CardDescription>
+          </CardDescription> */}
         </CardHeader>
         <CardContent className="space-y-6">
-          <div>
+          {/* <div>
             <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
               <User className="h-5 w-5 text-muted-foreground" />
               Profil Pengguna
@@ -88,7 +88,7 @@ export default function SettingsPage() {
             <p className="text-sm text-muted-foreground">
               Atur preferensi notifikasi untuk pengumuman, tugas, dan acara penting lainnya. (Fitur ini akan segera hadir)
             </p>
-          </div>
+          </div> */}
           
           <div className="border-t border-border pt-6">
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
