@@ -20,12 +20,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid } from "date-fns";
+import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid, getDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -34,12 +34,13 @@ import {
   getDocs,
   doc,
   setDoc,
-  addDoc, // Added for student attendance
+  addDoc, 
   query,
   where,
   Timestamp,
   serverTimestamp,
-  orderBy
+  orderBy,
+  documentId
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -52,17 +53,19 @@ const ATTENDANCE_STATUSES = ["Hadir", "Sakit", "Izin", "Alpa"] as const;
 type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
 
 interface ClassMin { id: string; name: string; }
-interface StudentMin { id: string; name: string; } // For teacher form student list
+interface SubjectMin { id: string; name: string; } // Added for subject dropdown
+interface StudentMin { id: string; name: string; } 
 
-interface TeacherStudentAttendanceRecord { // Renamed to avoid conflict
+interface TeacherStudentAttendanceRecord { 
   studentId: string;
   studentName: string; 
   status: AttendanceStatus;
   notes?: string;
 }
 
-const teacherAttendanceFormSchema = z.object({ // Renamed schema
+const teacherAttendanceFormSchema = z.object({ 
   classId: z.string({ required_error: "Pilih kelas." }),
+  subjectId: z.string({ required_error: "Pilih mata pelajaran." }), // Added subjectId
   date: z.date({ required_error: "Tanggal harus diisi." }),
   studentAttendances: z.array(z.object({
     studentId: z.string(),
@@ -71,7 +74,7 @@ const teacherAttendanceFormSchema = z.object({ // Renamed schema
     notes: z.string().optional(),
   })).min(1, "Minimal ada satu siswa untuk mencatat kehadiran."),
 });
-type TeacherAttendanceFormValues = z.infer<typeof teacherAttendanceFormSchema>; // Renamed type
+type TeacherAttendanceFormValues = z.infer<typeof teacherAttendanceFormSchema>; 
 
 interface MonthlyAttendanceSummary {
   studentId: string;
@@ -90,39 +93,44 @@ const months = [
   { value: 9, label: "Oktober" }, { value: 10, label: "November" }, { value: 11, label: "Desember" }
 ];
 
+const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
 // --- Types for Student View ---
 interface StudentLessonDisplay {
-  id: string; // Lesson document ID
+  id: string; 
   subjectName?: string;
   dayOfWeek: string;
-  startTime: string; // HH:MM
-  endTime: string;   // HH:MM
+  startTime: string; 
+  endTime: string;   
 }
 
 interface StudentSelfAttendanceRecord {
-  id?: string; // Firestore doc ID
+  id?: string; 
   studentId: string;
   studentName: string;
   classId: string;
   className: string;
   lessonId: string;
   subjectName?: string;
-  lessonTime: string; // e.g., "08:00 - 09:30"
-  date: Timestamp; // Date of attendance (start of day)
-  status: "Hadir"; // Student can only mark themselves as "Hadir"
-  attendedAt: Timestamp; // Actual time of attendance
+  lessonTime: string; 
+  date: Timestamp; 
+  status: "Hadir"; 
+  attendedAt: Timestamp; 
 }
 
 
 function TeacherAdminAttendanceManagement() {
   const { user, role, loading: authLoading } = useAuth(); 
   const [classes, setClasses] = useState<ClassMin[]>([]);
+  const [subjects, setSubjects] = useState<SubjectMin[]>([]); // State for subjects
   const [studentsInClassForForm, setStudentsInClassForForm] = useState<StudentMin[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true); // Loading state for subjects
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isLoadingExistingAttendance, setIsLoadingExistingAttendance] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>();
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); // State for selected subject
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [existingAttendanceDocId, setExistingAttendanceDocId] = useState<string | null>(null);
 
@@ -136,6 +144,7 @@ function TeacherAdminAttendanceManagement() {
     resolver: zodResolver(teacherAttendanceFormSchema),
     defaultValues: {
       classId: undefined,
+      subjectId: undefined, // Default for subjectId
       date: selectedDate,
       studentAttendances: [],
     },
@@ -150,19 +159,25 @@ function TeacherAdminAttendanceManagement() {
     if (authLoading) return; 
     if (!role || !["admin", "guru"].includes(role)) return; 
 
-    const fetchClassesForTeacher = async () => {
+    const fetchInitialData = async () => {
       setIsLoadingClasses(true);
+      setIsLoadingSubjects(true);
       try {
         const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
         setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        
+        const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
+        setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+
       } catch (error) {
-        console.error("Error fetching classes: ", error);
-        toast({ title: "Gagal Memuat Kelas", variant: "destructive" });
+        console.error("Error fetching initial data: ", error);
+        toast({ title: "Gagal Memuat Data Awal", variant: "destructive" });
       } finally {
         setIsLoadingClasses(false);
+        setIsLoadingSubjects(false);
       }
     };
-    fetchClassesForTeacher();
+    fetchInitialData();
   }, [toast, authLoading, role]);
 
   useEffect(() => {
@@ -176,23 +191,18 @@ function TeacherAdminAttendanceManagement() {
       setIsLoadingStudents(true);
       form.setValue("studentAttendances", []); 
       try {
-        const studentsQuery = query(collection(db, "students"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
+        const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
 
         const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setStudentsInClassForForm(fetchedStudents);
         
-        const initialAttendance = fetchedStudents.map(student => ({
-          studentId: student.id,
-          studentName: student.name,
-          status: "Hadir" as AttendanceStatus,
-          notes: "",
-        }));
-        replace(initialAttendance); 
+        // Default status will be set in fetchAttendanceData effect
+        // replace([]); // Don't replace here, let fetchAttendanceData handle it
 
       } catch (error) {
         console.error("Error fetching students: ", error);
-        toast({ title: "Gagal Memuat Siswa", description: "Pastikan siswa memiliki field 'classId' yang benar.", variant: "destructive" });
+        toast({ title: "Gagal Memuat Siswa", description: "Pastikan siswa memiliki field 'classId' yang benar di koleksi 'users'.", variant: "destructive" });
         setStudentsInClassForForm([]);
         replace([]);
       } finally {
@@ -205,13 +215,14 @@ function TeacherAdminAttendanceManagement() {
 
   useEffect(() => {
     if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
-    if (!selectedClassId || !selectedDate) {
+    if (!selectedClassId || !selectedSubjectId || !selectedDate) { // Added selectedSubjectId check
       setExistingAttendanceDocId(null);
-      if (studentsInClassForForm.length > 0) {
+      // Reset form only if all selections are not made yet
+      if (studentsInClassForForm.length > 0 && (!selectedClassId || !selectedSubjectId || !selectedDate)) {
          const resetAttendance = studentsInClassForForm.map(student => ({
           studentId: student.id,
           studentName: student.name,
-          status: "Hadir" as AttendanceStatus,
+          status: "Alpa" as AttendanceStatus, // Default to Alpa
           notes: "",
         }));
         form.setValue("studentAttendances", resetAttendance);
@@ -223,11 +234,13 @@ function TeacherAdminAttendanceManagement() {
       setIsLoadingExistingAttendance(true);
       setExistingAttendanceDocId(null);
       const dateToQuery = Timestamp.fromDate(startOfDay(selectedDate));
+      const currentDayName = DAY_NAMES_ID[getDay(selectedDate)];
 
       try {
         const attendanceQuery = query(
           collection(db, "attendances"),
           where("classId", "==", selectedClassId),
+          where("subjectId", "==", selectedSubjectId), // Added subjectId filter
           where("date", "==", dateToQuery)
         );
         const attendanceSnapshot = await getDocs(attendanceQuery);
@@ -235,30 +248,63 @@ function TeacherAdminAttendanceManagement() {
         if (!attendanceSnapshot.empty) {
           const attendanceDoc = attendanceSnapshot.docs[0];
           setExistingAttendanceDocId(attendanceDoc.id);
-          const data = attendanceDoc.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[] };
+          const data = attendanceDoc.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[], subjectId: string };
           
-          const currentClassStudents = studentsInClassForForm.length > 0 ? studentsInClassForForm : (await getDocs(query(collection(db, "students"), where("classId", "==", selectedClassId), orderBy("name", "asc")))).docs.map(d => ({id: d.id, name: d.data().name}));
+          const currentClassStudents = studentsInClassForForm.length > 0 ? studentsInClassForForm : (await getDocs(query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc")))).docs.map(d => ({id: d.id, name: d.data().name}));
 
           const mergedStudentAttendances = currentClassStudents.map(student => {
             const existingRecord = data.studentAttendances.find(sa => sa.studentId === student.id);
-            return existingRecord || {
+            return existingRecord || { // Should not happen if data is consistent
               studentId: student.id,
               studentName: student.name,
-              status: "Hadir" as AttendanceStatus,
+              status: "Alpa" as AttendanceStatus, // Default if somehow missing
               notes: "",
             };
           });
           form.setValue("studentAttendances", mergedStudentAttendances);
 
-        } else {
+        } else { // No manual attendance record found, check self-attendance
           if (studentsInClassForForm.length > 0) {
-            const initialAttendance = studentsInClassForForm.map(student => ({
-              studentId: student.id,
-              studentName: student.name,
-              status: "Hadir" as AttendanceStatus,
-              notes: "",
-            }));
-            form.setValue("studentAttendances", initialAttendance);
+            // Fetch lesson IDs for the selected class, subject, and day
+            const lessonsQuery = query(collection(db, "lessons"),
+              where("classId", "==", selectedClassId),
+              where("subjectId", "==", selectedSubjectId),
+              where("dayOfWeek", "==", currentDayName)
+            );
+            const lessonsSnapshot = await getDocs(lessonsQuery);
+            const relevantLessonIds = lessonsSnapshot.docs.map(doc => doc.id);
+
+            const studentAttendancePromises = studentsInClassForForm.map(async (student) => {
+              let studentStatus: AttendanceStatus = "Alpa"; // Default to Alpa
+              if (relevantLessonIds.length > 0) {
+                const selfAttendanceQuery = query(
+                  collection(db, "studentAttendanceRecords"),
+                  where("studentId", "==", student.id),
+                  where("date", "==", dateToQuery),
+                  where("lessonId", "in", relevantLessonIds) 
+                );
+                const selfAttendanceSnapshot = await getDocs(selfAttendanceQuery);
+                if (!selfAttendanceSnapshot.empty) {
+                  // If any "Hadir" record exists for any relevant lesson
+                  selfAttendanceSnapshot.forEach(doc => {
+                    if (doc.data().status === "Hadir") {
+                      studentStatus = "Hadir";
+                    }
+                  });
+                }
+              }
+              return {
+                studentId: student.id,
+                studentName: student.name,
+                status: studentStatus,
+                notes: "",
+              };
+            });
+            
+            const initialAttendanceWithSelfCheck = await Promise.all(studentAttendancePromises);
+            form.setValue("studentAttendances", initialAttendanceWithSelfCheck);
+          } else {
+            form.setValue("studentAttendances", []);
           }
         }
       } catch (error) {
@@ -269,19 +315,20 @@ function TeacherAdminAttendanceManagement() {
       }
     };
 
-    if(studentsInClassForForm.length > 0 || !isLoadingStudents) {
+    if(studentsInClassForForm.length > 0 || !isLoadingStudents) { // Ensure students are loaded or loading finished
         fetchAttendanceData();
     }
 
-  }, [selectedClassId, selectedDate, toast, form, studentsInClassForForm, isLoadingStudents, authLoading, role]);
+  }, [selectedClassId, selectedSubjectId, selectedDate, toast, form, studentsInClassForForm, isLoadingStudents, authLoading, role]);
 
   const handleSaveAttendance: SubmitHandler<TeacherAttendanceFormValues> = async (data) => {
     setIsSubmitting(true);
     const attendanceDate = Timestamp.fromDate(startOfDay(data.date));
     const selectedClass = classes.find(c => c.id === data.classId);
+    const selectedSubject = subjects.find(s => s.id === data.subjectId); // Get selected subject
 
-    if (!user || !selectedClass) {
-        toast({ title: "Data tidak lengkap", description: "Pengguna atau kelas tidak ditemukan.", variant: "destructive"});
+    if (!user || !selectedClass || !selectedSubject) { // Added subject check
+        toast({ title: "Data tidak lengkap", description: "Pengguna, kelas, atau mata pelajaran tidak ditemukan.", variant: "destructive"});
         setIsSubmitting(false);
         return;
     }
@@ -289,6 +336,8 @@ function TeacherAdminAttendanceManagement() {
     const attendanceDocumentData = {
       classId: data.classId,
       className: selectedClass.name,
+      subjectId: data.subjectId,       // Save subjectId
+      subjectName: selectedSubject.name, // Save subjectName
       date: attendanceDate,
       studentAttendances: data.studentAttendances,
       recordedById: user.uid,
@@ -303,6 +352,8 @@ function TeacherAdminAttendanceManagement() {
     try {
       let docIdToSave = existingAttendanceDocId;
       if (!docIdToSave) {
+        // Generate ID based on class, subject, and date for predictability if needed, or use Firestore auto-ID
+        // For simplicity, using Firestore auto-ID or previously fetched ID
         docIdToSave = doc(collection(db, "attendances")).id; 
       }
       await setDoc(doc(db, "attendances", docIdToSave), attendanceDocumentData, { merge: true }); 
@@ -323,6 +374,12 @@ function TeacherAdminAttendanceManagement() {
     setStudentsInClassForForm([]); 
     setExistingAttendanceDocId(null); 
   };
+  
+  const handleSubjectChange = (subjectId: string) => {
+    setSelectedSubjectId(subjectId);
+    form.setValue("subjectId", subjectId);
+    setExistingAttendanceDocId(null); // Reset existing doc ID when subject changes
+  };
 
   const handleDateChange = (date?: Date) => {
     if (date) {
@@ -334,16 +391,18 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportDailyExcel = async () => {
-    if (!selectedClassId || !selectedDate || fields.length === 0) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+    if (!selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     try {
       const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const formattedDate = format(selectedDate, "yyyy-MM-dd", { locale: indonesiaLocale });
-      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${formattedDate}.xlsx`;
+      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${formattedDate}.xlsx`;
 
       const dataToExport = fields.map(record => ({
         "Nama Siswa": record.studentName,
@@ -356,7 +415,7 @@ function TeacherAdminAttendanceManagement() {
       XLSX.utils.book_append_sheet(workbook, worksheet, `Kehadiran ${formattedDate}`);
       
       XLSX.utils.sheet_add_aoa(worksheet, [
-        [`Laporan Kehadiran Harian - Kelas: ${className} - Tanggal: ${format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale })}`],
+        [`Laporan Kehadiran Harian - Kelas: ${className} - Mata Pelajaran: ${subjectName} - Tanggal: ${format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale })}`],
         [] 
       ], { origin: "A1" });
 
@@ -374,23 +433,27 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportDailyPdf = async () => {
-    if (!selectedClassId || !selectedDate || fields.length === 0) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+    if (!selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     try {
       const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const formattedDate = format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale });
-      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${format(selectedDate, "yyyy-MM-dd")}.pdf`;
 
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text(`Laporan Kehadiran Harian`, 14, 15);
       doc.setFontSize(12);
       doc.text(`Kelas: ${className}`, 14, 22);
-      doc.text(`Tanggal: ${formattedDate}`, 14, 29);
+      doc.text(`Mata Pelajaran: ${subjectName}`, 14, 29);
+      doc.text(`Tanggal: ${formattedDate}`, 14, 36);
+
 
       const tableColumn = ["No", "Nama Siswa", "Status", "Catatan"];
       const tableRows: (string | number)[][] = [];
@@ -406,7 +469,7 @@ function TeacherAdminAttendanceManagement() {
       });
 
       autoTable(doc, {
-        startY: 35,
+        startY: 42,
         head: [tableColumn],
         body: tableRows,
         theme: 'grid',
@@ -423,11 +486,11 @@ function TeacherAdminAttendanceManagement() {
     }
   };
   
-  const generateMonthlyAttendanceSummary = async (classId: string, year: number, month: number): Promise<MonthlyAttendanceSummary[]> => {
+  const generateMonthlyAttendanceSummary = async (classId: string, subjectId: string, year: number, month: number): Promise<MonthlyAttendanceSummary[]> => {
     const startDate = startOfDay(setMonth(setYear(new Date(), year), month));
     const endDate = lastDayOfMonth(startDate);
 
-    const studentsSnapshot = await getDocs(query(collection(db, "students"), where("classId", "==", classId), orderBy("name")));
+    const studentsSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", classId), orderBy("name")));
     const classStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
 
     const studentSummaries: Record<string, MonthlyAttendanceSummary> = {};
@@ -443,6 +506,7 @@ function TeacherAdminAttendanceManagement() {
     const attendanceQuery = query(
         collection(db, "attendances"),
         where("classId", "==", classId),
+        where("subjectId", "==", subjectId),
         where("date", ">=", Timestamp.fromDate(startDate)),
         where("date", "<=", Timestamp.fromDate(endDate))
     );
@@ -478,23 +542,25 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportMonthlyExcel = async () => {
-     if (!selectedClassId || selectedExportMonth === null || !selectedExportYear) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
+     if (!selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     try {
-      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
+      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedSubjectId, selectedExportYear, selectedExportMonth);
       if (summaryData.length === 0) {
-        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
+        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk mata pelajaran, bulan dan kelas yang dipilih.", variant: "info" });
         setIsExporting(false);
         return;
       }
 
       const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
-      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.xlsx`;
+      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.xlsx`;
 
       const dataToExport = summaryData.map(record => ({
         "Nama Siswa": record.studentName,
@@ -510,7 +576,7 @@ function TeacherAdminAttendanceManagement() {
       XLSX.utils.book_append_sheet(workbook, worksheet, `${monthName} ${selectedExportYear}`);
       
       XLSX.utils.sheet_add_aoa(worksheet, [
-        [`Laporan Kehadiran Bulanan - Kelas: ${className}`],
+        [`Laporan Kehadiran Bulanan - Kelas: ${className} - Mata Pelajaran: ${subjectName}`],
         [`Bulan: ${monthName} ${selectedExportYear}`],
         [] 
       ], { origin: "A1" });
@@ -530,30 +596,33 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportMonthlyPdf = async () => {
-    if (!selectedClassId || selectedExportMonth === null || !selectedExportYear) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
+    if (!selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     try {
-      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
+      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedSubjectId, selectedExportYear, selectedExportMonth);
        if (summaryData.length === 0) {
-        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
+        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk mata pelajaran, bulan dan kelas yang dipilih.", variant: "info" });
         setIsExporting(false);
         return;
       }
 
       const selectedClassObj = classes.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
+      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
-      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.pdf`;
+      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.pdf`;
 
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text(`Laporan Kehadiran Bulanan`, 14, 15);
       doc.setFontSize(12);
       doc.text(`Kelas: ${className}`, 14, 22);
-      doc.text(`Bulan: ${monthName} ${selectedExportYear}`, 14, 29);
+      doc.text(`Mata Pelajaran: ${subjectName}`, 14, 29);
+      doc.text(`Bulan: ${monthName} ${selectedExportYear}`, 14, 36);
 
       const tableColumn = ["No", "Nama Siswa", "Hadir", "Sakit", "Izin", "Alpa", "Total Hari"];
       const tableRows: (string | number)[][] = [];
@@ -572,7 +641,7 @@ function TeacherAdminAttendanceManagement() {
       });
       
       autoTable(doc, {
-        startY: 35,
+        startY: 42,
         head: [tableColumn],
         body: tableRows,
         theme: 'grid',
@@ -595,7 +664,7 @@ function TeacherAdminAttendanceManagement() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Kehadiran</h1>
-        <p className="text-muted-foreground">Catat dan pantau kehadiran siswa.</p>
+        <p className="text-muted-foreground">Catat dan pantau kehadiran siswa per mata pelajaran.</p>
       </div>
       <form onSubmit={form.handleSubmit(handleSaveAttendance)}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
@@ -606,7 +675,7 @@ function TeacherAdminAttendanceManagement() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div>
                 <Label htmlFor="classId-teacher">Kelas</Label>
                 <Select
@@ -625,6 +694,24 @@ function TeacherAdminAttendanceManagement() {
                 </Select>
                 {form.formState.errors.classId && <p className="text-sm text-destructive mt-1">{form.formState.errors.classId.message}</p>}
               </div>
+               <div>
+                <Label htmlFor="subjectId-teacher">Mata Pelajaran</Label>
+                <Select
+                  value={selectedSubjectId}
+                  onValueChange={handleSubjectChange}
+                  disabled={isLoadingSubjects || isSubmitting || !selectedClassId}
+                >
+                  <SelectTrigger id="subjectId-teacher" className="mt-1">
+                    <SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat mapel..." : "Pilih mata pelajaran")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingSubjects && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                    {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    {subjects.length === 0 && !isLoadingSubjects && <SelectItem value="no-subjects" disabled>Tidak ada mapel.</SelectItem>}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{form.formState.errors.subjectId.message}</p>}
+              </div>
               <div>
                 <Label htmlFor="date-teacher">Tanggal</Label>
                 <Popover>
@@ -632,7 +719,7 @@ function TeacherAdminAttendanceManagement() {
                     <Button
                       variant={"outline"}
                       className="w-full justify-start text-left font-normal mt-1"
-                      disabled={isLoadingExistingAttendance || isSubmitting}
+                      disabled={isLoadingExistingAttendance || isSubmitting || !selectedClassId || !selectedSubjectId}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {selectedDate ? format(selectedDate, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
@@ -652,7 +739,7 @@ function TeacherAdminAttendanceManagement() {
               </div>
             </div>
 
-            {selectedClassId && selectedDate && (
+            {selectedClassId && selectedSubjectId && selectedDate && (
               isLoadingStudents || isLoadingExistingAttendance ? (
                 <div className="space-y-2 mt-4">
                   <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" />
@@ -694,9 +781,9 @@ function TeacherAdminAttendanceManagement() {
                   {form.formState.errors.studentAttendances && !form.formState.errors.studentAttendances.message && (<p className="text-sm text-destructive mt-1">Periksa kembali input kehadiran siswa.</p>)}
                    {form.formState.errors.studentAttendances?.message && (<p className="text-sm text-destructive mt-1">{form.formState.errors.studentAttendances?.message}</p>)}
                 </div>
-              ) : null
+              ) :  (selectedClassId && selectedSubjectId && selectedDate && !isLoadingStudents && !isLoadingExistingAttendance && studentsInClassForForm.length > 0 && fields.length === 0 && <p className="mt-4 text-center text-muted-foreground">Memuat data siswa atau status kehadiran...</p>)
             )}
-            {fields.length > 0 && selectedClassId && selectedDate && !isLoadingStudents && !isLoadingExistingAttendance && (
+            {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingStudents && !isLoadingExistingAttendance && (
               <div className="flex justify-end mt-6">
                 <Button type="submit" disabled={isSubmitting || isLoadingExistingAttendance || isLoadingStudents}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -713,23 +800,30 @@ function TeacherAdminAttendanceManagement() {
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader><CardTitle className="flex items-center gap-2"><FileDown className="h-6 w-6 text-primary" /><span>Rekap & Ekspor Kehadiran</span></CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
-              <Label htmlFor="exportClassId">Kelas (untuk Rekap)</Label>
+              <Label htmlFor="exportClassId">Kelas</Label>
               <Select value={selectedClassId} onValueChange={(value) => setSelectedClassId(value)} disabled={isLoadingClasses || isExporting}>
                 <SelectTrigger id="exportClassId" className="mt-1"><SelectValue placeholder={isLoadingClasses ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
                 <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+             <div>
+              <Label htmlFor="exportSubjectId">Mata Pelajaran</Label>
+              <Select value={selectedSubjectId} onValueChange={(value) => setSelectedSubjectId(value)} disabled={isLoadingSubjects || isExporting || !selectedClassId}>
+                <SelectTrigger id="exportSubjectId" className="mt-1"><SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat..." : "Pilih mapel")} /></SelectTrigger>
+                <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <div>
-              <Label htmlFor="exportMonth">Bulan (untuk Rekap Bulanan)</Label>
+              <Label htmlFor="exportMonth">Bulan</Label>
               <Select value={selectedExportMonth.toString()} onValueChange={(value) => setSelectedExportMonth(parseInt(value))} disabled={isExporting}>
                 <SelectTrigger id="exportMonth" className="mt-1"><SelectValue placeholder="Pilih bulan" /></SelectTrigger>
                 <SelectContent>{months.map(m => <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="exportYear">Tahun (untuk Rekap Bulanan)</Label>
+              <Label htmlFor="exportYear">Tahun</Label>
               <Input id="exportYear" type="number" value={selectedExportYear} onChange={(e) => setSelectedExportYear(parseInt(e.target.value))} className="mt-1" placeholder="Contoh: 2024" disabled={isExporting}/>
             </div>
           </div>
@@ -737,10 +831,10 @@ function TeacherAdminAttendanceManagement() {
         <CardFooter className="flex justify-end">
           <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting}>{isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportMonthlyExcel} disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportMonthlyPdf} disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}><FileDown className="mr-2 h-4 w-4" /> PDF Bulanan</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportMonthlyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportMonthlyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear}><FileDown className="mr-2 h-4 w-4" /> PDF Bulanan</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </CardFooter>
@@ -759,7 +853,7 @@ function StudentAttendanceView() {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Update time every 30s
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000); 
     return () => clearInterval(timer);
   }, []);
 
@@ -773,8 +867,7 @@ function StudentAttendanceView() {
 
     try {
       const todayObj = new Date();
-      const dayNames = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-      const currentDayName = dayNames[todayObj.getDay()];
+      const currentDayName = DAY_NAMES_ID[todayObj.getDay()];
 
       const lessonsQueryInstance = query(
         collection(db, "lessons"),
@@ -800,7 +893,7 @@ function StudentAttendanceView() {
         const attendanceSnapshot = await getDocs(attendanceQueryInstance);
         const recordsMap = new Map<string, StudentSelfAttendanceRecord>();
         attendanceSnapshot.forEach(docSnap => {
-          const data = docSnap.data() as Omit<StudentSelfAttendanceRecord, 'id'>; // Cast to ensure type correctness
+          const data = docSnap.data() as Omit<StudentSelfAttendanceRecord, 'id'>; 
           recordsMap.set(data.lessonId, { id: docSnap.id, ...data });
         });
         setAttendanceRecords(recordsMap);
@@ -829,8 +922,8 @@ function StudentAttendanceView() {
       return;
     }
 
-    const now = new Date(); // Use server-independent current time for check
-    const todayForCheck = startOfDay(now); // Compare against today
+    const now = new Date(); 
+    const todayForCheck = startOfDay(now); 
     
     const lessonStartTime = parse(lesson.startTime, "HH:mm", todayForCheck);
     const lessonEndTime = parse(lesson.endTime, "HH:mm", todayForCheck);
@@ -845,7 +938,7 @@ function StudentAttendanceView() {
         return;
     }
 
-    const attendanceRecordData: Omit<StudentSelfAttendanceRecord, 'id' | 'attendedAt'> & {attendedAt: any, date: any} = { // Use 'any' for serverTimestamp initially
+    const attendanceRecordData: Omit<StudentSelfAttendanceRecord, 'id' | 'attendedAt'> & {attendedAt: any, date: any} = { 
       studentId: user.uid,
       studentName: user.displayName,
       classId: user.classId,
@@ -853,19 +946,19 @@ function StudentAttendanceView() {
       lessonId: lesson.id,
       subjectName: lesson.subjectName,
       lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
-      date: Timestamp.fromDate(startOfDay(new Date())), // Use a new Date() for server consistency on record creation
+      date: Timestamp.fromDate(startOfDay(new Date())), 
       status: "Hadir",
       attendedAt: serverTimestamp(),
     };
 
     try {
       const docRef = await addDoc(collection(db, "studentAttendanceRecords"), attendanceRecordData);
-      // Optimistically update UI or re-fetch for consistency
+      
       setAttendanceRecords(prev => new Map(prev).set(lesson.id, { 
           ...attendanceRecordData, 
           id: docRef.id, 
-          attendedAt: Timestamp.now(), // Approximate client time for UI update
-          date: attendanceRecordData.date // keep the date object
+          attendedAt: Timestamp.now(), 
+          date: attendanceRecordData.date 
         } as StudentSelfAttendanceRecord ));
       toast({ title: "Kehadiran Tercatat", description: `Anda berhasil absen untuk pelajaran ${lesson.subjectName}.` });
     } catch (error) {
@@ -1010,3 +1103,4 @@ export default function AttendancePageWrapper() {
     );
   }
 }
+
