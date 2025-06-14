@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck } from "lucide-react";
+import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
@@ -63,6 +63,7 @@ export default function DashboardPage() {
     totalStudents: 0,
     totalTeachers: 0,
     totalSubjects: 0,
+    totalClasses: 0,
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
@@ -74,17 +75,20 @@ export default function DashboardPage() {
         const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
         const teacherQuery = query(collection(db, "users"), where("role", "==", "guru"));
         const subjectsQuery = collection(db, "subjects");
+        const classesQuery = collection(db, "classes");
 
-        const [studentSnap, teacherSnap, subjectSnap] = await Promise.all([
+        const [studentSnap, teacherSnap, subjectSnap, classSnap] = await Promise.all([
           getDocs(studentQuery),
           getDocs(teacherQuery),
           getDocs(subjectsQuery),
+          getDocs(classesQuery),
         ]);
 
         setStats({
           totalStudents: studentSnap.size,
           totalTeachers: teacherSnap.size,
           totalSubjects: subjectSnap.size,
+          totalClasses: classSnap.size,
         });
       } catch (error) {
         console.error("Error fetching stats: ", error);
@@ -163,9 +167,10 @@ export default function DashboardPage() {
       {(role === 'admin' || role === 'guru') && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Total Siswa" value={stats.totalStudents} icon={Users} loading={loadingStats} href="/students" />
             <StatCard title="Total Guru" value={stats.totalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
+            <StatCard title="Total Kelas" value={stats.totalClasses} icon={School} loading={loadingStats} href="/classes" />
             <StatCard title="Total Mata Pelajaran" value={stats.totalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
           </div>
         </section>
