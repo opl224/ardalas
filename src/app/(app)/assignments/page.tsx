@@ -93,14 +93,14 @@ interface AssignmentData {
   id: string;
   title: string;
   subjectId: string;
-  subjectName?: string; 
+  subjectName?: string;
   classId: string;
-  className?: string; 
+  className?: string;
   teacherId: string;
-  teacherName?: string; 
-  dueDate: Timestamp; 
+  teacherName?: string;
+  dueDate: Timestamp;
   description?: string;
-  fileURL?: string; 
+  fileURL?: string;
   meetingNumber?: number;
   createdAt?: Timestamp;
   // For student view
@@ -118,18 +118,18 @@ interface AssignmentSubmission {
   assignmentId: string;
   studentId: string;
   studentName: string;
-  classId: string; 
-  className?: string; 
+  classId: string;
+  className?: string;
   submissionLink: string;
   submittedAt: Timestamp;
   notes?: string;
-  teacherFileURL?: string; 
+  teacherFileURL?: string;
 }
 
 // Interface similar to ResultData from results page, for type casting
 interface FetchedResultData {
   id: string;
-  studentId: string; 
+  studentId: string;
   studentName: string;
   classId: string;
   className: string;
@@ -142,7 +142,7 @@ interface FetchedResultData {
   grade?: string;
   dateOfAssessment: Timestamp;
   feedback?: string;
-  assignmentId?: string; 
+  assignmentId?: string;
   meetingNumber?: number;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -181,12 +181,12 @@ export default function AssignmentsPage() {
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]);
-  
-  const [studentSubmissions, setStudentSubmissions] = useState<Map<string, AssignmentSubmission>>(new Map()); 
+
+  const [studentSubmissions, setStudentSubmissions] = useState<Map<string, AssignmentSubmission>>(new Map());
   const [submissionsForCurrentAssignment, setSubmissionsForCurrentAssignment] = useState<AssignmentSubmission[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true); 
-  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false); 
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -194,7 +194,7 @@ export default function AssignmentsPage() {
 
   const [isSubmitAssignmentDialogOpen, setIsSubmitAssignmentDialogOpen] = useState(false);
   const [selectedAssignmentForSubmission, setSelectedAssignmentForSubmission] = useState<AssignmentData | null>(null);
-  
+
   const [isViewSubmissionsDialogOpen, setIsViewSubmissionsDialogOpen] = useState(false);
   const [selectedAssignmentToViewSubmissions, setSelectedAssignmentToViewSubmissions] = useState<AssignmentData | null>(null);
 
@@ -226,16 +226,16 @@ export default function AssignmentsPage() {
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
-        getDocs(collection(db, "users")) 
+        getDocs(collection(db, "users"))
       ]);
       setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      
+
       const classData = classesSnapshot.docs.map(doc => {
         const classId = doc.id;
         const studentCount = usersSnapshot.docs.filter(sDoc => sDoc.data().role === "siswa" && sDoc.data().classId === classId).length;
         return { id: classId, name: doc.data().name, totalStudents: studentCount };
       });
-      setClasses(classData.map(c => ({id: c.id, name: c.name}))); 
+      setClasses(classData.map(c => ({id: c.id, name: c.name})));
 
       setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
@@ -243,16 +243,16 @@ export default function AssignmentsPage() {
       toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
     }
   };
-  
+
   const fetchAssignments = async () => {
     setIsLoading(true);
     try {
       if (isTeacherOrAdminRole) {
-        await fetchDropdownData(); 
+        await fetchDropdownData();
       }
-      
+
       let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
-      
+
       if (isStudentRole && user?.classId && user.classId.trim() !== "") {
         assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
       } else if (isStudentRole && (!user?.classId || user.classId.trim() === "")) {
@@ -273,7 +273,7 @@ export default function AssignmentsPage() {
           className: data.className,
           teacherId: data.teacherId,
           teacherName: data.teacherName,
-          dueDate: data.dueDate, 
+          dueDate: data.dueDate,
           description: data.description,
           fileURL: data.fileURL,
           meetingNumber: data.meetingNumber,
@@ -293,8 +293,7 @@ export default function AssignmentsPage() {
         // Fetch results related to these assignments for the student
         const assignmentIdsForResultsQuery = fetchedAssignments.map(a => a.id);
         const assignmentResultsMap = new Map<string, FetchedResultData>();
-        if (assignmentIdsForResultsQuery.length > 0 && user.uid) { // Added user.uid check here
-          // Firestore 'in' query limit is 30, chunk if necessary
+        if (assignmentIdsForResultsQuery.length > 0 && user.uid) {
           const resultsQueries = [];
           for (let i = 0; i < assignmentIdsForResultsQuery.length; i += 30) {
             const chunk = assignmentIdsForResultsQuery.slice(i, i + 30);
@@ -335,8 +334,8 @@ export default function AssignmentsPage() {
           } else if (isPast(assignment.dueDate.toDate())) {
             submissionStatus = "Terlambat";
           }
-          return { 
-            ...assignment, 
+          return {
+            ...assignment,
             submissionStatus,
             studentSubmissionLink: submission?.submissionLink,
             submissionTimestamp: submission?.submittedAt,
@@ -374,35 +373,35 @@ export default function AssignmentsPage() {
 
  useEffect(() => {
     if (authLoading) {
-      setIsLoading(true); 
+      setIsLoading(true);
       return;
     }
 
-    if (!user) { 
+    if (!user) {
       setIsLoading(false);
       setAssignments([]);
       return;
     }
 
     if (isStudentRole) {
-      if (user.classId && user.classId.trim() !== "") {
+      if (user.classId && user.classId.trim() !== "" && user.uid) { // Added user.uid check
         fetchAssignments();
       } else {
         toast({
-          title: "Tidak Terdaftar di Kelas",
-          description: "Anda belum terdaftar di kelas manapun atau ID kelas tidak valid. Tugas tidak dapat ditampilkan.",
+          title: "Tidak Terdaftar di Kelas atau Data Pengguna Tidak Lengkap",
+          description: "Tugas tidak dapat ditampilkan. Pastikan Anda terdaftar di kelas dan ID pengguna Anda valid.",
           variant: "destructive",
         });
         setAssignments([]);
         setIsLoading(false);
       }
     } else if (isTeacherOrAdminRole) {
-      fetchAssignments(); 
+      fetchAssignments();
     } else {
       setAssignments([]);
       setIsLoading(false);
     }
-  }, [authLoading, user, role, user?.classId]);
+  }, [authLoading, user, role, user?.classId, user?.uid]);
 
 
   useEffect(() => {
@@ -428,7 +427,7 @@ export default function AssignmentsPage() {
     return { subjectName: subject?.name, className: aClass?.name, teacherName: teacher?.name };
   };
 
-  const handleAddAssignmentSubmit: SubmitHandler<AssignmentFormValues> = async (data) => { 
+  const handleAddAssignmentSubmit: SubmitHandler<AssignmentFormValues> = async (data) => {
     addAssignmentForm.clearErrors();
     const { subjectName, className, teacherName } = getDenormalizedNames(data);
     if (!subjectName || !className || !teacherName) {
@@ -441,13 +440,13 @@ export default function AssignmentsPage() {
     }
 
     try {
-      const assignmentData:any = { 
-        ...data, 
-        dueDate: Timestamp.fromDate(data.dueDate), 
-        subjectName, 
-        className, 
-        teacherName, 
-        createdAt: serverTimestamp() 
+      const assignmentData:any = {
+        ...data,
+        dueDate: Timestamp.fromDate(data.dueDate),
+        subjectName,
+        className,
+        teacherName,
+        createdAt: serverTimestamp()
       };
       if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber) ) {
         delete assignmentData.meetingNumber;
@@ -456,7 +455,7 @@ export default function AssignmentsPage() {
 
       const newAssignmentRef = await addDoc(collection(db, "assignments"), assignmentData);
       toast({ title: "Tugas Ditambahkan" });
-      
+
       const batch = writeBatch(db);
       let descriptionText = data.description?.substring(0, 50) + (data.description && data.description.length > 50 ? "..." : "") || `Batas waktu: ${format(data.dueDate, "dd MMM yyyy, HH:mm", {locale: indonesiaLocale})}`;
       if(data.meetingNumber) {
@@ -466,7 +465,7 @@ export default function AssignmentsPage() {
       const notificationBase = {
         title: `Tugas Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
         description: descriptionText,
-        href: `/assignments`, 
+        href: `/assignments`,
         read: false,
         createdAt: serverTimestamp(),
         type: "new_assignment",
@@ -483,9 +482,9 @@ export default function AssignmentsPage() {
 
       const creatorNotificationRef = doc(collection(db, "notifications"));
       batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda membuat tugas baru: ${data.title}` });
-      
+
       await batch.commit();
-      
+
       setIsAddDialogOpen(false);
       addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined });
       fetchAssignments();
@@ -494,7 +493,7 @@ export default function AssignmentsPage() {
       toast({ title: "Gagal Menambahkan Tugas", variant: "destructive" });
     }
   };
-  const handleEditAssignmentSubmit: SubmitHandler<EditAssignmentFormValues> = async (data) => { 
+  const handleEditAssignmentSubmit: SubmitHandler<EditAssignmentFormValues> = async (data) => {
     if (!selectedAssignment) return;
     editAssignmentForm.clearErrors();
     const { subjectName, className, teacherName } = getDenormalizedNames(data);
@@ -504,17 +503,17 @@ export default function AssignmentsPage() {
     }
     try {
       const assignmentDocRef = doc(db, "assignments", data.id);
-      const updateData: any = { 
-          ...data,  
-          dueDate: Timestamp.fromDate(data.dueDate), 
-          subjectName, 
-          className, 
-          teacherName 
+      const updateData: any = {
+          ...data,
+          dueDate: Timestamp.fromDate(data.dueDate),
+          subjectName,
+          className,
+          teacherName
       };
       if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        updateData.meetingNumber = null; 
+        updateData.meetingNumber = null;
       }
-      
+
       await updateDoc(assignmentDocRef, updateData);
       toast({ title: "Tugas Diperbarui" });
       setIsEditDialogOpen(false);
@@ -524,7 +523,7 @@ export default function AssignmentsPage() {
       toast({ title: "Gagal Memperbarui Tugas", variant: "destructive" });
     }
   };
-  const handleDeleteAssignment = async (assignmentId: string) => { 
+  const handleDeleteAssignment = async (assignmentId: string) => {
     try {
       const submissionsQuery = query(collection(db, "assignmentSubmissions"), where("assignmentId", "==", assignmentId));
       const submissionsSnapshot = await getDocs(submissionsQuery);
@@ -540,7 +539,7 @@ export default function AssignmentsPage() {
       toast({ title: "Gagal Menghapus Tugas", variant: "destructive" });
     }
   };
-  
+
   const openEditDialog = (assignment: AssignmentData) => { setSelectedAssignment(assignment); setIsEditDialogOpen(true); };
   const openDeleteDialog = (assignment: AssignmentData) => { setSelectedAssignment(assignment); };
 
@@ -584,7 +583,7 @@ export default function AssignmentsPage() {
       studentId: user.uid,
       studentName: user.displayName,
       classId: user.classId,
-      className: user.className, 
+      className: user.className,
       submissionLink: data.submissionLink,
       submittedAt: Timestamp.now(),
       notes: data.notes,
@@ -603,7 +602,7 @@ export default function AssignmentsPage() {
       setIsSubmitAssignmentDialogOpen(false);
       setSelectedAssignmentForSubmission(null);
       studentSubmitForm.reset();
-      fetchAssignments(); 
+      fetchAssignments();
     } catch (error) {
       console.error("Error submitting assignment:", error);
       toast({ title: "Gagal Mengirim Tugas", variant: "destructive" });
@@ -616,7 +615,7 @@ export default function AssignmentsPage() {
   };
 
 
-  if (authLoading || (!user && !authLoading)) { 
+  if (authLoading || (!user && !authLoading)) {
     return <div className="space-y-6"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
@@ -694,7 +693,7 @@ export default function AssignmentsPage() {
                       <TableCell className={cn(isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
                         {format(assignment.dueDate.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
                       </TableCell>
-                      
+
                       {isStudentRole && (
                         <>
                           <TableCell>
@@ -927,3 +926,4 @@ export default function AssignmentsPage() {
   );
 }
 
+    
