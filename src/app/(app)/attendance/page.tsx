@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -41,7 +40,8 @@ import {
   Timestamp,
   serverTimestamp,
   orderBy,
-  documentId
+  documentId,
+  limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -132,8 +132,11 @@ interface StudentAttendanceViewProps {
 
 function TeacherAdminAttendanceManagement() {
   const { user, role, loading: authLoading } = useAuth(); 
-  const [classes, setClasses] = useState<ClassMin[]>([]);
-  const [subjects, setSubjects] = useState<SubjectMin[]>([]);
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]); // For admin, or initial list for teacher
+  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); // For admin, or initial list for teacher
+  const [classesForDropdown, setClassesForDropdown] = useState<ClassMin[]>([]);
+  const [subjectsForDropdown, setSubjectsForDropdown] = useState<SubjectMin[]>([]);
+
   const [studentsInClassForForm, setStudentsInClassForForm] = useState<StudentMin[]>([]);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true); 
@@ -167,29 +170,131 @@ function TeacherAdminAttendanceManagement() {
   });
 
   useEffect(() => {
-    if (authLoading) return; 
-    if (!role || !["admin", "guru"].includes(role)) return; 
+    if (authLoading || !user || !role) return; 
 
-    const fetchInitialData = async () => {
+    const fetchInitialDropdownData = async () => {
       setIsLoadingClasses(true);
       setIsLoadingSubjects(true);
       try {
-        const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
-        setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-        
-        const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-        setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        if (role === 'admin') {
+          const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
+          const adminClasses = classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+          setAllClasses(adminClasses);
+          setClassesForDropdown(adminClasses);
+          
+          const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
+          const adminSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+          setAllSubjects(adminSubjects);
+          // For admin, subjectsForDropdown will be set when a class is selected, or show all if no class selected
+          setSubjectsForDropdown(adminSubjects); 
+        } else if (role === 'guru' && user.uid) {
+            const teacherAuthUid = user.uid;
+            
+            // Fetch lessons taught by this teacher
+            const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherAuthUid));
+            const lessonsSnapshot = await getDocs(lessonsQuery);
+            const taughtLessons = lessonsSnapshot.docs.map(d => d.data());
 
+            const uniqueClassIds = Array.from(new Set(taughtLessons.map(l => l.classId).filter(id => !!id)));
+            
+            let teacherClasses: ClassMin[] = [];
+            if (uniqueClassIds.length > 0) {
+              const classChunks = [];
+              for (let i = 0; i < uniqueClassIds.length; i += 30) { classChunks.push(uniqueClassIds.slice(i, i + 30)); }
+              const classPromises = classChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))));
+              const classSnapshots = await Promise.all(classPromises);
+              classSnapshots.forEach(snap => snap.docs.forEach(d => teacherClasses.push({ id: d.id, name: d.data().name })));
+              teacherClasses.sort((a, b) => a.name.localeCompare(b.name));
+            }
+            setAllClasses(teacherClasses); // Store all classes teacher is involved in
+            setClassesForDropdown(teacherClasses);
+            setSubjectsForDropdown([]); // Subjects will be loaded when class is selected
+        }
       } catch (error) {
-        console.error("Error fetching initial data: ", error);
+        console.error("Error fetching initial dropdown data for attendance:", error);
         toast({ title: "Gagal Memuat Data Awal", variant: "destructive" });
+        setAllClasses([]);
+        setAllSubjects([]);
+        setClassesForDropdown([]);
+        setSubjectsForDropdown([]);
       } finally {
         setIsLoadingClasses(false);
-        setIsLoadingSubjects(false);
+        setIsLoadingSubjects(false); // Initial subjects loading done for admin, teacher loads on class select
       }
     };
-    fetchInitialData();
-  }, [toast, authLoading, role]);
+    fetchInitialDropdownData();
+  }, [authLoading, user, role, toast]);
+
+
+  // Effect to update subjects dropdown when class is selected (especially for teachers)
+  useEffect(() => {
+    if (authLoading || !user || !role) return;
+
+    const updateSubjectsForSelectedClass = async () => {
+        if (!selectedClassId) {
+            if (role === 'admin') setSubjectsForDropdown(allSubjects); // Admin sees all if no class selected
+            else setSubjectsForDropdown([]);
+            return;
+        }
+        setIsLoadingSubjects(true);
+        try {
+            if (role === 'admin') {
+                // Admin: Could filter subjects that actually exist in the selected class via lessons,
+                // but for simplicity, let's assume they can record for any subject in any class.
+                // Or, more accurately, fetch subjects that have lessons in this class.
+                const lessonsInClassQuery = query(collection(db, "lessons"), where("classId", "==", selectedClassId));
+                const lessonsSnapshot = await getDocs(lessonsInClassQuery);
+                const subjectIdsInClass = Array.from(new Set(lessonsSnapshot.docs.map(d => d.data().subjectId).filter(id => !!id)));
+                
+                let subjectsInClass: SubjectMin[] = [];
+                if (subjectIdsInClass.length > 0) {
+                    const subjectChunks = [];
+                    for (let i = 0; i < subjectIdsInClass.length; i += 30) { subjectChunks.push(subjectIdsInClass.slice(i, i+30));}
+                    const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db,"subjects"), where(documentId(), "in", chunk))));
+                    const subjectSnapshots = await Promise.all(subjectPromises);
+                    subjectSnapshots.forEach(snap => snap.docs.forEach(d => subjectsInClass.push({id: d.id, name: d.data().name})));
+                    subjectsInClass.sort((a,b) => a.name.localeCompare(b.name));
+                }
+                setSubjectsForDropdown(subjectsInClass);
+
+            } else if (role === 'guru' && user.uid) {
+                const teacherAuthUid = user.uid;
+                const lessonsQuery = query(collection(db, "lessons"), 
+                    where("teacherId", "==", teacherAuthUid),
+                    where("classId", "==", selectedClassId)
+                );
+                const lessonsSnapshot = await getDocs(lessonsQuery);
+                const subjectIds = Array.from(new Set(lessonsSnapshot.docs.map(d => d.data().subjectId).filter(id => !!id)));
+
+                let teacherSubjectsInClass: SubjectMin[] = [];
+                if (subjectIds.length > 0) {
+                    const subjectChunks = [];
+                    for (let i = 0; i < subjectIds.length; i += 30) { subjectChunks.push(subjectIds.slice(i, i+30));}
+                    const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db,"subjects"), where(documentId(), "in", chunk))));
+                    const subjectSnapshots = await Promise.all(subjectPromises);
+                    subjectSnapshots.forEach(snap => snap.docs.forEach(d => teacherSubjectsInClass.push({id: d.id, name: d.data().name})));
+                    teacherSubjectsInClass.sort((a,b) => a.name.localeCompare(b.name));
+                }
+                setSubjectsForDropdown(teacherSubjectsInClass);
+                
+                // Reset selected subject if not in new list
+                if (selectedSubjectId && !teacherSubjectsInClass.find(s => s.id === selectedSubjectId)) {
+                    setSelectedSubjectId(undefined);
+                    form.setValue("subjectId", undefined);
+                }
+            }
+        } catch (error) {
+            console.error("Error updating subjects for class:", error);
+            toast({title: "Gagal Memuat Mata Pelajaran Kelas", variant: "destructive"});
+            setSubjectsForDropdown([]);
+        } finally {
+            setIsLoadingSubjects(false);
+        }
+    };
+
+    updateSubjectsForSelectedClass();
+  }, [selectedClassId, role, user, authLoading, toast, allSubjects]); // allSubjects for admin fallback
+
 
   useEffect(() => {
     if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
@@ -329,8 +434,8 @@ function TeacherAdminAttendanceManagement() {
   const handleSaveAttendance: SubmitHandler<TeacherAttendanceFormValues> = async (data) => {
     setIsSubmitting(true);
     const attendanceDate = Timestamp.fromDate(startOfDay(data.date));
-    const selectedClass = classes.find(c => c.id === data.classId);
-    const selectedSubject = subjects.find(s => s.id === data.subjectId); 
+    const selectedClass = allClasses.find(c => c.id === data.classId); // Use allClasses which has all classes
+    const selectedSubject = allSubjects.find(s => s.id === data.subjectId); // Use allSubjects for name lookup
 
     if (!user || !selectedClass || !selectedSubject) { 
         toast({ title: "Data tidak lengkap", description: "Pengguna, kelas, atau mata pelajaran tidak ditemukan.", variant: "destructive"});
@@ -376,6 +481,8 @@ function TeacherAdminAttendanceManagement() {
     form.setValue("studentAttendances", []); 
     setStudentsInClassForForm([]); 
     setExistingAttendanceDocId(null); 
+    setSelectedSubjectId(undefined); // Reset subject when class changes
+    form.setValue("subjectId", undefined);
   };
   
   const handleSubjectChange = (subjectId: string) => {
@@ -400,8 +507,8 @@ function TeacherAdminAttendanceManagement() {
     }
     setIsExporting(true);
     try {
-      const selectedClassObj = classes.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
       const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const formattedDate = format(selectedDate, "yyyy-MM-dd", { locale: indonesiaLocale });
@@ -442,8 +549,8 @@ function TeacherAdminAttendanceManagement() {
     }
     setIsExporting(true);
     try {
-      const selectedClassObj = classes.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
       const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const formattedDate = format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale });
@@ -558,8 +665,8 @@ function TeacherAdminAttendanceManagement() {
         return;
       }
 
-      const selectedClassObj = classes.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
       const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
@@ -612,8 +719,8 @@ function TeacherAdminAttendanceManagement() {
         return;
       }
 
-      const selectedClassObj = classes.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = subjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
+      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
       const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
@@ -691,8 +798,8 @@ function TeacherAdminAttendanceManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                    {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    {classes.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
+                    {classesForDropdown.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    {classesForDropdown.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.classId && <p className="text-sm text-destructive mt-1">{form.formState.errors.classId.message}</p>}
@@ -702,15 +809,15 @@ function TeacherAdminAttendanceManagement() {
                 <Select
                   value={selectedSubjectId}
                   onValueChange={handleSubjectChange}
-                  disabled={isLoadingSubjects || isSubmitting || !selectedClassId}
+                  disabled={isLoadingSubjects || isSubmitting || !selectedClassId || (subjectsForDropdown.length === 0 && !!selectedClassId)}
                 >
                   <SelectTrigger id="subjectId-teacher" className="mt-1">
-                    <SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat mapel..." : "Pilih mata pelajaran")} />
+                    <SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat mapel..." : ((subjectsForDropdown.length === 0 && !!selectedClassId) ? "Tidak ada mapel di kelas ini" : "Pilih mata pelajaran"))} />
                   </SelectTrigger>
                   <SelectContent>
                     {isLoadingSubjects && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                    {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    {subjects.length === 0 && !isLoadingSubjects && <SelectItem value="no-subjects" disabled>Tidak ada mapel.</SelectItem>}
+                    {subjectsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    {subjectsForDropdown.length === 0 && !isLoadingSubjects && selectedClassId && <SelectItem value="no-subjects" disabled>Tidak ada mapel di kelas ini.</SelectItem>}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{form.formState.errors.subjectId.message}</p>}
@@ -808,14 +915,14 @@ function TeacherAdminAttendanceManagement() {
               <Label htmlFor="exportClassId">Kelas</Label>
               <Select value={selectedClassId} onValueChange={(value) => setSelectedClassId(value)} disabled={isLoadingClasses || isExporting}>
                 <SelectTrigger id="exportClassId" className="mt-1"><SelectValue placeholder={isLoadingClasses ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
-                <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{classesForDropdown.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
              <div>
               <Label htmlFor="exportSubjectId">Mata Pelajaran</Label>
               <Select value={selectedSubjectId} onValueChange={(value) => setSelectedSubjectId(value)} disabled={isLoadingSubjects || isExporting || !selectedClassId}>
                 <SelectTrigger id="exportSubjectId" className="mt-1"><SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat..." : "Pilih mapel")} /></SelectTrigger>
-                <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{subjectsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
