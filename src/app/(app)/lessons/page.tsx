@@ -66,6 +66,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
+import { format, parse, getDay, isWithinInterval, isValid } from "date-fns"; // Added date-fns functions
+import { id as indonesiaLocale } from "date-fns/locale"; // For day name localization
+import { cn } from "@/lib/utils";
+
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
@@ -89,6 +93,7 @@ interface LessonData {
 }
 
 const DAYS_OF_WEEK = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] as const;
+const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 
@@ -140,6 +145,8 @@ export default function LessonsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
 
   const { toast } = useToast();
 
@@ -160,6 +167,12 @@ export default function LessonsPage() {
   const editLessonForm = useForm<EditLessonFormValues>({
     resolver: zodResolver(editLessonFormSchema),
   });
+  
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Update time every 30 seconds
+    return () => clearInterval(timer);
+  }, []);
+
 
   const fetchDropdownData = async () => {
     if (role !== "admin" && role !== "guru") return;
@@ -361,6 +374,23 @@ export default function LessonsPage() {
 
   const canManageLessons = role === "admin" || role === "guru";
   const isStudentOrParent = role === "siswa" || role === "orangtua";
+  
+  const isLessonCurrentlyActive = (lesson: LessonData): boolean => {
+    if (!lesson.dayOfWeek || !lesson.startTime || !lesson.endTime) return false;
+
+    const now = currentTime;
+    const currentDayName = DAY_NAMES_ID[getDay(now)];
+    
+    if (lesson.dayOfWeek !== currentDayName) return false;
+
+    const lessonStartTime = parse(lesson.startTime, "HH:mm", now);
+    const lessonEndTime = parse(lesson.endTime, "HH:mm", now);
+
+    if (!isValid(lessonStartTime) || !isValid(lessonEndTime)) return false;
+    
+    return isWithinInterval(now, { start: lessonStartTime, end: lessonEndTime });
+  };
+
 
   return (
     <div className="space-y-6">
@@ -487,58 +517,61 @@ export default function LessonsPage() {
                     <TableHead>Hari</TableHead>
                     <TableHead>Waktu</TableHead>
                     {canManageLessons && <TableHead>Topik</TableHead>}
-                    {isStudentOrParent && <TableHead className="text-right">Aksi</TableHead>}
+                    {(isStudentOrParent || role === 'siswa') && <TableHead className="text-right">Aksi</TableHead>}
                     {canManageLessons && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedLessons.map((lesson) => (
-                    <TableRow key={lesson.id}>
-                      <TableCell className="font-medium">{lesson.subjectName || lesson.subjectId}</TableCell>
-                      {!isStudentOrParent && <TableCell>{lesson.className || lesson.classId}</TableCell>}
-                      <TableCell>{lesson.teacherName || lesson.teacherId}</TableCell>
-                      <TableCell>{lesson.dayOfWeek}</TableCell>
-                      <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
-                      {canManageLessons && <TableCell>{lesson.topic || "-"}</TableCell>}
-                      {isStudentOrParent && (
-                        <TableCell className="text-right">
-                          <Button asChild size="sm" variant="outline">
-                            <Link href={`/lessons/${lesson.id}`}>
-                              <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      )}
-                      {canManageLessons && (
-                        <TableCell className="text-right space-x-2">
-                          <Button variant="outline" size="icon" onClick={() => openEditDialog(lesson)} aria-label={`Edit pelajaran ${lesson.subjectName}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(lesson)} aria-label={`Hapus pelajaran ${lesson.subjectName}`}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            {selectedLesson && selectedLesson.id === lesson.id && (
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tindakan ini akan menghapus jadwal pelajaran <span className="font-semibold">{selectedLesson?.subjectName} ({selectedLesson?.className})</span> pada hari {selectedLesson?.dayOfWeek}.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setSelectedLesson(null)}>Batal</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteLesson(selectedLesson.id)}>Ya, Hapus Jadwal</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            )}
-                          </AlertDialog>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))}
+                  {sortedLessons.map((lesson) => {
+                    const isActiveNow = isStudentOrParent ? isLessonCurrentlyActive(lesson) : false;
+                    return (
+                      <TableRow key={lesson.id}>
+                        <TableCell className="font-medium">{lesson.subjectName || lesson.subjectId}</TableCell>
+                        {!isStudentOrParent && <TableCell>{lesson.className || lesson.classId}</TableCell>}
+                        <TableCell>{lesson.teacherName || lesson.teacherId}</TableCell>
+                        <TableCell>{lesson.dayOfWeek}</TableCell>
+                        <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
+                        {canManageLessons && <TableCell>{lesson.topic || "-"}</TableCell>}
+                        {(isStudentOrParent || role === 'siswa') && (
+                          <TableCell className="text-right">
+                            <Button asChild size="sm" variant="outline" disabled={!isActiveNow}>
+                              <Link href={`/lessons/${lesson.id}`}>
+                                <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                              </Link>
+                            </Button>
+                          </TableCell>
+                        )}
+                        {canManageLessons && (
+                          <TableCell className="text-right space-x-2">
+                            <Button variant="outline" size="icon" onClick={() => openEditDialog(lesson)} aria-label={`Edit pelajaran ${lesson.subjectName}`}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(lesson)} aria-label={`Hapus pelajaran ${lesson.subjectName}`}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              {selectedLesson && selectedLesson.id === lesson.id && (
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tindakan ini akan menghapus jadwal pelajaran <span className="font-semibold">{selectedLesson?.subjectName} ({selectedLesson?.className})</span> pada hari {selectedLesson?.dayOfWeek}.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={() => setSelectedLesson(null)}>Batal</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteLesson(selectedLesson.id)}>Ya, Hapus Jadwal</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              )}
+                            </AlertDialog>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
