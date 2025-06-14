@@ -102,7 +102,7 @@ export default function SubjectsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const { role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
 
   const { toast } = useToast();
 
@@ -148,13 +148,26 @@ export default function SubjectsPage() {
 
 
   const fetchSubjects = async () => {
+    if (authLoading) return;
     setIsLoadingSubjects(true);
     try {
-      if (role === "admin" && authGuruUsers.length === 0) {
+      if (role === "admin" && authGuruUsers.length === 0 && !isLoadingAuthUsers) {
         await fetchAuthGuruUsers();
       }
       const subjectsCollectionRef = collection(db, "subjects");
-      const q = query(subjectsCollectionRef, orderBy("name", "asc"));
+      let q;
+      if (role === "guru" && user?.uid) {
+        q = query(subjectsCollectionRef, where("teacherUid", "==", user.uid), orderBy("name", "asc"));
+      } else if (role === "admin") {
+        q = query(subjectsCollectionRef, orderBy("name", "asc"));
+      } else {
+        // For other roles (siswa, orangtua), no subjects are fetched for this management view.
+        // They would see subjects through lesson schedules, etc.
+        setSubjects([]);
+        setIsLoadingSubjects(false);
+        return;
+      }
+      
       const querySnapshot = await getDocs(q);
       const fetchedSubjects: Subject[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
@@ -178,7 +191,7 @@ export default function SubjectsPage() {
 
   useEffect(() => {
     fetchSubjects();
-  }, [role]);
+  }, [role, user, authLoading, isLoadingAuthUsers]); // Re-fetch if role, user, or authLoading changes
 
   useEffect(() => {
     if (selectedSubject && isEditDialogOpen && role === "admin") {
@@ -194,7 +207,7 @@ export default function SubjectsPage() {
   const handleAddSubjectSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
     if (role !== "admin") return;
     addSubjectForm.clearErrors();
-    const selectedTeacher = authGuruUsers.find(user => user.id === data.teacherUid);
+    const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.teacherUid);
 
     try {
       const subjectsCollectionRef = collection(db, "subjects");
@@ -222,7 +235,7 @@ export default function SubjectsPage() {
   const handleEditSubjectSubmit: SubmitHandler<EditSubjectFormValues> = async (data) => {
     if (role !== "admin" || !selectedSubject) return;
     editSubjectForm.clearErrors();
-    const selectedTeacher = authGuruUsers.find(user => user.id === data.teacherUid);
+    const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.teacherUid);
 
     try {
       const subjectDocRef = doc(db, "subjects", data.id);
@@ -305,10 +318,10 @@ export default function SubjectsPage() {
                   {isLoadingAuthUsers && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
                   <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
                   {authGuruUsers
-                    .filter(user => user && typeof user.id === 'string' && user.id.length > 0)
-                    .map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.name} ({user.email})
+                    .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
+                    .map((authUser) => (
+                    <SelectItem key={authUser.id} value={authUser.id}>
+                      {authUser.name} ({authUser.email})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -323,12 +336,15 @@ export default function SubjectsPage() {
     </>
   );
 
+  const pageDescription = role === "guru"
+    ? "Daftar subjek atau mata pelajaran yang menjadi tanggung jawab Anda."
+    : "Kelola daftar subjek atau mata pelajaran yang diajarkan.";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Subjek Pelajaran</h1>
-        <p className="text-muted-foreground">Kelola daftar subjek atau mata pelajaran yang diajarkan.</p>
+        <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -374,7 +390,7 @@ export default function SubjectsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoadingSubjects || (role === "admin" && isLoadingAuthUsers) ? (
+          {isLoadingSubjects || (role === "admin" && isLoadingAuthUsers) || authLoading ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -387,7 +403,7 @@ export default function SubjectsPage() {
                   <TableRow>
                     <TableHead>Nama Subjek</TableHead>
                     <TableHead>Deskripsi</TableHead>
-                    {role === "admin" && <TableHead>Guru Penanggung Jawab</TableHead>}
+                    {(role === "admin" || role === "guru") && <TableHead>Guru Penanggung Jawab</TableHead>}
                     {role === "admin" && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -396,7 +412,7 @@ export default function SubjectsPage() {
                     <TableRow key={subject.id}>
                       <TableCell className="font-medium">{subject.name}</TableCell>
                       <TableCell>{subject.description || "-"}</TableCell>
-                      {role === "admin" && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
+                      {(role === "admin" || role === "guru") && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
                       {role === "admin" && (
                         <TableCell className="text-right space-x-2">
                           <Button variant="outline" size="icon" onClick={() => openEditDialog(subject)} aria-label={`Edit ${subject.name}`}>
@@ -434,7 +450,7 @@ export default function SubjectsPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Tidak ada data subjek untuk ditampilkan. {role === "admin" && 'Klik "Tambah Subjek" untuk membuat data baru.'}
+              {role === "admin" ? 'Tidak ada data subjek untuk ditampilkan. Klik "Tambah Subjek" untuk membuat data baru.' : 'Tidak ada subjek yang ditugaskan kepada Anda.'}
             </div>
           )}
         </CardContent>
@@ -475,3 +491,4 @@ export default function SubjectsPage() {
     </div>
   );
 }
+
