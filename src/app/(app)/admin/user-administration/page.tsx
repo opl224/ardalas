@@ -288,8 +288,8 @@ export default function UserAdministrationPage() {
         const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
         addUserForm.setError("email", { type: "manual", message: specificMessage });
         toast({ 
-            title: "Email Sudah Ada", 
-            description: specificMessage, 
+            title: "Gagal: Email Sudah Ada", 
+            description: specificMessage + " Gunakan email lain atau periksa apakah pengguna sudah ada di daftar.", 
             variant: "destructive" 
         });
       } else {
@@ -379,7 +379,7 @@ export default function UserAdministrationPage() {
           ) : noClassesAvailable ? (
             <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              <span>Tidak ada kelas tersedia. Tambah data kelas terlebih dahulu.</span>
+              <span>Tidak ada kelas tersedia. Tambahkan data kelas di menu "Akademik &gt; Kelas" terlebih dahulu.</span>
             </div>
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
@@ -422,7 +422,7 @@ export default function UserAdministrationPage() {
             {noClassesAvailable && (
                  <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada kelas tersedia. Tambah data kelas terlebih dahulu.</span>
+                    <span>Tidak ada kelas tersedia. Tambahkan data kelas di menu "Akademik &gt; Kelas" terlebih dahulu.</span>
                 </div>
             )}
             <Controller
@@ -583,7 +583,7 @@ export default function UserAdministrationPage() {
                 </TableBody>
               </Table>
             </div>
-          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna.</div> )}
+          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini agar muncul di sini (bukan hanya di Firebase Authentication).</div> )}
         </CardContent>
       </Card>
 
@@ -644,6 +644,6 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
-
+    
 
     
