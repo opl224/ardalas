@@ -74,6 +74,7 @@ interface ClassMin {
 
 interface User {
   id: string; 
+  uid: string; // Ensure UID is part of the User interface if it's expected from Firestore
   name: string;
   email: string;
   role: Role;
@@ -113,7 +114,7 @@ const addUserFormSchema = baseUserSchema.extend({
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 const editUserFormSchema = baseUserSchema.extend({
-  id: z.string(),
+  id: z.string(), // This 'id' will be the Firestore document ID, which should be the user's UID
 }).refine(data => {
     if (data.role === 'guru') {
       return data.assignedClassIds && data.assignedClassIds.length > 0;
@@ -187,7 +188,8 @@ export default function UserAdministrationPage() {
       const q = query(usersCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: User[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
+        id: docSnap.id, // This is the Firestore document ID, should be user's UID
+        uid: docSnap.data().uid, // Make sure 'uid' field exists and is fetched
         name: docSnap.data().name,
         email: docSnap.data().email,
         role: docSnap.data().role,
@@ -236,7 +238,7 @@ export default function UserAdministrationPage() {
   useEffect(() => {
     if (selectedUser && isEditUserDialogOpen) {
       editUserForm.reset({
-        id: selectedUser.id,
+        id: selectedUser.id, // This is the user's UID / Firestore doc ID
         name: selectedUser.name,
         email: selectedUser.email,
         role: selectedUser.role,
@@ -262,7 +264,7 @@ export default function UserAdministrationPage() {
         classId?: string;
         className?: string;
       } = {
-        uid: newAuthUser.uid,
+        uid: newAuthUser.uid, // Store the Auth UID in Firestore
         name: data.name,
         email: data.email,
         role: data.role,
@@ -271,14 +273,22 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
         userData.assignedClassIds = data.assignedClassIds;
+      } else {
+        // Ensure assignedClassIds is not set if role is not guru
+        delete userData.assignedClassIds; 
       }
 
       if (data.role === 'siswa' && data.classId) {
         const selectedClass = allClasses.find(c => c.id === data.classId);
         userData.classId = data.classId;
         userData.className = selectedClass?.name || "";
+      } else {
+         // Ensure classId and className are not set if role is not siswa
+        delete userData.classId;
+        delete userData.className;
       }
       
+      // Use the user's UID as the document ID in Firestore for direct mapping
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
       
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -316,7 +326,7 @@ export default function UserAdministrationPage() {
     if (!selectedUser) return;
     editUserForm.clearErrors();
     try {
-      const userDocRef = doc(db, "users", data.id);
+      const userDocRef = doc(db, "users", data.id); // data.id is the user's UID
       const updateData: any = {
         name: data.name,
         email: data.email, 
@@ -354,6 +364,7 @@ export default function UserAdministrationPage() {
   };
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
+    // Note: This only deletes from Firestore. Deleting from Firebase Auth needs separate handling.
     try {
       await deleteDoc(doc(db, "users", userId));
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
@@ -391,7 +402,7 @@ export default function UserAdministrationPage() {
           ) : noClassesAvailable ? (
             <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              <span>Tidak ada kelas yang dapat dipilih. Harap tambahkan data kelas terlebih dahulu melalui menu "Akademik &gt; Kelas".</span>
+              <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
             </div>
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
@@ -434,7 +445,7 @@ export default function UserAdministrationPage() {
             {noClassesAvailable && (
                  <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada kelas yang dapat dipilih. Harap tambahkan data kelas terlebih dahulu melalui menu "Akademik &gt; Kelas".</span>
+                    <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
                 </div>
             )}
             <Controller
@@ -595,7 +606,7 @@ export default function UserAdministrationPage() {
                 </TableBody>
               </Table>
             </div>
-          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini (yang akan membuat entri di database dan di Firebase Authentication), atau jika pengguna sudah ada di Firebase Authentication, pastikan ada entri yang sesuai di database Firestore pada koleksi 'users'.</div> )}
+          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini (yang akan membuat entri di database dan di Firebase Authentication), atau jika pengguna sudah ada di Firebase Authentication, pastikan ada entri yang sesuai di database Firestore pada koleksi 'users' dengan field `uid` yang sesuai.</div> )}
         </CardContent>
       </Card>
 
