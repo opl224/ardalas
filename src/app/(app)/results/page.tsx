@@ -66,8 +66,8 @@ import {
   orderBy,
   where,
   writeBatch,
-  Query as FirebaseQuery, // Import Query type
-  DocumentData, // Import DocumentData type
+  Query as FirebaseQuery, 
+  DocumentData, 
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -75,9 +75,7 @@ import { Form } from "@/components/ui/form";
 import Link from "next/link";
 
 
-// Minimal interfaces for dropdowns
 interface ClassMin { id: string; name: string; }
-// StudentMin's id will now be the student's authUid
 interface StudentMin { id: string; name: string; classId: string; className?: string; }
 interface SubjectMin { id: string; name: string; }
 interface AssignmentMin { id: string; title: string; meetingNumber?: number; subjectId: string; classId: string; }
@@ -87,7 +85,7 @@ type AssessmentType = typeof ASSESSMENT_TYPES[number];
 
 interface ResultData {
   id: string;
-  studentId: string; // This will store student's authUid
+  studentId: string; 
   studentName: string;
   classId: string;
   className: string;
@@ -112,7 +110,7 @@ interface ResultData {
 
 const baseResultFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
-  studentId: z.string({ required_error: "Pilih siswa." }), // This will be authUid
+  studentId: z.string({ required_error: "Pilih siswa." }), 
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
@@ -201,7 +199,7 @@ export default function ResultsPage() {
       setStudents(studentsAuthSnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
-            id: docSnap.id, // This is the authUid
+            id: docSnap.id, 
             name: data.name,
             classId: data.classId,
             className: data.className,
@@ -227,7 +225,6 @@ export default function ResultsPage() {
 
 
   const fetchResults = async () => {
-    // Ensure user and role are available from AuthContext
     if (!user || !role) {
         setResults([]);
         setIsLoadingResults(false);
@@ -259,7 +256,6 @@ export default function ResultsPage() {
         ...docSnap.data(),
       })) as ResultData[];
 
-      // Fetch submission links for student/parent view
       const studentToQueryId = role === 'siswa' ? user.uid : (role === 'orangtua' ? user.linkedStudentId : null);
       if (studentToQueryId && fetchedResults.length > 0) {
         const assignmentIds = fetchedResults
@@ -267,7 +263,6 @@ export default function ResultsPage() {
             .filter((id): id is string => !!id);
 
         if (assignmentIds.length > 0) {
-            // Firestore 'in' query limit is 30
             const submissionQueries = [];
             for (let i = 0; i < assignmentIds.length; i += 30) {
                 const chunk = assignmentIds.slice(i, i + 30);
@@ -284,7 +279,9 @@ export default function ResultsPage() {
             submissionsSnapshots.forEach(snapshot => {
                 snapshot.forEach(doc => {
                     const subData = doc.data();
-                    submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
+                    if (subData.assignmentId) { // Ensure assignmentId exists before setting
+                      submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
+                    }
                 });
             });
 
@@ -313,8 +310,8 @@ export default function ResultsPage() {
 
  useEffect(() => {
     if (authLoading) {
-      setIsLoadingData(true); // For dropdowns, if applicable by role
-      setIsLoadingResults(true); // For results table
+      setIsLoadingData(true); 
+      setIsLoadingResults(true); 
       return;
     }
 
@@ -328,24 +325,22 @@ export default function ResultsPage() {
       setIsLoadingResults(false);
       return;
     }
-
-    // Define an async function to orchestrate data fetching
+    
     const loadAllData = async () => {
-      // Reset loading states at the beginning of a new data fetch cycle
       setIsLoadingData(true);
       setIsLoadingResults(true);
 
       if (role === "admin" || role === "guru") {
-        await fetchDropdownData(); // This sets setIsLoadingData(false) internally
+        await fetchDropdownData(); 
       } else {
-        setIsLoadingData(false); // For other roles, dropdown data might not be fetched
+        setIsLoadingData(false); 
       }
-      await fetchResults(); // This sets setIsLoadingResults(false) internally
+      await fetchResults(); 
     };
 
     loadAllData();
 
-  }, [authLoading, user, role]); // Depend on user object and role
+  }, [authLoading, user, role]); 
 
 
   const watchClassId = addResultForm.watch("classId");
@@ -365,10 +360,8 @@ export default function ResultsPage() {
     }
     setFilteredStudents(newFilteredStudentsList);
 
-    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) && watchClassId) {
+    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) || !watchClassId) {
       addResultForm.setValue("studentId", undefined, { shouldValidate: true });
-    } else if (!watchClassId) {
-        addResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, students, addResultForm]);
 
@@ -380,17 +373,11 @@ export default function ResultsPage() {
     if (editWatchClassId) {
         newFilteredStudentsList = students.filter(s => s.classId === editWatchClassId);
     } else if (role === "admin" || role === "guru") {
-        // For admin/guru, if no class is selected in edit mode, potentially show all students or handle as needed.
-        // For now, keeping it consistent: if class is cleared, student list is based on available students.
-        // If editing an existing record, classId will be pre-filled.
         newFilteredStudentsList = students;
     }
     setFilteredStudents(newFilteredStudentsList);
 
-    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) && editWatchClassId) {
-        editResultForm.setValue("studentId", undefined, { shouldValidate: true });
-    } else if (!editWatchClassId && (role === "admin" || role === "guru")) {
-         // If class is cleared by admin/guru in edit, clear student selection.
+    if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) || !editWatchClassId && (role === "admin" || role === "guru")) {
         editResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
 }, [editWatchClassId, students, editResultForm, role]);
@@ -403,7 +390,7 @@ export default function ResultsPage() {
     } else {
       setFilteredAssignments([]);
     }
-    if (addResultForm.getValues("assignmentId") !== undefined) { // Reset assignment if class/subject changes
+    if (addResultForm.getValues("assignmentId") !== undefined && (!currentClassIdValue || !watchSubjectIdForAdd)) { 
       addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
@@ -419,9 +406,8 @@ export default function ResultsPage() {
              addResultForm.setValue("meetingNumber", undefined, {shouldValidate: true});
          }
      } else if (watchAssignmentId === "" || watchAssignmentId === undefined) {
-         // Only clear if the title was previously from an assignment
          const currentTitle = addResultForm.getValues("assessmentTitle");
-         const previousAssignmentId = addResultForm.formState.defaultValues?.assignmentId; // This might not be the 'actual' previous
+         const previousAssignmentId = addResultForm.formState.defaultValues?.assignmentId; 
          const wasTitleFromAssignment = assignments.some(a => a.id === previousAssignmentId && a.title === currentTitle);
 
          if (!addResultForm.formState.dirtyFields.assessmentTitle && (wasTitleFromAssignment || !currentTitle) ) {
@@ -440,6 +426,9 @@ export default function ResultsPage() {
         setFilteredAssignments(assignments.filter(a => a.classId === currentClassIdValue && a.subjectId === editWatchSubjectId));
     } else {
         setFilteredAssignments([]);
+    }
+    if (editResultForm.getValues("assignmentId") !== undefined && (!currentClassIdValue || !editWatchSubjectId) ) {
+        editResultForm.setValue("assignmentId", undefined, {shouldValidate: true});
     }
   }, [editWatchClassId, editWatchSubjectId, assignments, editResultForm]);
 
@@ -473,7 +462,7 @@ export default function ResultsPage() {
       editResultForm.reset({
         id: selectedResult.id,
         classId: initialClassId,
-        studentId: selectedResult.studentId, // This is authUid
+        studentId: selectedResult.studentId, 
         subjectId: initialSubjectId,
         assessmentType: selectedResult.assessmentType,
         assessmentTitle: selectedResult.assessmentTitle,
@@ -489,12 +478,12 @@ export default function ResultsPage() {
   }, [selectedResult, isEditDialogOpen, editResultForm, students, assignments]);
 
   const getDenormalizedNames = (data: ResultFormValues | EditResultFormValues) => {
-    const student = students.find(s => s.id === data.studentId); // student.id is authUid here
+    const student = students.find(s => s.id === data.studentId); 
     const aClass = classes.find(c => c.id === data.classId);
     const subject = subjects.find(s => s.id === data.subjectId);
     return {
       studentName: student?.name,
-      className: aClass?.name || student?.className, // Fallback to student's className if class not in dropdown (edge case)
+      className: aClass?.name || student?.className, 
       subjectName: subject?.name,
     };
   };
@@ -515,7 +504,7 @@ export default function ResultsPage() {
     }
 
     const resultData: any = {
-        ...data, // data.studentId is authUid
+        ...data, 
         studentName,
         className,
         subjectName,
@@ -562,14 +551,12 @@ export default function ResultsPage() {
     }
 
     const resultData: any = {
-        ...data, // data.studentId is authUid
+        ...data, 
         studentName,
         className,
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
         maxScore: data.maxScore || 100,
-        // recordedById: user.uid, // Keep original recorder, or update if policy changes
-        // recordedByName: user.displayName || user.email,
         updatedAt: serverTimestamp(),
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
@@ -830,21 +817,23 @@ export default function ResultsPage() {
             <span>Daftar Hasil Belajar</span>
           </CardTitle>
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <Select
-              value={selectedAssessmentTypeFilter}
-              onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
-            >
-              <SelectTrigger className="w-full md:w-[200px]">
-                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter Tipe Asesmen" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Tipe</SelectItem>
-                {ASSESSMENT_TYPES.map(type => (
-                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            { (role === "admin" || role === "guru") && (
+                <Select
+                value={selectedAssessmentTypeFilter}
+                onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+                >
+                <SelectTrigger className="w-full md:w-[200px]">
+                    <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Filter Tipe Asesmen" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">Semua Tipe</SelectItem>
+                    {ASSESSMENT_TYPES.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            )}
             {canManageResults && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
                   setIsAddDialogOpen(isOpen);
@@ -855,7 +844,7 @@ export default function ResultsPage() {
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+                <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-lg">
                   <DialogHeader>
                       <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
                       <DialogDescription>Isi detail nilai siswa.</DialogDescription>
@@ -869,7 +858,7 @@ export default function ResultsPage() {
                         <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
                             {renderResultFormFields(addResultForm, 'add')}
                         </div>
-                        <DialogFooter className="pt-4 border-t">
+                         <DialogFooter className="pt-4 border-t mt-auto">
                             <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                             <Button type="submit" form="addResultDialogForm" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
                         </DialogFooter>
@@ -890,12 +879,23 @@ export default function ResultsPage() {
                   <TableRow>
                     {canManageResults && <TableHead>Siswa</TableHead>}
                     {canManageResults && <TableHead>Kelas</TableHead>}
-                    <TableHead>Mapel</TableHead>
-                    <TableHead>Asesmen</TableHead>
-                    <TableHead>Nilai</TableHead>
-                    {(role === 'siswa' || role === 'orangtua') && <TableHead>Link Pengumpulan & Catatan Siswa</TableHead>}
-                    <TableHead>Feedback Guru</TableHead>
-                    <TableHead>Tanggal {(role === 'siswa' || role === 'orangtua') ? 'Diinput Guru' : 'Asesmen'}</TableHead>
+                    {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
+                    
+                    {(role === 'siswa' || role === 'orangtua') ? (
+                      <>
+                        <TableHead>Judul</TableHead>
+                        <TableHead>Link Tugas</TableHead>
+                        <TableHead>Feedback Guru</TableHead>
+                        <TableHead>Nilai</TableHead>
+                      </>
+                    ) : (
+                      <>
+                        <TableHead>Asesmen</TableHead>
+                        <TableHead>Nilai</TableHead>
+                        <TableHead>Feedback Guru</TableHead>
+                        <TableHead>Tanggal Asesmen</TableHead>
+                      </>
+                    )}
                     {canManageResults && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -904,35 +904,39 @@ export default function ResultsPage() {
                     <TableRow key={result.id}>
                       {canManageResults && <TableCell className="font-medium">{result.studentName}</TableCell>}
                       {canManageResults && <TableCell>{result.className}</TableCell>}
-                      <TableCell>{result.subjectName}</TableCell>
-                      <TableCell>
-                        {result.assessmentTitle} ({result.assessmentType})
-                        {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
-                      </TableCell>
-                      <TableCell>{result.score}{result.maxScore && result.maxScore !== 100 ? `/${result.maxScore}` : ''} {result.grade && `(${result.grade})`}</TableCell>
-                      {(role === 'siswa' || role === 'orangtua') && (
-                        <TableCell>
-                          {result.studentSubmissionLink ? (
-                            <Button variant="link" asChild className="p-0 h-auto text-sm">
-                              <Link href={result.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
-                                <LinkIcon className="mr-1 h-3 w-3" />Lihat Pengumpulan
-                              </Link>
-                            </Button>
-                          ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">Tidak ada pengumpulan</span> : "-")}
-                          {result.submissionNotes && (
-                            <p className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate" title={result.submissionNotes}>
-                              Catatan: {result.submissionNotes}
-                            </p>
-                          )}
-                        </TableCell>
+                      {(role === 'admin' || role === 'guru') && <TableCell>{result.subjectName}</TableCell>}
+                      
+                      {(role === 'siswa' || role === 'orangtua') ? (
+                        <>
+                          <TableCell>
+                            {result.assessmentTitle}
+                            {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
+                          </TableCell>
+                          <TableCell>
+                            {result.studentSubmissionLink ? (
+                              <Button variant="link" asChild className="p-0 h-auto text-sm">
+                                <Link href={result.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
+                                  <LinkIcon className="mr-1 h-3 w-3" />Lihat Pengumpulan
+                                </Link>
+                              </Button>
+                            ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">Tidak ada pengumpulan</span> : "-")}
+                          </TableCell>
+                          <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
+                           <TableCell>{result.score}{result.maxScore && result.maxScore !== 100 ? `/${result.maxScore}` : '/100'} {result.grade && `(${result.grade})`}</TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell>
+                            {result.assessmentTitle} ({result.assessmentType})
+                            {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
+                          </TableCell>
+                          <TableCell>{result.score}{result.maxScore && result.maxScore !== 100 ? `/${result.maxScore}` : ''} {result.grade && `(${result.grade})`}</TableCell>
+                          <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
+                          <TableCell>
+                            {format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
+                          </TableCell>
+                        </>
                       )}
-                       <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
-                       <TableCell>
-                        { (role === 'siswa' || role === 'orangtua') && result.createdAt
-                            ? format(result.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })
-                            : format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })
-                        }
-                      </TableCell>
                       {canManageResults && (
                         <TableCell className="text-right space-x-2">
                             <Button variant="outline" size="icon" onClick={() => openEditDialog(result)} aria-label={`Edit hasil ${result.studentName}`}>
@@ -969,7 +973,7 @@ export default function ResultsPage() {
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
-                 (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." : // Added check for !user
+                 (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." : 
                  selectedAssessmentTypeFilter !== "all" ? `Tidak ada hasil belajar untuk tipe asesmen "${selectedAssessmentTypeFilter}". Coba filter lain.` :
                  "Belum ada data hasil belajar yang sesuai."}
             </div>
@@ -983,7 +987,7 @@ export default function ResultsPage() {
             setIsEditDialogOpen(isOpen);
             if (!isOpen) { setSelectedResult(null); editResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
         }}>
-          <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh]">
+          <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-lg">
             <DialogHeader>
                 <DialogTitle>Edit Hasil Belajar</DialogTitle>
                 <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
@@ -999,7 +1003,7 @@ export default function ResultsPage() {
                     <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
                         {renderResultFormFields(editResultForm, 'edit')}
                     </div>
-                    <DialogFooter className="pt-4 border-t">
+                    <DialogFooter className="pt-4 border-t mt-auto">
                         <DialogClose asChild><Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setSelectedResult(null);}}>Batal</Button></DialogClose>
                         <Button type="submit" form="editResultDialogForm" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
                     </DialogFooter>
