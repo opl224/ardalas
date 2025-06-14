@@ -174,7 +174,7 @@ export default function UserAdministrationPage() {
       setAllClasses(querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
       console.error("Error fetching classes: ", error);
-      toast({ title: "Gagal Memuat Daftar Kelas", variant: "destructive" });
+      toast({ title: "Gagal Memuat Daftar Kelas", description: "Pastikan Anda memiliki koneksi internet dan coba lagi. Jika berlanjut, hubungi administrator.", variant: "destructive" });
     } finally {
       setIsLoadingClasses(false);
     }
@@ -252,27 +252,33 @@ export default function UserAdministrationPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const newAuthUser = userCredential.user;
 
-      const userData: any = {
+      const userData: {
+        name: string;
+        email: string;
+        role: Role;
+        createdAt: Timestamp;
+        uid: string;
+        assignedClassIds?: string[];
+        classId?: string;
+        className?: string;
+      } = {
+        uid: newAuthUser.uid,
         name: data.name,
         email: data.email,
         role: data.role,
-        createdAt: serverTimestamp(),
+        createdAt: serverTimestamp() as Timestamp,
       };
+
       if (data.role === 'guru') {
         userData.assignedClassIds = data.assignedClassIds || [];
-      } else {
-        userData.assignedClassIds = deleteField();
       }
 
       if (data.role === 'siswa' && data.classId) {
         const selectedClass = allClasses.find(c => c.id === data.classId);
         userData.classId = data.classId;
         userData.className = selectedClass?.name || "";
-      } else {
-        userData.classId = deleteField();
-        userData.className = deleteField();
       }
-
+      
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
       
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -316,6 +322,8 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru') {
         updateData.assignedClassIds = data.assignedClassIds || [];
+        updateData.classId = deleteField(); // Remove classId if role changed to guru
+        updateData.className = deleteField(); // Remove className if role changed to guru
       } else {
         updateData.assignedClassIds = deleteField();
       }
@@ -324,7 +332,8 @@ export default function UserAdministrationPage() {
         const selectedClass = allClasses.find(c => c.id === data.classId);
         updateData.classId = data.classId;
         updateData.className = selectedClass?.name || "";
-      } else {
+        updateData.assignedClassIds = deleteField(); // Remove assignedClassIds if role changed to siswa
+      } else if (data.role !== 'guru') { // if role is not guru (and not siswa with classId) then clear class fields
         updateData.classId = deleteField();
         updateData.className = deleteField();
       }
@@ -343,6 +352,9 @@ export default function UserAdministrationPage() {
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
     try {
+      // Note: Deleting user from Firebase Auth is a separate, more complex operation
+      // and often requires backend logic or Firebase Functions for security.
+      // This function currently only deletes from Firestore.
       await deleteDoc(doc(db, "users", userId));
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
       setSelectedUser(null);
