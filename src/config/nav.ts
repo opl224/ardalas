@@ -16,7 +16,7 @@ import {
   MessageSquare,
   Settings,
   UserCog,
-  GraduationCap, // Added for "Nilai Tugas Saya"
+  GraduationCap, 
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -24,9 +24,9 @@ export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
-  roles?: Role[]; // Roles that can see this nav item. Undefined means all authenticated users.
+  roles?: Role[]; 
   children?: NavItem[];
-  label?: string; // Optional label for badges etc.
+  label?: string; 
 }
 
 export const navItems: NavItem[] = [
@@ -40,7 +40,7 @@ export const navItems: NavItem[] = [
   },
   {
     title: "Pengguna",
-    href: "#", // Parent item, no direct link
+    href: "#", 
     icon: Users,
     roles: ["admin", "guru"], 
     children: [
@@ -51,7 +51,7 @@ export const navItems: NavItem[] = [
   },
   {
     title: "Akademik",
-    href: "#", // Parent item
+    href: "#", 
     icon: BookOpen,
     roles: ["admin", "guru", "siswa", "orangtua"],
     children: [
@@ -59,11 +59,12 @@ export const navItems: NavItem[] = [
       { title: "Kelas", href: "/classes", icon: School, roles: ["admin", "guru"] },
       { title: "Kelas Saya", href: "/my-class", icon: School, roles: ["siswa"] },
       { title: "Pelajaran", href: "/lessons", icon: BookCopy, roles: ["admin", "guru", "siswa", "orangtua"] },
+      { title: "Kehadiran", href: "/attendance", icon: CalendarCheck, roles: ["admin", "guru", "siswa"] },
     ],
   },
   {
     title: "Tugas & Penilaian",
-    href: "#", // Parent item
+    href: "#", 
     icon: ClipboardCheck,
     roles: ["admin", "guru", "siswa", "orangtua"],
     children: [
@@ -75,10 +76,9 @@ export const navItems: NavItem[] = [
   },
   {
     title: "Kehidupan Sekolah",
-    href: "#", // Parent item
+    href: "#", 
     icon: CalendarDays,
     children: [
-      { title: "Kehadiran", href: "/attendance", icon: CalendarCheck, roles: ["admin", "guru", "siswa"] },
       { title: "Acara Sekolah", href: "/events", icon: CalendarDays }, 
       { title: "Pesan", href: "/messages", icon: MessageSquare }, 
     ],
@@ -90,7 +90,6 @@ export const navItems: NavItem[] = [
   }, 
 ];
 
-// bottomNavItems sekarang hanya untuk referensi, Pengaturan sudah dipindah
 export const bottomNavItems: NavItem[] = [
-    // Logout akan ditangani oleh tombol, bukan item nav langsung di daftar ini
+    
 ];
