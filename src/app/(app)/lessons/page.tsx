@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BookCopy, PlusCircle, Edit, Trash2 } from "lucide-react";
+import { BookCopy, PlusCircle, Edit, Trash2, LogIn } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,6 +64,7 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
@@ -186,7 +187,10 @@ export default function LessonsPage() {
       let q;
       if (role === "siswa" && user?.classId) {
         q = query(lessonsCollectionRef, where("classId", "==", user.classId));
-      } else {
+      } else if (role === "orangtua" && user?.linkedStudentClassId) {
+        q = query(lessonsCollectionRef, where("classId", "==", user.linkedStudentClassId));
+      }
+       else {
          q = query(lessonsCollectionRef, orderBy("createdAt", "desc"));
       }
       const querySnapshot = await getDocs(q);
@@ -336,12 +340,20 @@ export default function LessonsPage() {
   }, [lessons]);
 
   const canManageLessons = role === "admin" || role === "guru";
+  const isStudentOrParent = role === "siswa" || role === "orangtua";
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Manajemen Pelajaran</h1>
-        <p className="text-muted-foreground">Kelola jadwal pelajaran, materi ajar, dan silabus.</p>
+        <h1 className="text-3xl font-bold font-headline">Jadwal Pelajaran</h1>
+        <p className="text-muted-foreground">
+          {canManageLessons 
+            ? "Kelola jadwal pelajaran, materi ajar, dan silabus."
+            : isStudentOrParent
+            ? (role === "siswa" ? "Lihat jadwal pelajaran Anda." : "Lihat jadwal pelajaran anak Anda.")
+            : "Lihat jadwal pelajaran."
+          }
+        </p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -450,11 +462,12 @@ export default function LessonsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Mata Pelajaran</TableHead>
-                    <TableHead>Kelas</TableHead>
+                    {!isStudentOrParent && <TableHead>Kelas</TableHead>}
                     <TableHead>Guru</TableHead>
                     <TableHead>Hari</TableHead>
                     <TableHead>Waktu</TableHead>
-                    <TableHead>Topik</TableHead>
+                    {canManageLessons && <TableHead>Topik</TableHead>}
+                    {isStudentOrParent && <TableHead className="text-right">Aksi</TableHead>}
                     {canManageLessons && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -462,11 +475,20 @@ export default function LessonsPage() {
                   {sortedLessons.map((lesson) => (
                     <TableRow key={lesson.id}>
                       <TableCell className="font-medium">{lesson.subjectName || lesson.subjectId}</TableCell>
-                      <TableCell>{lesson.className || lesson.classId}</TableCell>
+                      {!isStudentOrParent && <TableCell>{lesson.className || lesson.classId}</TableCell>}
                       <TableCell>{lesson.teacherName || lesson.teacherId}</TableCell>
                       <TableCell>{lesson.dayOfWeek}</TableCell>
                       <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
-                      <TableCell>{lesson.topic || "-"}</TableCell>
+                      {canManageLessons && <TableCell>{lesson.topic || "-"}</TableCell>}
+                      {isStudentOrParent && (
+                        <TableCell className="text-right">
+                          <Button asChild size="sm" variant="outline">
+                            <Link href={`/lessons/${lesson.id}`}>
+                              <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                            </Link>
+                          </Button>
+                        </TableCell>
+                      )}
                       {canManageLessons && (
                         <TableCell className="text-right space-x-2">
                           <Button variant="outline" size="icon" onClick={() => openEditDialog(lesson)} aria-label={`Edit pelajaran ${lesson.subjectName}`}>
