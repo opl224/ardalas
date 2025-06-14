@@ -59,7 +59,8 @@ import {
   Timestamp,
   query,
   orderBy,
-  where 
+  where,
+  limit 
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
@@ -97,7 +98,7 @@ type EditClassFormValues = z.infer<typeof editClassFormSchema>;
 const NO_TEACHER_VALUE = "_NONE_";
 
 export default function ClassesPage() {
-  const { role } = useAuth(); 
+  const { user, role, loading: authLoading } = useAuth(); 
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
@@ -145,13 +146,35 @@ export default function ClassesPage() {
   };
   
   const fetchClasses = async () => {
+    if (authLoading) return;
     setIsLoading(true);
     try {
-      if (role === "admin") { // Only admin needs teachers for dropdown in this context
-        await fetchTeachersForDropdown(); 
-      }
       const classesCollectionRef = collection(db, "classes");
-      const q = query(classesCollectionRef, orderBy("name", "asc"));
+      let q;
+
+      if (role === "admin") {
+        if (teachers.length === 0) { // Ensure teachers are loaded for admin dropdowns
+          await fetchTeachersForDropdown();
+        }
+        q = query(classesCollectionRef, orderBy("name", "asc"));
+      } else if (role === "guru" && user?.uid) {
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+        if (!teacherProfileSnapshot.empty) {
+          const teacherDocId = teacherProfileSnapshot.docs[0].id;
+          q = query(classesCollectionRef, where("teacherId", "==", teacherDocId), orderBy("name", "asc"));
+        } else {
+          setClasses([]);
+          setIsLoading(false);
+          return;
+        }
+      } else {
+        setClasses([]);
+        setIsLoading(false);
+        return;
+      }
+
       const querySnapshot = await getDocs(q);
       const fetchedClasses: ClassData[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
@@ -168,14 +191,16 @@ export default function ClassesPage() {
         description: "Terjadi kesalahan saat mengambil data kelas.",
         variant: "destructive",
       });
+      setClasses([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+
   useEffect(() => {
     fetchClasses();
-  }, [role]); 
+  }, [role, user, authLoading]); 
 
   useEffect(() => {
     if (selectedClass && isEditDialogOpen && role === "admin") {
@@ -275,16 +300,18 @@ export default function ClassesPage() {
     setIsLoadingStudentsInClass(true);
     setStudentsInClass([]); 
     try {
+      // Fetch students from 'users' collection with role 'siswa'
       const studentsQuery = query(
-        collection(db, "students"), // Assuming students are in "students" collection
+        collection(db, "users"), 
+        where("role", "==", "siswa"),
         where("classId", "==", classId),
         orderBy("name", "asc")
       );
       const querySnapshot = await getDocs(studentsQuery);
       const fetchedStudents: StudentInClass[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
+        id: docSnap.id, // Document ID from 'users' collection (which is user's UID)
         name: docSnap.data().name,
-        nis: docSnap.data().nis || "N/A", // Assuming students have an NIS field
+        nis: docSnap.data().nis || "N/A", 
       }));
       setStudentsInClass(fetchedStudents);
     } catch (error) {
@@ -298,6 +325,7 @@ export default function ClassesPage() {
       setIsLoadingStudentsInClass(false);
     }
   };
+
 
   const openViewStudentsDialog = (classItem: ClassData) => {
     setSelectedClassForViewingStudents(classItem);
@@ -383,7 +411,7 @@ export default function ClassesPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || authLoading ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -448,7 +476,10 @@ export default function ClassesPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Tidak ada data kelas untuk ditampilkan. {role === "admin" && 'Klik "Tambah Kelas" untuk membuat data baru.'}
+              {role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
+               role === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
+               'Tidak ada data kelas untuk ditampilkan.'
+              }
             </div>
           )}
         </CardContent>
