@@ -49,6 +49,7 @@ export default function MyGradesPage() {
     const fetchMyGrades = async () => {
       if (authLoading || !user) {
         setIsLoading(false);
+        setGrades([]);
         return;
       }
 
@@ -84,6 +85,7 @@ export default function MyGradesPage() {
         const resultsMap = new Map<string, any>();
         if (assignmentIds.length > 0) {
             const resultsPromises = [];
+            // Firestore 'in' queries are limited to 30 items in the array.
             for (let i = 0; i < assignmentIds.length; i += 30) {
                 const chunk = assignmentIds.slice(i, i + 30);
                 resultsPromises.push(
@@ -132,7 +134,7 @@ export default function MyGradesPage() {
         }
 
         // 4. Combine data
-        const combinedGrades: MyGradeEntry[] = classAssignments.map(assignment => {
+        const combinedGradesData: MyGradeEntry[] = classAssignments.map(assignment => {
           const submission = submissionsMap.get(assignment.id);
           const result = resultsMap.get(assignment.id);
 
@@ -147,9 +149,9 @@ export default function MyGradesPage() {
             grade: result?.grade,
             dateOfAssessment: result?.dateOfAssessment,
           };
-        }).filter(entry => entry.score !== undefined || entry.submissionLink !== undefined); 
+        }).filter(entry => entry.score !== undefined || entry.submissionLink !== undefined); // Show if scored OR submitted
 
-        setGrades(combinedGrades);
+        setGrades(combinedGradesData);
 
       } catch (error) {
         console.error("Error fetching student grades:", error);
@@ -159,7 +161,12 @@ export default function MyGradesPage() {
       }
     };
 
-    fetchMyGrades();
+    if (!authLoading && user) {
+        fetchMyGrades();
+    } else if (!authLoading && !user) {
+        setIsLoading(false);
+        setGrades([]);
+    }
   }, [authLoading, user, role]);
 
   if (authLoading || isLoading) {
@@ -238,8 +245,8 @@ export default function MyGradesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Judul Tugas</TableHead>
-                    <TableHead>Link Pengumpulan</TableHead>
+                    <TableHead>Judul</TableHead>
+                    <TableHead>Link Tugas</TableHead>
                     <TableHead>Komentar Guru</TableHead>
                     <TableHead>Nilai</TableHead>
                   </TableRow>
@@ -250,6 +257,11 @@ export default function MyGradesPage() {
                       <TableCell className="font-medium">
                         {grade.assignmentTitle}
                         {grade.subjectName && <p className="text-xs text-muted-foreground">{grade.subjectName}</p>}
+                         {grade.dateOfAssessment && (
+                            <p className="text-xs text-muted-foreground">
+                                Dinilai: {format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
+                            </p>
+                        )}
                       </TableCell>
                       <TableCell>
                         {grade.submissionLink ? (
@@ -262,7 +274,7 @@ export default function MyGradesPage() {
                           <span className="text-xs text-muted-foreground italic">Belum dikumpulkan</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-[250px] truncate" title={grade.teacherFeedback || undefined}>
+                      <TableCell className="max-w-[250px] whitespace-pre-line">
                         {grade.teacherFeedback || "-"}
                       </TableCell>
                       <TableCell>
@@ -289,3 +301,5 @@ export default function MyGradesPage() {
   );
 }
 
+
+    
