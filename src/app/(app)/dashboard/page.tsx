@@ -67,6 +67,7 @@ interface DashboardStats {
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
   teacherTotalSubjectsTaught: number;
+  teacherTotalAssignmentsGiven: number;
 }
 
 export default function DashboardPage() {
@@ -79,6 +80,7 @@ export default function DashboardPage() {
     teacherTotalStudentsTaught: 0,
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
+    teacherTotalAssignmentsGiven: 0,
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
@@ -91,7 +93,7 @@ export default function DashboardPage() {
         setLoadingAnnouncements(false);
         setStats({ 
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
-            teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
+            teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
         });
         setRecentAnnouncements([]);
         return;
@@ -102,7 +104,7 @@ export default function DashboardPage() {
       
       const newStats: DashboardStats = {
         adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
-        teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
+        teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
       };
 
       try {
@@ -114,7 +116,7 @@ export default function DashboardPage() {
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserQuery),
+            getDocs(teacherUserSnap),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
@@ -125,6 +127,7 @@ export default function DashboardPage() {
           newStats.adminTotalClasses = classSnap.size;
 
         } else if (role === 'guru' && user.uid) {
+            // Query for the teacher's profile in 'teachers' collection using their Auth UID
             const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
@@ -132,6 +135,7 @@ export default function DashboardPage() {
                 const teacherProfileDoc = teacherProfileSnapshot.docs[0];
                 const teacherProfileId = teacherProfileDoc.id; // This is the Document ID from 'teachers' collection
 
+                // Fetch lessons taught by this teacher using the teacher's profile ID
                 const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
                 const lessonsSnapshot = await getDocs(lessonsQuery);
               
@@ -146,6 +150,12 @@ export default function DashboardPage() {
 
                 newStats.teacherTotalClassesTaught = taughtClassIds.size;
                 newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+
+                // Fetch total assignments given by this teacher
+                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId));
+                const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
+                newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
+
 
                 if (taughtClassIds.size > 0) {
                     const studentClassesArray = Array.from(taughtClassIds);
@@ -170,15 +180,16 @@ export default function DashboardPage() {
                 }
             } else {
                 // No teacher profile found for this Auth UID, stats remain 0
-                console.warn(`No teacher profile found in 'teachers' collection for UID: ${user.uid}`);
+                 console.warn(`No teacher profile found in 'teachers' collection linked to Auth UID: ${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.`);
             }
         }
         setStats(newStats);
       } catch (error) {
         console.error("Error fetching stats: ", error);
+        // Reset stats on error to avoid displaying stale or incorrect data
         setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
-            teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
+            teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
         });
       } finally {
         setLoadingStats(false);
@@ -188,30 +199,54 @@ export default function DashboardPage() {
         const announcementsRef = collection(db, "announcements");
         let announcementsQueryInstance;
         
-        if (role && user?.classId && (role === 'siswa' || role === 'orangtua')) {
+        // Adjusting announcement query based on user role and context
+        if (role === 'siswa' && user?.classId) {
            announcementsQueryInstance = query(
             announcementsRef,
-            where("targetAudience", "array-contains-any", [role, "semua", user.classId]), 
+            where("targetAudience", "array-contains-any", [role, "semua"]), // Simpler general query first
             orderBy("date", "desc"),
-            limit(3)
+            limit(10) // Fetch more initially to filter client-side for class-specific ones if needed
           );
-        } else if (role === 'guru' && user?.uid) { 
+        } else if (role === 'orangtua' && user?.linkedStudentClassId) {
            announcementsQueryInstance = query(
             announcementsRef,
-             where("targetAudience", "array-contains", "guru"), 
+            where("targetAudience", "array-contains-any", [role, "semua"]),
+            orderBy("date", "desc"),
+            limit(10)
+          );
+        } else if (role === 'guru') { 
+           announcementsQueryInstance = query(
+            announcementsRef,
+             where("targetAudience", "array-contains-any", ["guru", "semua"]), 
             orderBy("date", "desc"),
             limit(3)
           );
         }
-        else { 
+        else { // Admin or general fallback
          announcementsQueryInstance = query(announcementsRef, orderBy("date", "desc"), limit(3));
         }
 
         const querySnapshot = await getDocs(announcementsQueryInstance);
-        const fetchedAnnouncements = querySnapshot.docs.map(doc => ({
+        let fetchedAnnouncements = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         })) as Announcement[];
+
+        // Client-side filtering for class-specific announcements if needed
+        if (role === 'siswa' && user?.classId) {
+            fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+                ann.targetAudience.includes(role) || 
+                ann.targetAudience.includes("semua") ||
+                (ann.targetClassIds && ann.targetClassIds.includes(user.classId!))
+            ).slice(0,3);
+        } else if (role === 'orangtua' && user?.linkedStudentClassId) {
+             fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+                ann.targetAudience.includes(role) || 
+                ann.targetAudience.includes("semua") ||
+                (ann.targetClassIds && ann.targetClassIds.includes(user.linkedStudentClassId!))
+            ).slice(0,3);
+        }
+        
         setRecentAnnouncements(fetchedAnnouncements);
       } catch (error) {
         console.error("Error fetching announcements:", error);
@@ -220,14 +255,14 @@ export default function DashboardPage() {
       }
     };
     
-    if (user && role) { // Ensure user and role are available before fetching
+    if (user && role) {
         fetchAllData();
-    } else if (!user && !loadingStats) { // If no user and not already loading, ensure loading is false
+    } else if (!user && !loadingStats) { 
         setLoadingStats(false);
         setLoadingAnnouncements(false);
     }
 
-  }, [user, role]); // Removed loadingStats from dependency array
+  }, [user, role]);
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -265,10 +300,11 @@ export default function DashboardPage() {
       {role === 'guru' && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Pengajaran Anda</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Total Siswa Diajar" value={stats.teacherTotalStudentsTaught} icon={Users} loading={loadingStats} />
             <StatCard title="Total Kelas Diajar" value={stats.teacherTotalClassesTaught} icon={School} loading={loadingStats} />
             <StatCard title="Total Mapel Diajar" value={stats.teacherTotalSubjectsTaught} icon={Library} loading={loadingStats} />
+            <StatCard title="Total Tugas Diberikan" value={stats.teacherTotalAssignmentsGiven} icon={ClipboardCheck} loading={loadingStats} href="/assignments" />
           </div>
         </section>
       )}
