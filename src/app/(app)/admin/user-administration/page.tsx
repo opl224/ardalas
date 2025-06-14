@@ -279,7 +279,6 @@ export default function UserAdministrationPage() {
         userData.className = selectedClass?.name || "";
       }
       
-      // Use newAuthUser.uid as the document ID in Firestore
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
       
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -295,7 +294,7 @@ export default function UserAdministrationPage() {
         const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
         addUserForm.setError("email", { type: "manual", message: specificMessage });
         toast({ 
-            title: "Gagal: Email Sudah Terdaftar", 
+            title: "Gagal Menambahkan Pengguna: Email Sudah Terdaftar", 
             description: specificMessage + " Gunakan email lain atau periksa apakah pengguna sudah ada di daftar.", 
             variant: "destructive" 
         });
@@ -326,8 +325,8 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru') {
         updateData.assignedClassIds = data.assignedClassIds || [];
-        updateData.classId = deleteField(); // Remove classId if role changed to guru
-        updateData.className = deleteField(); // Remove className if role changed to guru
+        updateData.classId = deleteField(); 
+        updateData.className = deleteField(); 
       } else {
         updateData.assignedClassIds = deleteField();
       }
@@ -336,8 +335,8 @@ export default function UserAdministrationPage() {
         const selectedClass = allClasses.find(c => c.id === data.classId);
         updateData.classId = data.classId;
         updateData.className = selectedClass?.name || "";
-        updateData.assignedClassIds = deleteField(); // Remove assignedClassIds if role changed to siswa
-      } else if (data.role !== 'guru') { // if role is not guru (and not siswa with classId) then clear class fields
+        updateData.assignedClassIds = deleteField(); 
+      } else if (data.role !== 'guru') { 
         updateData.classId = deleteField();
         updateData.className = deleteField();
       }
@@ -356,9 +355,6 @@ export default function UserAdministrationPage() {
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
     try {
-      // Note: Deleting user from Firebase Auth is a separate, more complex operation
-      // and often requires backend logic or Firebase Functions for security.
-      // This function currently only deletes from Firestore.
       await deleteDoc(doc(db, "users", userId));
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
       setSelectedUser(null);
@@ -451,12 +447,12 @@ export default function UserAdministrationPage() {
                         disabled={isLoadingClasses || noClassesAvailable}
                     >
                         <SelectTrigger id="classId" className="mt-1">
-                            <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas" : "Pilih kelas")} />
+                            <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas tersedia." : "Pilih kelas")} />
                         </SelectTrigger>
                         <SelectContent>
                             {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
                             {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            {allClasses.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
+                            {allClasses.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia. Harap tambahkan kelas terlebih dahulu.</SelectItem>}
                         </SelectContent>
                     </Select>
                 )}
@@ -588,7 +584,7 @@ export default function UserAdministrationPage() {
                           <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(user)} aria-label={`Hapus ${user.name}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
                           {selectedUser && selectedUser.id === user.id && (
                             <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database.</AlertDialogDescription></AlertDialogHeader>
+                              <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
                               <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
                             </AlertDialogContent>
                           )}
@@ -599,7 +595,7 @@ export default function UserAdministrationPage() {
                 </TableBody>
               </Table>
             </div>
-          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini agar muncul di sini (bukan hanya di Firebase Authentication).</div> )}
+          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini (yang akan membuat entri di database dan di Firebase Authentication), atau jika pengguna sudah ada di Firebase Authentication, pastikan ada entri yang sesuai di database Firestore pada koleksi 'users'.</div> )}
         </CardContent>
       </Card>
 
