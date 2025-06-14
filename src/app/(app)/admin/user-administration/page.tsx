@@ -253,11 +253,11 @@ export default function UserAdministrationPage() {
       const newAuthUser = userCredential.user;
 
       const userData: {
+        uid: string;
         name: string;
         email: string;
         role: Role;
         createdAt: Timestamp;
-        uid: string;
         assignedClassIds?: string[];
         classId?: string;
         className?: string;
@@ -269,8 +269,8 @@ export default function UserAdministrationPage() {
         createdAt: serverTimestamp() as Timestamp,
       };
 
-      if (data.role === 'guru') {
-        userData.assignedClassIds = data.assignedClassIds || [];
+      if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
+        userData.assignedClassIds = data.assignedClassIds;
       }
 
       if (data.role === 'siswa' && data.classId) {
@@ -279,6 +279,7 @@ export default function UserAdministrationPage() {
         userData.className = selectedClass?.name || "";
       }
       
+      // Use newAuthUser.uid as the document ID in Firestore
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
       
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -300,6 +301,9 @@ export default function UserAdministrationPage() {
         });
       } else {
         let generalErrorMessage = "Gagal menambahkan pengguna. Silakan coba lagi.";
+        if (firebaseError.message) {
+            generalErrorMessage = firebaseError.message;
+        }
         toast({ 
             title: "Gagal Menambahkan Pengguna", 
             description: generalErrorMessage, 
