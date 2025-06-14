@@ -35,8 +35,8 @@ interface MyGradeEntry {
   submissionLink?: string;
   teacherFeedback?: string;
   score?: number;
-  maxScore?: number;
-  grade?: string;
+  maxScore?: number; // Kept for potential future use or other contexts
+  grade?: string; // Kept for potential future use or other contexts
   dateOfAssessment?: Timestamp; 
 }
 
@@ -279,11 +279,10 @@ export default function MyGradesPage() {
                       </TableCell>
                       <TableCell>
                         {grade.score !== undefined ? (
-                          `${grade.score}${grade.maxScore && grade.maxScore !== 100 ? `/${grade.maxScore}` : '/100'}`
+                          grade.score
                         ) : (
                           <span className="text-xs text-muted-foreground italic">Belum Dinilai</span>
                         )}
-                        {grade.grade && <span className="ml-1 text-xs">({grade.grade})</span>}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -300,6 +299,3 @@ export default function MyGradesPage() {
     </div>
   );
 }
-
-
-    
