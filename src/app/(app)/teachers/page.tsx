@@ -315,15 +315,17 @@ export default function TeachersPage() {
                 <SelectValue placeholder={isLoadingAuthUsers ? "Memuat akun..." : "Pilih akun pengguna guru"} />
               </SelectTrigger>
               <SelectContent>
-                {isLoadingAuthUsers && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                <SelectItem value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Tautkan nanti</SelectItem>
-                {authGuruUsers.map((authUser) => (
+                {isLoadingAuthUsers && <SelectItem key="loading-auth-users" value="loading" disabled>Memuat...</SelectItem>}
+                <SelectItem key="no-auth-user-option" value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Tautkan nanti</SelectItem>
+                {authGuruUsers
+                  .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
+                  .map((authUser) => (
                   <SelectItem key={authUser.id} value={authUser.id}>
                     {authUser.name} ({authUser.email})
                   </SelectItem>
                 ))}
                 {!isLoadingAuthUsers && authGuruUsers.length === 0 && (
-                  <SelectItem value="no-users" disabled>Tidak ada akun guru di User Admin.</SelectItem>
+                  <SelectItem key="no-auth-users-found" value="no-users" disabled>Tidak ada akun guru di User Admin.</SelectItem>
                 )}
               </SelectContent>
             </Select>
