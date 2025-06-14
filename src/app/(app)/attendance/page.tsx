@@ -864,7 +864,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
   const isParentView = !!targetStudentId;
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 30000); 
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update time every minute
     return () => clearInterval(timer);
   }, []);
 
@@ -935,10 +935,10 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     const now = timeToCheck;
     const today = startOfDay(now);
 
-    const lessonStart = parse(lesson.startTime, "HH:mm", today);
-    const lessonEnd = parse(lesson.endTime, "HH:mm", today);
+    const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
+    const lessonEnd = lesson.endTime ? parse(lesson.endTime, "HH:mm", today) : null;
 
-    if (!isValid(lessonStart) || !isValid(lessonEnd)) {
+    if (!lessonStart || !lessonEnd || !isValid(lessonStart) || !isValid(lessonEnd)) {
         return { text: "Jadwal Error", icon: <Info className="h-5 w-5 text-orange-400" /> };
     }
     
@@ -950,10 +950,11 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
       return { text: "Belum Dimulai", icon: <Clock className="h-5 w-5 text-gray-400" /> };
     }
     if (now >= lessonStart && now <= lessonEnd) {
-      return { text: "Sesi Berlangsung", icon: <Clock className="h-5 w-5 text-blue-500" /> };
+      return { text: "Sesi Berlangsung (Belum Absen)", icon: <Clock className="h-5 w-5 text-blue-500" /> };
     }
     return { text: "Sesi Berakhir (Belum Absen)", icon: <XCircle className="h-5 w-5 text-red-500" /> };
   };
+
 
   const handleExportStudentDailyPdf = async () => {
     if (!studentToView.name || todayLessons.length === 0) {
@@ -1098,27 +1099,25 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
             </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-4">
           {todayLessons.map(lesson => {
             const status = getLessonStatus(lesson, attendanceRecords, currentTime);
             return (
-              <Card key={lesson.id} className="bg-card/80 backdrop-blur-sm border shadow-md flex flex-col">
-                <CardHeader className="pb-2">
-                    <div className="flex justify-between items-start">
-                        <CardTitle className="text-lg">{lesson.subjectName || "Pelajaran Tanpa Nama"}</CardTitle>
-                         <Button variant="ghost" size="iconSm" asChild className="h-7 w-7 text-primary hover:bg-primary/10">
-                            <Link href={`/lessons/${lesson.id}`} aria-label={`Detail pelajaran ${lesson.subjectName}`}>
-                                <ExternalLink className="h-4 w-4" />
-                            </Link>
-                        </Button>
+              <Card key={lesson.id} className="bg-card/80 backdrop-blur-sm border shadow-md">
+                <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div className="flex-grow">
+                        <h3 className="text-lg font-semibold text-primary">{lesson.subjectName || "Pelajaran Tanpa Nama"}</h3>
+                        <p className="text-sm text-muted-foreground"> Waktu: {lesson.startTime} - {lesson.endTime} </p>
+                        <div className="flex items-center gap-2 text-sm font-medium mt-1">
+                            {status.icon}
+                            <span>{status.text}</span>
+                        </div>
                     </div>
-                  <p className="text-sm text-muted-foreground"> Waktu: {lesson.startTime} - {lesson.endTime} </p>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center space-y-2 pt-2 pb-4 flex-grow">
-                    <div className="flex items-center gap-2 text-sm font-medium text-center">
-                        {status.icon}
-                        <span>{status.text}</span>
-                    </div>
+                    <Button variant="outline" size="sm" asChild className="shrink-0 w-full sm:w-auto">
+                        <Link href={`/lessons/${lesson.id}`} aria-label={`Detail pelajaran ${lesson.subjectName}`}>
+                            <ExternalLink className="mr-2 h-4 w-4" /> Lihat Detail
+                        </Link>
+                    </Button>
                 </CardContent>
               </Card>
             );
@@ -1128,7 +1127,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
        <Card className="mt-6 bg-card/70 backdrop-blur-sm border-border shadow-sm">
             <CardHeader><CardTitle className="text-lg">Catatan Penting</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-1">
-                <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui ikon <ExternalLink className="inline-block h-4 w-4 align-text-bottom" /> di pojok kanan atas kartu pelajaran.</p>
+                <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui tombol "Lihat Detail" di samping masing-masing pelajaran.</p>
                 <p>&bull; Pastikan Anda melakukan absen selama jam pelajaran berlangsung.</p>
                 <p>&bull; Jika ada kendala teknis atau alasan lain tidak bisa absen, segera hubungi guru mata pelajaran atau wali kelas Anda.</p>
             </CardContent>
@@ -1182,3 +1181,4 @@ export default function AttendancePageWrapper() {
   }
 }
 
+    
