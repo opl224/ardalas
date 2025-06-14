@@ -638,13 +638,6 @@ export default function AssignmentsPage() {
             <span>Daftar Tugas</span>
           </CardTitle>
           <div className="flex items-center gap-2">
-            {(isStudentRole || isParentRole) && (
-                 <Button size="sm" asChild>
-                    <NextLink href="/assignments/my-results">
-                        <GraduationCap className="mr-2 h-4 w-4" /> Lihat Hasil Belajar
-                    </NextLink>
-                </Button>
-            )}
             {isTeacherOrAdminRole && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
                 setIsAddDialogOpen(isOpen);
