@@ -4,11 +4,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink } from "lucide-react";
+import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
