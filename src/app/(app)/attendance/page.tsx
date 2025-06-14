@@ -852,7 +852,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
   const [todayLessons, setTodayLessons] = useState<StudentLessonDisplay[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Map<string, StudentSelfAttendanceRecord>>(new Map());
   const [isLoadingView, setIsLoadingView] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState(new Date()); // Initialize once
   const [isExporting, setIsExporting] = useState(false);
 
   const studentToView = {
@@ -863,11 +863,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
   
   const isParentView = !!targetStudentId;
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000); // Update time every minute
-    return () => clearInterval(timer);
-  }, []);
-
   const fetchStudentScheduleAndAttendance = async () => {
     if (!studentToView.id || !studentToView.classId) {
       setIsLoadingView(false);
@@ -877,7 +872,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     setIsLoadingView(true);
 
     try {
-      const todayObj = new Date();
+      const todayObj = new Date(); // Use current time for this fetch
       const currentDayName = DAY_NAMES_ID[todayObj.getDay()];
 
       const lessonsQueryInstance = query(
@@ -898,7 +893,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
         const attendanceQueryInstance = query(
           collection(db, "studentAttendanceRecords"),
           where("studentId", "==", studentToView.id),
-          where("date", "==", Timestamp.fromDate(startOfDay(todayObj))),
+          where("date", "==", Timestamp.fromDate(startOfDay(todayObj))), // Compare with start of today
           where("lessonId", "in", lessonIds.length > 0 ? lessonIds : ["_empty_"]) 
         );
         const attendanceSnapshot = await getDocs(attendanceQueryInstance);
@@ -910,7 +905,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
       setAttendanceRecords(currentRunRecordsMap);
       
       const lessonsWithStatus = fetchedLessons.map(lesson => {
-         const statusInfo = getLessonStatus(lesson, currentRunRecordsMap, currentTime); 
+         const statusInfo = getLessonStatus(lesson, currentRunRecordsMap, new Date()); // Use fresh Date for status
          return {...lesson, statusText: statusInfo.text, statusIcon: statusInfo.icon }
       });
       setTodayLessons(lessonsWithStatus);
@@ -929,7 +924,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     } else if (!authLoading && !studentToView.id){
         setIsLoadingView(false);
     }
-  }, [authLoading, studentToView.id, studentToView.classId, currentTime]); 
+  }, [authLoading, studentToView.id, studentToView.classId]); // Removed currentTime from dependencies
 
   const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>, timeToCheck: Date) => {
     const now = timeToCheck;
