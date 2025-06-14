@@ -108,7 +108,7 @@ interface StudentLessonDisplay {
   statusIcon?: React.ReactNode; 
 }
 
-export interface StudentSelfAttendanceRecord { // Exported this interface
+export interface StudentSelfAttendanceRecord { 
   id?: string; 
   studentId: string;
   studentName: string;
@@ -847,7 +847,7 @@ function TeacherAdminAttendanceManagement() {
 
 
 function StudentAttendanceView({ targetStudentId, targetStudentName, targetStudentClassId }: StudentAttendanceViewProps) {
-  const { user: authUser, loading: authLoading, role } = useAuth(); // Added role here
+  const { user: authUser, loading: authLoading, role } = useAuth(); 
   const { toast } = useToast();
   const [todayLessons, setTodayLessons] = useState<StudentLessonDisplay[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Map<string, StudentSelfAttendanceRecord>>(new Map());
@@ -859,13 +859,9 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     id: targetStudentId || authUser?.uid,
     name: targetStudentName || authUser?.displayName,
     classId: targetStudentClassId || authUser?.classId,
-    className: targetStudentClassId 
-      ? (authUser?.role === 'orangtua' ? authUser.linkedStudentClassName : authUser?.className) 
-      : authUser?.className,
   };
   
-  const isParentView = !!targetStudentId; // True if targetStudentId is provided (parent viewing child's attendance)
-
+  const isParentView = !!targetStudentId;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000); 
@@ -896,7 +892,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
         return { id: docSnap.id, subjectName: data.subjectName, dayOfWeek: data.dayOfWeek, startTime: data.startTime, endTime: data.endTime };
       });
       
-
       if (fetchedLessons.length > 0) {
         const lessonIds = fetchedLessons.map(l => l.id);
         const attendanceQueryInstance = query(
@@ -917,11 +912,10 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
       }
       
       const lessonsWithStatus = fetchedLessons.map(lesson => {
-         const statusInfo = getLessonStatus(lesson, attendanceRecords, currentTime); 
+         const statusInfo = getLessonStatus(lesson, recordsMap, currentTime); 
          return {...lesson, statusText: statusInfo.text, statusIcon: statusInfo.icon }
       });
       setTodayLessons(lessonsWithStatus);
-
 
     } catch (error) {
       console.error("Error fetching student schedule/attendance: ", error);
@@ -937,9 +931,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     } else if (!authLoading && !studentToView.id){
         setIsLoadingView(false);
     }
-  }, [authLoading, studentToView.id, studentToView.classId]);
-
-  // Removed handleSelfAttend as it's moved to lesson detail page
+  }, [authLoading, studentToView.id, studentToView.classId, currentTime]); // Added currentTime to re-evaluate status
 
   const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>, timeToCheck: Date) => {
     const now = timeToCheck;
@@ -1073,7 +1065,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
-            <h1 className="text-3xl font-bold font-headline">Kehadiran {isParentView ? `Anak (${studentToView.name || '...'})` : 'Saya'}</h1>
+            <h1 className="text-3xl font-bold font-headline">Rekap Kehadiran {isParentView ? `Anak (${studentToView.name || '...'})` : 'Saya'}</h1>
             <p className="text-muted-foreground">Hari/Tanggal: {format(currentTime, "eeee, dd MMMM yyyy", { locale: indonesiaLocale })}</p>
         </div>
         <div className="flex gap-2 self-start sm:self-center">
@@ -1129,7 +1121,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
                         {status.icon}
                         <span>{status.text}</span>
                     </div>
-                    {/* Button is removed here, attendance is handled in detail page */}
                 </CardContent>
               </Card>
             );
@@ -1192,4 +1183,3 @@ export default function AttendancePageWrapper() {
     );
   }
 }
-
