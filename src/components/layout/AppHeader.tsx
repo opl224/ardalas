@@ -17,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft } from "lucide-react";
+import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft, Mail } from "lucide-react"; // Added Mail for example, adjust as needed
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +36,7 @@ import {
   writeBatch,
   Timestamp, 
 } from "firebase/firestore";
+import { ScrollArea } from "@/components/ui/scroll-area"; // Added ScrollArea
 
 interface NotificationDoc {
   id: string; 
@@ -54,6 +55,8 @@ function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
 
+  const MAX_DROPDOWN_NOTIFICATIONS = 10; // Fetch 10, but initially show 5 in dropdown.
+
   useEffect(() => {
     if (!user || !user.uid) { 
       setNotifications([]);
@@ -66,7 +69,7 @@ function NotificationBell() {
       notificationsRef,
       where("userId", "==", user.uid), 
       orderBy("createdAt", "desc"),
-      limit(10) 
+      limit(MAX_DROPDOWN_NOTIFICATIONS) 
     );
 
     const unsubscribe = onSnapshot(
@@ -75,13 +78,10 @@ function NotificationBell() {
         const fetchedNotifications: NotificationDoc[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          // Ensure createdAt is a Firestore Timestamp or null
           let createdAtTimestamp: Timestamp | null = null;
           if (data.createdAt instanceof Timestamp) {
             createdAtTimestamp = data.createdAt;
           }
-
-
           fetchedNotifications.push({ 
             id: docSnap.id, 
             title: data.title || "Tanpa Judul",
@@ -111,6 +111,10 @@ function NotificationBell() {
 
   const handleMarkAsRead = async (id: string) => {
     if (!user) return;
+    // Optimistically update UI
+    setNotifications(prev => prev.map(n => n.id === id && !n.read ? {...n, read: true} : n));
+    setUnreadCount(prev => prev > 0 ? prev - 1 : 0);
+
     const notificationRef = doc(db, "notifications", id);
     try {
       await updateDoc(notificationRef, { read: true });
@@ -121,20 +125,23 @@ function NotificationBell() {
         description: "Gagal menandai notifikasi sebagai dibaca.",
         variant: "destructive",
       });
+      // Revert UI update on error if needed (complex, for now log and toast)
     }
   };
   
   const handleMarkAllAsRead = async () => {
     if (!user || unreadCount === 0) return;
     const batch = writeBatch(db);
-    notifications.forEach(notification => {
-      if (!notification.read) {
-        const notificationRef = doc(db, "notifications", notification.id);
-        batch.update(notificationRef, { read: true });
-      }
+    const unreadNotifications = notifications.filter(n => !n.read);
+
+    unreadNotifications.forEach(notification => {
+      const notificationRef = doc(db, "notifications", notification.id);
+      batch.update(notificationRef, { read: true });
     });
+    
     try {
       await batch.commit();
+      // Firestore listener will update state
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       toast({
@@ -144,6 +151,8 @@ function NotificationBell() {
       });
     }
   };
+  
+  const displayedNotifications = notifications.slice(0, 5); // Show first 5
 
   return (
     <DropdownMenu>
@@ -159,60 +168,59 @@ function NotificationBell() {
           <span className="sr-only">Notifikasi</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-80 bg-popover/90 backdrop-blur-md" align="end">
-        <DropdownMenuLabel className="flex justify-between items-center">
-          <span>Notifikasi ({unreadCount})</span>
+      <DropdownMenuContent className="w-80 bg-popover/95 backdrop-blur-md shadow-xl" align="end">
+        <DropdownMenuLabel className="flex justify-between items-center sticky top-0 bg-popover/95 z-10 pt-2 px-2 pb-1.5">
+          <span>Notifikasi Terbaru ({unreadCount})</span>
           {unreadCount > 0 && (
-            <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={handleMarkAllAsRead}>
+            <Button variant="link" size="xs" className="p-0 h-auto text-xs" onClick={handleMarkAllAsRead}>
               Tandai semua dibaca
             </Button>
           )}
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {notifications.length === 0 ? (
-          <DropdownMenuItem disabled className="justify-center text-muted-foreground">
-            Tidak ada notifikasi.
+        <DropdownMenuSeparator className="mt-0" />
+        {displayedNotifications.length === 0 ? (
+          <DropdownMenuItem disabled className="justify-center text-muted-foreground py-4">
+            Tidak ada notifikasi baru.
           </DropdownMenuItem>
         ) : (
-          notifications.slice(0, 5).map(notification => (
-            <DropdownMenuItem 
-              key={notification.id} 
-              className={cn("flex flex-col items-start gap-1", !notification.read && "bg-accent/50")}
-              onClick={() => !notification.read && handleMarkAsRead(notification.id)}
-              asChild={!!notification.href}
-            >
-              {notification.href ? (
-                 <Link href={notification.href} className="w-full">
-                    <p className="font-semibold text-sm">{notification.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
-                    <p className="text-xs text-muted-foreground/70">
-                      {notification.createdAt && typeof notification.createdAt.toDate === 'function'
-                        ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                        : "Tanggal tidak valid"}
+          <ScrollArea className="max-h-[calc(5*3.5rem)]"> {/* Approx 5 items visible */}
+            {displayedNotifications.map(notification => (
+              <DropdownMenuItem 
+                key={notification.id} 
+                className={cn(
+                  "flex flex-col items-start gap-0.5 p-2 cursor-pointer focus:bg-accent/80",
+                  !notification.read && "bg-accent/50 hover:bg-accent/70"
+                )}
+                onClick={() => !notification.read && handleMarkAsRead(notification.id)}
+                asChild={!!notification.href} // Use asChild only if href exists
+              >
+                {notification.href ? (
+                  <Link href={notification.href} className="w-full block">
+                    <p className="font-semibold text-sm line-clamp-1">{notification.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
+                    <p className="text-xs text-muted-foreground/80">
+                      {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || "Baru saja"}
                     </p>
-                 </Link>
-              ) : (
-                <div className="w-full">
-                  <p className="font-semibold text-sm">{notification.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{notification.description}</p>
-                   <p className="text-xs text-muted-foreground/70">
-                     {notification.createdAt && typeof notification.createdAt.toDate === 'function'
-                       ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                       : "Tanggal tidak valid"}
+                  </Link>
+                ) : (
+                  <div className="w-full">
+                    <p className="font-semibold text-sm line-clamp-1">{notification.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
+                    <p className="text-xs text-muted-foreground/80">
+                      {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || "Baru saja"}
                     </p>
-                </div>
-              )}
-            </DropdownMenuItem>
-          ))
+                  </div>
+                )}
+              </DropdownMenuItem>
+            ))}
+          </ScrollArea>
         )}
-        {notifications.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild className="justify-center">
-              <Link href="/notifications" className="text-sm text-primary">Lihat Semua Notifikasi</Link>
-            </DropdownMenuItem>
-          </>
-        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild className="justify-center focus:bg-accent/80">
+          <Link href="/notifications" className="w-full text-center text-sm text-primary font-medium py-1.5">
+            Lihat Semua Notifikasi
+          </Link>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -249,25 +257,12 @@ function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} data-ai-hint="profile picture" />
+            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile picture"/>
             <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 bg-popover/90 backdrop-blur-md" align="end" forceMount>
-        {/* <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.displayName || "Pengguna"}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
-            </p>
-            {user.role && (
-              <p className="text-xs leading-none text-muted-foreground capitalize">
-                Peran: {user.role}
-              </p>
-            )}
-          </div>
-        </DropdownMenuLabel> */}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/settings/profile"> 
@@ -299,8 +294,7 @@ export function AppHeader() {
   const pageTitle = currentNavItem?.title || "SDN";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background px-4 sm:px-8">
-      {/* Left Aligned Items: Mobile Trigger + Page Title */}
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-4 sm:px-8">
       <div className="flex items-center gap-2">
         {isMobile && (
           <SheetTrigger asChild>
@@ -310,21 +304,11 @@ export function AppHeader() {
             </Button>
           </SheetTrigger>
         )}
-        <div className="flex items-center"> {/* Wrapper for title only */}
+        <div className="flex items-center">
           <h1 className="text-xl font-semibold font-headline">{pageTitle}</h1>
         </div>
       </div>
-
-      {/* Right Aligned Items: Search, Notifications, User Menu */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* <form className="relative hidden sm:block flex-1 md:grow-0">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Cari..."
-              className="w-full rounded-lg bg-muted pl-8 md:w-[200px] lg:w-[320px]"
-            />
-        </form> */}
         <NotificationBell />
         <UserNav />
       </div>
