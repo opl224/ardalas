@@ -62,7 +62,7 @@ interface DashboardStats {
   adminTotalStudents: number;
   adminTotalTeachers: number;
   adminTotalSubjects: number;
-  adminTotalClasses: number; // Added for admin
+  adminTotalClasses: number;
   // Teacher specific
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     adminTotalStudents: 0,
     adminTotalTeachers: 0,
     adminTotalSubjects: 0,
-    adminTotalClasses: 0, // Initialized for admin
+    adminTotalClasses: 0,
     teacherTotalStudentsTaught: 0,
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
@@ -100,28 +100,36 @@ export default function DashboardPage() {
       setLoadingStats(true);
       setLoadingAnnouncements(true);
       
-      const statsUpdate: Partial<DashboardStats> = {};
+      const newStats: DashboardStats = { // Initialize with all zeros for a clean slate
+        adminTotalStudents: 0,
+        adminTotalTeachers: 0,
+        adminTotalSubjects: 0,
+        adminTotalClasses: 0,
+        teacherTotalStudentsTaught: 0,
+        teacherTotalClassesTaught: 0,
+        teacherTotalSubjectsTaught: 0,
+      };
 
       try {
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
           const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
           const subjectsQuery = collection(db, "subjects");
-          const classesQuery = collection(db, "classes"); // Query for classes
+          const classesQuery = collection(db, "classes");
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
             getDocs(subjectsQuery),
-            getDocs(classesQuery), // Fetch classes
+            getDocs(classesQuery),
           ]);
 
-          statsUpdate.adminTotalStudents = studentSnap.size;
-          statsUpdate.adminTotalTeachers = teacherUserSnap.size;
-          statsUpdate.adminTotalSubjects = subjectSnap.size;
-          statsUpdate.adminTotalClasses = classSnap.size; // Assign class count
+          newStats.adminTotalStudents = studentSnap.size;
+          newStats.adminTotalTeachers = teacherUserSnap.size;
+          newStats.adminTotalSubjects = subjectSnap.size;
+          newStats.adminTotalClasses = classSnap.size;
 
-        } else if (role === 'guru' && user.email) { // Ensure user.email exists
+        } else if (role === 'guru' && user.email) {
             const teacherProfileQuery = query(collection(db, "teachers"), where("email", "==", user.email), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
@@ -139,8 +147,8 @@ export default function DashboardPage() {
                     if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
                 });
 
-                statsUpdate.teacherTotalClassesTaught = taughtClassIds.size;
-                statsUpdate.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+                newStats.teacherTotalClassesTaught = taughtClassIds.size;
+                newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
 
                 if (taughtClassIds.size > 0) {
                     const studentClassesArray = Array.from(taughtClassIds);
@@ -159,31 +167,25 @@ export default function DashboardPage() {
                             studentsTaughtSnapshot.forEach(doc => allStudentIds.add(doc.id));
                         }
                     }
-                    statsUpdate.teacherTotalStudentsTaught = allStudentIds.size;
+                    newStats.teacherTotalStudentsTaught = allStudentIds.size;
                 } else {
-                    statsUpdate.teacherTotalStudentsTaught = 0;
+                    newStats.teacherTotalStudentsTaught = 0;
                 }
             } else {
-                // Teacher profile not found in 'teachers' collection by email, set stats to 0
-                statsUpdate.teacherTotalStudentsTaught = 0;
-                statsUpdate.teacherTotalClassesTaught = 0;
-                statsUpdate.teacherTotalSubjectsTaught = 0;
+                // Teacher profile not found, stats remain 0 as initialized in newStats
             }
-        } else {
-            // Default to 0 if role is not admin or guru, or required user info (like email for guru) is missing
-            statsUpdate.teacherTotalStudentsTaught = 0;
-            statsUpdate.teacherTotalClassesTaught = 0;
-            statsUpdate.teacherTotalSubjectsTaught = 0;
-            statsUpdate.adminTotalStudents = 0;
-            statsUpdate.adminTotalTeachers = 0;
-            statsUpdate.adminTotalSubjects = 0;
-            statsUpdate.adminTotalClasses = 0;
         }
+        // For other roles, stats remain 0 as initialized
         
-        setStats(prevStats => ({ ...prevStats, ...statsUpdate }));
+        setStats(newStats);
 
       } catch (error) {
         console.error("Error fetching stats: ", error);
+        // Set to initial zero state on error
+        setStats({
+            adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
+            teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
+        });
       } finally {
         setLoadingStats(false);
       }
@@ -199,7 +201,7 @@ export default function DashboardPage() {
             orderBy("date", "desc"),
             limit(3)
           );
-        } else if (role === 'guru' && user?.uid) {
+        } else if (role === 'guru' && user?.uid) { // Check for user.uid as well for guru
            announcementsQueryInstance = query(
             announcementsRef,
              where("targetAudience", "array-contains", "guru"), 
@@ -226,7 +228,7 @@ export default function DashboardPage() {
     
     fetchAllData();
 
-  }, [user, role]);
+  }, [user, role]); // Removed loadingStats from dependency array
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -344,4 +346,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
