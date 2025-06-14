@@ -281,7 +281,7 @@ export default function AssignmentsPage() {
         };
       });
 
-      if (isStudentRole && user && fetchedAssignments.length > 0) {
+      if (isStudentRole && user && user.uid && fetchedAssignments.length > 0) {
         const submissionsSnapshot = await getDocs(query(collection(db, "assignmentSubmissions"), where("studentId", "==", user.uid)));
         const userSubs = new Map<string, AssignmentSubmission>();
         submissionsSnapshot.forEach(doc => {
@@ -293,7 +293,7 @@ export default function AssignmentsPage() {
         // Fetch results related to these assignments for the student
         const assignmentIdsForResultsQuery = fetchedAssignments.map(a => a.id);
         const assignmentResultsMap = new Map<string, FetchedResultData>();
-        if (assignmentIdsForResultsQuery.length > 0) {
+        if (assignmentIdsForResultsQuery.length > 0 && user.uid) { // Added user.uid check here
           // Firestore 'in' query limit is 30, chunk if necessary
           const resultsQueries = [];
           for (let i = 0; i < assignmentIdsForResultsQuery.length; i += 30) {
@@ -753,7 +753,7 @@ export default function AssignmentsPage() {
                                 <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
                              </Button>
                            )}
-                           {assignment.result && (
+                           {isStudentRole && assignment.result && (
                              <Button variant="secondary" size="sm" onClick={() => handleOpenViewResultDialog(assignment)}>
                                 <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
                              </Button>
