@@ -132,8 +132,8 @@ interface StudentAttendanceViewProps {
 
 function TeacherAdminAttendanceManagement() {
   const { user, role, loading: authLoading } = useAuth(); 
-  const [allClasses, setAllClasses] = useState<ClassMin[]>([]); // For admin, or initial list for teacher
-  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); // For admin, or initial list for teacher
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]); 
+  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); 
   const [classesForDropdown, setClassesForDropdown] = useState<ClassMin[]>([]);
   const [subjectsForDropdown, setSubjectsForDropdown] = useState<SubjectMin[]>([]);
 
@@ -185,13 +185,24 @@ function TeacherAdminAttendanceManagement() {
           const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
           const adminSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
           setAllSubjects(adminSubjects);
-          // For admin, subjectsForDropdown will be set when a class is selected, or show all if no class selected
           setSubjectsForDropdown(adminSubjects); 
         } else if (role === 'guru' && user.uid) {
-            const teacherAuthUid = user.uid;
-            
-            // Fetch lessons taught by this teacher
-            const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherAuthUid));
+            // 1. Find teacher profile ID using Auth UID
+            const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+            if (teacherProfileSnapshot.empty) {
+                toast({ title: "Profil Guru Tidak Ditemukan", description: "Tidak dapat memuat kelas karena profil guru tidak ditemukan.", variant: "warning" });
+                setAllClasses([]);
+                setClassesForDropdown([]);
+                setIsLoadingClasses(false);
+                setIsLoadingSubjects(false);
+                return;
+            }
+            const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+
+            // 2. Fetch lessons taught by this teacher using their profile ID
+            const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
             const lessonsSnapshot = await getDocs(lessonsQuery);
             const taughtLessons = lessonsSnapshot.docs.map(d => d.data());
 
@@ -206,9 +217,14 @@ function TeacherAdminAttendanceManagement() {
               classSnapshots.forEach(snap => snap.docs.forEach(d => teacherClasses.push({ id: d.id, name: d.data().name })));
               teacherClasses.sort((a, b) => a.name.localeCompare(b.name));
             }
-            setAllClasses(teacherClasses); // Store all classes teacher is involved in
+            setAllClasses(teacherClasses); 
             setClassesForDropdown(teacherClasses);
-            setSubjectsForDropdown([]); // Subjects will be loaded when class is selected
+
+            // Fetch all subjects for admin to simplify denormalization for now
+            // or if needed for other logic. Teacher subjects are filtered later.
+            const allSubjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
+            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+            setSubjectsForDropdown([]); 
         }
       } catch (error) {
         console.error("Error fetching initial dropdown data for attendance:", error);
@@ -219,29 +235,25 @@ function TeacherAdminAttendanceManagement() {
         setSubjectsForDropdown([]);
       } finally {
         setIsLoadingClasses(false);
-        setIsLoadingSubjects(false); // Initial subjects loading done for admin, teacher loads on class select
+        setIsLoadingSubjects(false); 
       }
     };
     fetchInitialDropdownData();
   }, [authLoading, user, role, toast]);
 
 
-  // Effect to update subjects dropdown when class is selected (especially for teachers)
   useEffect(() => {
     if (authLoading || !user || !role) return;
 
     const updateSubjectsForSelectedClass = async () => {
         if (!selectedClassId) {
-            if (role === 'admin') setSubjectsForDropdown(allSubjects); // Admin sees all if no class selected
+            if (role === 'admin') setSubjectsForDropdown(allSubjects); 
             else setSubjectsForDropdown([]);
             return;
         }
         setIsLoadingSubjects(true);
         try {
             if (role === 'admin') {
-                // Admin: Could filter subjects that actually exist in the selected class via lessons,
-                // but for simplicity, let's assume they can record for any subject in any class.
-                // Or, more accurately, fetch subjects that have lessons in this class.
                 const lessonsInClassQuery = query(collection(db, "lessons"), where("classId", "==", selectedClassId));
                 const lessonsSnapshot = await getDocs(lessonsInClassQuery);
                 const subjectIdsInClass = Array.from(new Set(lessonsSnapshot.docs.map(d => d.data().subjectId).filter(id => !!id)));
@@ -258,9 +270,18 @@ function TeacherAdminAttendanceManagement() {
                 setSubjectsForDropdown(subjectsInClass);
 
             } else if (role === 'guru' && user.uid) {
-                const teacherAuthUid = user.uid;
+                const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+                const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+                if (teacherProfileSnapshot.empty) {
+                    setSubjectsForDropdown([]);
+                    setIsLoadingSubjects(false);
+                    return;
+                }
+                const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+
                 const lessonsQuery = query(collection(db, "lessons"), 
-                    where("teacherId", "==", teacherAuthUid),
+                    where("teacherId", "==", teacherProfileId),
                     where("classId", "==", selectedClassId)
                 );
                 const lessonsSnapshot = await getDocs(lessonsQuery);
@@ -277,7 +298,6 @@ function TeacherAdminAttendanceManagement() {
                 }
                 setSubjectsForDropdown(teacherSubjectsInClass);
                 
-                // Reset selected subject if not in new list
                 if (selectedSubjectId && !teacherSubjectsInClass.find(s => s.id === selectedSubjectId)) {
                     setSelectedSubjectId(undefined);
                     form.setValue("subjectId", undefined);
@@ -293,7 +313,7 @@ function TeacherAdminAttendanceManagement() {
     };
 
     updateSubjectsForSelectedClass();
-  }, [selectedClassId, role, user, authLoading, toast, allSubjects]); // allSubjects for admin fallback
+  }, [selectedClassId, role, user, authLoading, toast, allSubjects]); 
 
 
   useEffect(() => {
@@ -434,8 +454,8 @@ function TeacherAdminAttendanceManagement() {
   const handleSaveAttendance: SubmitHandler<TeacherAttendanceFormValues> = async (data) => {
     setIsSubmitting(true);
     const attendanceDate = Timestamp.fromDate(startOfDay(data.date));
-    const selectedClass = allClasses.find(c => c.id === data.classId); // Use allClasses which has all classes
-    const selectedSubject = allSubjects.find(s => s.id === data.subjectId); // Use allSubjects for name lookup
+    const selectedClass = allClasses.find(c => c.id === data.classId); 
+    const selectedSubject = allSubjects.find(s => s.id === data.subjectId); 
 
     if (!user || !selectedClass || !selectedSubject) { 
         toast({ title: "Data tidak lengkap", description: "Pengguna, kelas, atau mata pelajaran tidak ditemukan.", variant: "destructive"});
@@ -481,7 +501,7 @@ function TeacherAdminAttendanceManagement() {
     form.setValue("studentAttendances", []); 
     setStudentsInClassForForm([]); 
     setExistingAttendanceDocId(null); 
-    setSelectedSubjectId(undefined); // Reset subject when class changes
+    setSelectedSubjectId(undefined); 
     form.setValue("subjectId", undefined);
   };
   
