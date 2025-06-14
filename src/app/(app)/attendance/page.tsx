@@ -927,7 +927,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
   }, [authLoading, studentToView.id, studentToView.classId]); 
 
   const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>) => {
-    const now = new Date(); // Check against current time for status display
+    const now = new Date(); 
     const today = startOfDay(now);
 
     const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
@@ -1100,21 +1100,19 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
             return (
               <Card key={lesson.id} className="bg-card/80 backdrop-blur-sm border shadow-md">
                 <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="flex-grow">
-                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                            <h3 className="text-lg font-semibold text-primary whitespace-nowrap">{lesson.subjectName || "Pelajaran Tanpa Nama"}</h3>
-                            <p className="text-sm text-muted-foreground whitespace-nowrap">
-                                Waktu: {lesson.startTime} - {lesson.endTime}
-                            </p>
-                            <div className="flex items-center gap-1 text-sm font-medium whitespace-nowrap">
-                                {status.icon}
-                                <span>{status.text}</span>
-                            </div>
+                    <div className="flex-grow flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <h3 className="text-lg font-semibold text-primary whitespace-nowrap">{lesson.subjectName || "Pelajaran Tanpa Nama"}</h3>
+                        <p className="text-sm text-muted-foreground whitespace-nowrap">
+                            Waktu: {lesson.startTime} - {lesson.endTime}
+                        </p>
+                        <div className="flex items-center gap-1 text-sm font-medium whitespace-nowrap">
+                            {status.icon}
+                            <span>{status.text}</span>
                         </div>
                     </div>
-                    <Button variant="outline" size="sm" asChild className="shrink-0 w-full sm:w-auto">
+                    <Button variant="outline" size="icon" asChild className="shrink-0">
                         <Link href={`/lessons/${lesson.id}`} aria-label={`Detail pelajaran ${lesson.subjectName}`}>
-                            <ExternalLink className="mr-2 h-4 w-4" /> Lihat Detail
+                            <ExternalLink className="h-4 w-4" />
                         </Link>
                     </Button>
                 </CardContent>
@@ -1126,7 +1124,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
        <Card className="mt-6 bg-card/70 backdrop-blur-sm border-border shadow-sm">
             <CardHeader><CardTitle className="text-lg">Catatan Penting</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-1">
-                <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui tombol "Lihat Detail" di samping masing-masing pelajaran.</p>
+                <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui tombol <ExternalLink className="inline h-3.5 w-3.5 align-text-bottom" /> di samping masing-masing pelajaran.</p>
                 <p>&bull; Pastikan Anda melakukan absen selama jam pelajaran berlangsung.</p>
                 <p>&bull; Jika ada kendala teknis atau alasan lain tidak bisa absen, segera hubungi guru mata pelajaran atau wali kelas Anda.</p>
             </CardContent>
