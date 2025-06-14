@@ -288,7 +288,7 @@ export default function UserAdministrationPage() {
         const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
         addUserForm.setError("email", { type: "manual", message: specificMessage });
         toast({ 
-            title: "Gagal: Email Sudah Ada", 
+            title: "Gagal: Email Sudah Terdaftar", 
             description: specificMessage + " Gunakan email lain atau periksa apakah pengguna sudah ada di daftar.", 
             variant: "destructive" 
         });
@@ -379,7 +379,7 @@ export default function UserAdministrationPage() {
           ) : noClassesAvailable ? (
             <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              <span>Tidak ada kelas tersedia. Tambahkan data kelas di menu "Akademik &gt; Kelas" terlebih dahulu.</span>
+              <span>Tidak ada kelas yang dapat dipilih. Harap tambahkan data kelas terlebih dahulu melalui menu "Akademik &gt; Kelas".</span>
             </div>
           ) : (
             <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
@@ -422,7 +422,7 @@ export default function UserAdministrationPage() {
             {noClassesAvailable && (
                  <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada kelas tersedia. Tambahkan data kelas di menu "Akademik &gt; Kelas" terlebih dahulu.</span>
+                    <span>Tidak ada kelas yang dapat dipilih. Harap tambahkan data kelas terlebih dahulu melalui menu "Akademik &gt; Kelas".</span>
                 </div>
             )}
             <Controller
