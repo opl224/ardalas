@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2, Eye } from "lucide-react"; // Added Eye icon
+import { School, PlusCircle, Edit, Trash2, Eye } from "lucide-react"; 
 import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,9 +59,10 @@ import {
   Timestamp,
   query,
   orderBy,
-  where // Added where for student query
+  where 
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext"; 
 
 interface TeacherMin { 
   id: string;
@@ -76,7 +77,6 @@ interface ClassData {
   createdAt?: Timestamp; 
 }
 
-// Interface for students listed in the class view dialog
 interface StudentInClass {
   id: string;
   name: string;
@@ -97,6 +97,7 @@ type EditClassFormValues = z.infer<typeof editClassFormSchema>;
 const NO_TEACHER_VALUE = "_NONE_";
 
 export default function ClassesPage() {
+  const { role } = useAuth(); 
   const [classes, setClasses] = useState<ClassData[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +105,6 @@ export default function ClassesPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
 
-  // State for viewing students in a class
   const [isViewStudentsDialogOpen, setIsViewStudentsDialogOpen] = useState(false);
   const [selectedClassForViewingStudents, setSelectedClassForViewingStudents] = useState<ClassData | null>(null);
   const [studentsInClass, setStudentsInClass] = useState<StudentInClass[]>([]);
@@ -147,7 +147,9 @@ export default function ClassesPage() {
   const fetchClasses = async () => {
     setIsLoading(true);
     try {
-      await fetchTeachersForDropdown(); 
+      if (role === "admin") { // Only admin needs teachers for dropdown in this context
+        await fetchTeachersForDropdown(); 
+      }
       const classesCollectionRef = collection(db, "classes");
       const q = query(classesCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
@@ -173,19 +175,20 @@ export default function ClassesPage() {
 
   useEffect(() => {
     fetchClasses();
-  }, []);
+  }, [role]); 
 
   useEffect(() => {
-    if (selectedClass && isEditDialogOpen) {
+    if (selectedClass && isEditDialogOpen && role === "admin") {
       editClassForm.reset({
         id: selectedClass.id,
         name: selectedClass.name,
         teacherId: selectedClass.teacherId || undefined, 
       });
     }
-  }, [selectedClass, isEditDialogOpen, editClassForm]);
+  }, [selectedClass, isEditDialogOpen, editClassForm, role]);
 
   const handleAddClassSubmit: SubmitHandler<ClassFormValues> = async (data) => {
+    if (role !== "admin") return; 
     addClassForm.clearErrors();
     const selectedTeacher = data.teacherId ? teachers.find(t => t.id === data.teacherId) : undefined;
     
@@ -213,7 +216,7 @@ export default function ClassesPage() {
   };
 
   const handleEditClassSubmit: SubmitHandler<EditClassFormValues> = async (data) => {
-    if (!selectedClass) return;
+    if (role !== "admin" || !selectedClass) return;
     editClassForm.clearErrors();
     const selectedTeacher = data.teacherId ? teachers.find(t => t.id === data.teacherId) : undefined;
 
@@ -240,6 +243,7 @@ export default function ClassesPage() {
   };
 
   const handleDeleteClass = async (classId: string, className?: string) => {
+    if (role !== "admin") return;
     try {
       await deleteDoc(doc(db, "classes", classId));
       toast({ title: "Data Kelas Dihapus", description: `${className || 'Kelas'} berhasil dihapus.` });
@@ -256,11 +260,13 @@ export default function ClassesPage() {
   };
 
   const openEditDialog = (classItem: ClassData) => {
+    if (role !== "admin") return;
     setSelectedClass(classItem);
     setIsEditDialogOpen(true);
   };
   
   const openDeleteDialog = (classItem: ClassData) => {
+    if (role !== "admin") return;
     setSelectedClass(classItem); 
   };
 
@@ -270,7 +276,7 @@ export default function ClassesPage() {
     setStudentsInClass([]); 
     try {
       const studentsQuery = query(
-        collection(db, "students"),
+        collection(db, "students"), // Assuming students are in "students" collection
         where("classId", "==", classId),
         orderBy("name", "asc")
       );
@@ -278,7 +284,7 @@ export default function ClassesPage() {
       const fetchedStudents: StudentInClass[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         name: docSnap.data().name,
-        nis: docSnap.data().nis, // Assuming students have an NIS field
+        nis: docSnap.data().nis || "N/A", // Assuming students have an NIS field
       }));
       setStudentsInClass(fetchedStudents);
     } catch (error) {
@@ -312,67 +318,69 @@ export default function ClassesPage() {
             <School className="h-6 w-6 text-primary" />
             <span>Daftar Kelas</span>
           </CardTitle>
-          <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-            setIsAddDialogOpen(isOpen);
-            if (!isOpen) {
-              addClassForm.reset();
-              addClassForm.clearErrors();
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={() => { if (teachers.length === 0) fetchTeachersForDropdown(); }}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Tambah Kelas
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Tambah Kelas Baru</DialogTitle>
-                <DialogDescription>
-                  Isi detail kelas dan pilih wali kelas jika ada.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={addClassForm.handleSubmit(handleAddClassSubmit)} className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="add-class-name">Nama Kelas</Label>
-                  <Input id="add-class-name" {...addClassForm.register("name")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1" />
-                  {addClassForm.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-class-teacherId">Wali Kelas (Opsional)</Label>
-                  <Select
-                    onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
-                    defaultValue={addClassForm.getValues("teacherId")}
-                  >
-                    <SelectTrigger id="add-class-teacherId" className="mt-1">
-                      <SelectValue placeholder="Pilih wali kelas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.length === 0 && <SelectItem value="loading" disabled>Memuat guru...</SelectItem>}
-                      <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
-                      {teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {addClassForm.formState.errors.teacherId && (
-                    <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.teacherId.message}</p>
-                  )}
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                     <Button type="button" variant="outline">Batal</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={addClassForm.formState.isSubmitting}>
-                    {addClassForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Kelas"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {role === "admin" && (
+            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+              setIsAddDialogOpen(isOpen);
+              if (!isOpen) {
+                addClassForm.reset();
+                addClassForm.clearErrors();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" onClick={() => { if (teachers.length === 0) fetchTeachersForDropdown(); }}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Kelas
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Tambah Kelas Baru</DialogTitle>
+                  <DialogDescription>
+                    Isi detail kelas dan pilih wali kelas jika ada.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={addClassForm.handleSubmit(handleAddClassSubmit)} className="space-y-4 py-4">
+                  <div>
+                    <Label htmlFor="add-class-name">Nama Kelas</Label>
+                    <Input id="add-class-name" {...addClassForm.register("name")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1" />
+                    {addClassForm.formState.errors.name && (
+                      <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="add-class-teacherId">Wali Kelas (Opsional)</Label>
+                    <Select
+                      onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
+                      defaultValue={addClassForm.getValues("teacherId")}
+                    >
+                      <SelectTrigger id="add-class-teacherId" className="mt-1">
+                        <SelectValue placeholder="Pilih wali kelas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teachers.length === 0 && <SelectItem value="loading" disabled>Memuat guru...</SelectItem>}
+                        <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
+                        {teachers.map((teacher) => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {addClassForm.formState.errors.teacherId && (
+                      <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.teacherId.message}</p>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                       <Button type="button" variant="outline">Batal</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={addClassForm.formState.isSubmitting}>
+                      {addClassForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Kelas"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -388,7 +396,9 @@ export default function ClassesPage() {
                   <TableRow>
                     <TableHead>Nama Kelas</TableHead>
                     <TableHead>Wali Kelas</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className="text-right">
+                      {role === "admin" ? "Aksi" : "Lihat Siswa"}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -400,32 +410,36 @@ export default function ClassesPage() {
                         <Button variant="outline" size="icon" onClick={() => openViewStudentsDialog(classItem)} aria-label={`Lihat siswa di ${classItem.name}`}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="icon" onClick={() => openEditDialog(classItem)} aria-label={`Edit ${classItem.name}`}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(classItem)} aria-label={`Hapus ${classItem.name}`}>
-                              <Trash2 className="h-4 w-4" />
+                        {role === "admin" && (
+                          <>
+                            <Button variant="outline" size="icon" onClick={() => openEditDialog(classItem)} aria-label={`Edit ${classItem.name}`}>
+                              <Edit className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          {selectedClass && selectedClass.id === classItem.id && ( 
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setSelectedClass(null)}>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteClass(selectedClass.id, selectedClass.name)}>
-                                  Ya, Hapus Kelas
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          )}
-                        </AlertDialog>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(classItem)} aria-label={`Hapus ${classItem.name}`}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              {selectedClass && selectedClass.id === classItem.id && ( 
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={() => setSelectedClass(null)}>Batal</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteClass(selectedClass.id, selectedClass.name)}>
+                                      Ya, Hapus Kelas
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              )}
+                            </AlertDialog>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -434,81 +448,81 @@ export default function ClassesPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.
+              Tidak ada data kelas untuk ditampilkan. {role === "admin" && 'Klik "Tambah Kelas" untuk membuat data baru.'}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Edit Class Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
-          setIsEditDialogOpen(isOpen);
-          if (!isOpen) {
-            setSelectedClass(null);
-            editClassForm.clearErrors();
-          }
-      }}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Data Kelas</DialogTitle>
-            <DialogDescription>
-              Perbarui detail data kelas.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedClass && (
-            <form onSubmit={editClassForm.handleSubmit(handleEditClassSubmit)} className="space-y-4 py-4">
-              <Input type="hidden" {...editClassForm.register("id")} />
-              <div>
-                <Label htmlFor="edit-class-name">Nama Kelas</Label>
-                <Input id="edit-class-name" {...editClassForm.register("name")} className="mt-1" />
-                {editClassForm.formState.errors.name && (
-                  <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.name.message}</p>
-                )}
-              </div>
-              <div>
-                  <Label htmlFor="edit-class-teacherId">Wali Kelas (Opsional)</Label>
-                  <Select
-                    onValueChange={(value) => editClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
-                    defaultValue={editClassForm.getValues("teacherId") || undefined}
-                  >
-                    <SelectTrigger id="edit-class-teacherId" className="mt-1">
-                      <SelectValue placeholder="Pilih wali kelas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
-                      {teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {editClassForm.formState.errors.teacherId && (
-                    <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.teacherId.message}</p>
+      {role === "admin" && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+            setIsEditDialogOpen(isOpen);
+            if (!isOpen) {
+              setSelectedClass(null);
+              editClassForm.clearErrors();
+            }
+        }}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Data Kelas</DialogTitle>
+              <DialogDescription>
+                Perbarui detail data kelas.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedClass && (
+              <form onSubmit={editClassForm.handleSubmit(handleEditClassSubmit)} className="space-y-4 py-4">
+                <Input type="hidden" {...editClassForm.register("id")} />
+                <div>
+                  <Label htmlFor="edit-class-name">Nama Kelas</Label>
+                  <Input id="edit-class-name" {...editClassForm.register("name")} className="mt-1" />
+                  {editClassForm.formState.errors.name && (
+                    <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.name.message}</p>
                   )}
                 </div>
-              <DialogFooter>
-                 <DialogClose asChild>
-                    <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedClass(null); }}>Batal</Button>
-                 </DialogClose>
-                <Button type="submit" disabled={editClassForm.formState.isSubmitting}>
-                  {editClassForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+                <div>
+                    <Label htmlFor="edit-class-teacherId">Wali Kelas (Opsional)</Label>
+                    <Select
+                      onValueChange={(value) => editClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
+                      defaultValue={editClassForm.getValues("teacherId") || undefined}
+                    >
+                      <SelectTrigger id="edit-class-teacherId" className="mt-1">
+                        <SelectValue placeholder="Pilih wali kelas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
+                        {teachers.map((teacher) => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {editClassForm.formState.errors.teacherId && (
+                      <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.teacherId.message}</p>
+                    )}
+                  </div>
+                <DialogFooter>
+                   <DialogClose asChild>
+                      <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedClass(null); }}>Batal</Button>
+                   </DialogClose>
+                  <Button type="submit" disabled={editClassForm.formState.isSubmitting}>
+                    {editClassForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
-      {/* View Students in Class Dialog */}
       <Dialog open={isViewStudentsDialogOpen} onOpenChange={(isOpen) => {
         setIsViewStudentsDialogOpen(isOpen);
         if (!isOpen) {
           setSelectedClassForViewingStudents(null);
-          setStudentsInClass([]); // Clear students when dialog closes
+          setStudentsInClass([]); 
         }
       }}>
-        <DialogContent className="sm:max-w-lg"> {/* Increased width for student list */}
+        <DialogContent className="sm:max-w-lg"> 
           <DialogHeader>
             <DialogTitle>Daftar Siswa di Kelas: {selectedClassForViewingStudents?.name || "Memuat..."}</DialogTitle>
             <DialogDescription>
@@ -554,5 +568,4 @@ export default function ClassesPage() {
     </div>
   );
 }
-
     
