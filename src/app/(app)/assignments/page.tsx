@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap } from "lucide-react";
+import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -275,7 +275,7 @@ export default function AssignmentsPage() {
         } else {
           setAssignments([]); setIsLoading(false); return;
         }
-      } else if (!isTeacherOrAdminRole) { 
+      } else if (!isTeacherOrAdminRole && !isStudentRole && !isParentRole) { 
          setAssignments([]); setIsLoading(false); return;
       }
 
@@ -397,7 +397,7 @@ export default function AssignmentsPage() {
       return;
     }
 
-    if (!user || !user.uid) { // Add specific check for user.uid
+    if (!user || !user.uid) { 
       setIsLoading(false);
       setAssignments([]);
       return;
@@ -757,8 +757,8 @@ export default function AssignmentsPage() {
                         {isStudentRole && (
                           <div className="flex justify-end space-x-2">
                            {assignment.submissionStatus === "Sudah Dikerjakan" ? (
-                             <Button variant="outline" size="sm" onClick={() => handleOpenSubmitAssignmentDialog(assignment)}>
-                                Lihat/Edit Pengumpulan
+                             <Button variant="outline" size="icon" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} aria-label="Lihat atau Edit Pengumpulan">
+                               <FilePenLine className="h-4 w-4" />
                              </Button>
                            ) : (
                              <Button size="sm" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
