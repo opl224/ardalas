@@ -74,15 +74,7 @@ export const navItems: NavItem[] = [
       { title: "Hasil", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
     ],
   },
-  {
-    title: "Kehidupan Sekolah",
-    href: "#", 
-    icon: CalendarDays,
-    children: [
-      { title: "Acara Sekolah", href: "/events", icon: CalendarDays }, 
-      { title: "Pesan", href: "/messages", icon: MessageSquare }, 
-    ],
-  },
+  // Menu "Kehidupan Sekolah" dihapus dari sini
   { 
     title: "Pengaturan", 
     href: "/settings", 
@@ -93,3 +85,4 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
+
