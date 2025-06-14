@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -852,7 +853,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
   const [todayLessons, setTodayLessons] = useState<StudentLessonDisplay[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Map<string, StudentSelfAttendanceRecord>>(new Map());
   const [isLoadingView, setIsLoadingView] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date()); // Initialize once
   const [isExporting, setIsExporting] = useState(false);
 
   const studentToView = {
@@ -872,7 +872,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     setIsLoadingView(true);
 
     try {
-      const todayObj = new Date(); // Use current time for this fetch
+      const todayObj = new Date();
       const currentDayName = DAY_NAMES_ID[todayObj.getDay()];
 
       const lessonsQueryInstance = query(
@@ -893,7 +893,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
         const attendanceQueryInstance = query(
           collection(db, "studentAttendanceRecords"),
           where("studentId", "==", studentToView.id),
-          where("date", "==", Timestamp.fromDate(startOfDay(todayObj))), // Compare with start of today
+          where("date", "==", Timestamp.fromDate(startOfDay(todayObj))), 
           where("lessonId", "in", lessonIds.length > 0 ? lessonIds : ["_empty_"]) 
         );
         const attendanceSnapshot = await getDocs(attendanceQueryInstance);
@@ -905,7 +905,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
       setAttendanceRecords(currentRunRecordsMap);
       
       const lessonsWithStatus = fetchedLessons.map(lesson => {
-         const statusInfo = getLessonStatus(lesson, currentRunRecordsMap, new Date()); // Use fresh Date for status
+         const statusInfo = getLessonStatus(lesson, currentRunRecordsMap); 
          return {...lesson, statusText: statusInfo.text, statusIcon: statusInfo.icon }
       });
       setTodayLessons(lessonsWithStatus);
@@ -924,10 +924,10 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     } else if (!authLoading && !studentToView.id){
         setIsLoadingView(false);
     }
-  }, [authLoading, studentToView.id, studentToView.classId]); // Removed currentTime from dependencies
+  }, [authLoading, studentToView.id, studentToView.classId]); 
 
-  const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>, timeToCheck: Date) => {
-    const now = timeToCheck;
+  const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>) => {
+    const now = new Date(); // Check against current time for status display
     const today = startOfDay(now);
 
     const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
@@ -1060,7 +1060,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
             <h1 className="text-3xl font-bold font-headline">Rekap Kehadiran {isParentView ? `Anak (${studentToView.name || '...'})` : 'Saya'}</h1>
-            <p className="text-muted-foreground">Hari/Tanggal: {format(currentTime, "eeee, dd MMMM yyyy", { locale: indonesiaLocale })}</p>
+            <p className="text-muted-foreground">Hari/Tanggal: {format(new Date(), "eeee, dd MMMM yyyy", { locale: indonesiaLocale })}</p>
         </div>
         <div className="flex gap-2 self-start sm:self-center">
             <Button onClick={fetchStudentScheduleAndAttendance} variant="outline" size="sm">
@@ -1096,16 +1096,20 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
       ) : (
         <div className="space-y-4">
           {todayLessons.map(lesson => {
-            const status = getLessonStatus(lesson, attendanceRecords, currentTime);
+            const status = getLessonStatus(lesson, attendanceRecords);
             return (
               <Card key={lesson.id} className="bg-card/80 backdrop-blur-sm border shadow-md">
                 <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div className="flex-grow">
-                        <h3 className="text-lg font-semibold text-primary">{lesson.subjectName || "Pelajaran Tanpa Nama"}</h3>
-                        <p className="text-sm text-muted-foreground"> Waktu: {lesson.startTime} - {lesson.endTime} </p>
-                        <div className="flex items-center gap-2 text-sm font-medium mt-1">
-                            {status.icon}
-                            <span>{status.text}</span>
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <h3 className="text-lg font-semibold text-primary whitespace-nowrap">{lesson.subjectName || "Pelajaran Tanpa Nama"}</h3>
+                            <p className="text-sm text-muted-foreground whitespace-nowrap">
+                                Waktu: {lesson.startTime} - {lesson.endTime}
+                            </p>
+                            <div className="flex items-center gap-1 text-sm font-medium whitespace-nowrap">
+                                {status.icon}
+                                <span>{status.text}</span>
+                            </div>
                         </div>
                     </div>
                     <Button variant="outline" size="sm" asChild className="shrink-0 w-full sm:w-auto">
