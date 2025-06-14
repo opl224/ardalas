@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye } from "lucide-react";
+import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,13 +71,23 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import Link from "next/link";
+import NextLink from "next/link"; // Renamed to avoid conflict
 import { cn } from "@/lib/utils";
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
 interface ClassMin { id: string; name: string; }
 interface TeacherMin { id: string; name: string; }
+
+// Minimal interface for result info needed in assignments page
+interface AssignmentResultInfo {
+  id?: string; // Result document ID
+  score?: number;
+  maxScore?: number;
+  grade?: string;
+  feedback?: string;
+  dateOfAssessment?: Timestamp;
+}
 
 interface AssignmentData {
   id: string;
@@ -91,12 +101,13 @@ interface AssignmentData {
   dueDate: Timestamp; 
   description?: string;
   fileURL?: string; 
-  meetingNumber?: number; // Added meetingNumber
+  meetingNumber?: number;
   createdAt?: Timestamp;
   // For student view
   submissionStatus?: "Belum Dikerjakan" | "Sudah Dikerjakan" | "Terlambat";
   studentSubmissionLink?: string;
   submissionTimestamp?: Timestamp;
+  result?: AssignmentResultInfo; // Store the fetched result data here
   // For teacher view
   submissionCount?: number;
   totalStudentsInClass?: number; // For "X/Y submitted"
@@ -107,12 +118,36 @@ interface AssignmentSubmission {
   assignmentId: string;
   studentId: string;
   studentName: string;
-  classId: string; // Student's classId at time of submission
-  className?: string; // Student's className at time of submission
+  classId: string; 
+  className?: string; 
   submissionLink: string;
   submittedAt: Timestamp;
   notes?: string;
-  teacherFileURL?: string; // Store the teacher's file URL for student reference
+  teacherFileURL?: string; 
+}
+
+// Interface similar to ResultData from results page, for type casting
+interface FetchedResultData {
+  id: string;
+  studentId: string; 
+  studentName: string;
+  classId: string;
+  className: string;
+  subjectId: string;
+  subjectName: string;
+  assessmentType: string; // Assuming string type for simplicity here
+  assessmentTitle: string;
+  score: number;
+  maxScore?: number;
+  grade?: string;
+  dateOfAssessment: Timestamp;
+  feedback?: string;
+  assignmentId?: string; 
+  meetingNumber?: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  recordedById?: string;
+  recordedByName?: string;
 }
 
 
@@ -147,11 +182,11 @@ export default function AssignmentsPage() {
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]);
   
-  const [studentSubmissions, setStudentSubmissions] = useState<Map<string, AssignmentSubmission>>(new Map()); // Map<assignmentId, submissionData>
+  const [studentSubmissions, setStudentSubmissions] = useState<Map<string, AssignmentSubmission>>(new Map()); 
   const [submissionsForCurrentAssignment, setSubmissionsForCurrentAssignment] = useState<AssignmentSubmission[]>([]);
 
-  const [isLoading, setIsLoading] = useState(true); // General loading for initial data
-  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false); // For loading submissions in teacher view dialog
+  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false); 
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -162,6 +197,9 @@ export default function AssignmentsPage() {
   
   const [isViewSubmissionsDialogOpen, setIsViewSubmissionsDialogOpen] = useState(false);
   const [selectedAssignmentToViewSubmissions, setSelectedAssignmentToViewSubmissions] = useState<AssignmentData | null>(null);
+
+  const [isViewResultDialogOpen, setIsViewResultDialogOpen] = useState(false);
+  const [selectedAssignmentForViewingResult, setSelectedAssignmentForViewingResult] = useState<AssignmentData | null>(null);
 
 
   const { toast } = useToast();
@@ -182,7 +220,6 @@ export default function AssignmentsPage() {
   const isTeacherOrAdminRole = role === "guru" || role === "admin";
 
   const fetchDropdownData = async () => {
-    // Only needed for teacher/admin
     if (!isTeacherOrAdminRole) return;
     try {
       const [subjectsSnapshot, classesSnapshot, teachersSnapshot, usersSnapshot] = await Promise.all([
@@ -244,7 +281,7 @@ export default function AssignmentsPage() {
         };
       });
 
-      if (isStudentRole && user) {
+      if (isStudentRole && user && fetchedAssignments.length > 0) {
         const submissionsSnapshot = await getDocs(query(collection(db, "assignmentSubmissions"), where("studentId", "==", user.uid)));
         const userSubs = new Map<string, AssignmentSubmission>();
         submissionsSnapshot.forEach(doc => {
@@ -253,11 +290,48 @@ export default function AssignmentsPage() {
         });
         setStudentSubmissions(userSubs);
 
+        // Fetch results related to these assignments for the student
+        const assignmentIdsForResultsQuery = fetchedAssignments.map(a => a.id);
+        const assignmentResultsMap = new Map<string, FetchedResultData>();
+        if (assignmentIdsForResultsQuery.length > 0) {
+          // Firestore 'in' query limit is 30, chunk if necessary
+          const resultsQueries = [];
+          for (let i = 0; i < assignmentIdsForResultsQuery.length; i += 30) {
+            const chunk = assignmentIdsForResultsQuery.slice(i, i + 30);
+            resultsQueries.push(
+              getDocs(query(
+                collection(db, "results"),
+                where("studentId", "==", user.uid),
+                where("assignmentId", "in", chunk)
+              ))
+            );
+          }
+          const resultsSnapshots = await Promise.all(resultsQueries);
+          resultsSnapshots.forEach(snapshot => {
+            snapshot.forEach(doc => {
+              const result = doc.data() as FetchedResultData;
+              if (result.assignmentId) {
+                assignmentResultsMap.set(result.assignmentId, { ...result, id: doc.id });
+              }
+            });
+          });
+        }
+
         fetchedAssignments = fetchedAssignments.map(assignment => {
           const submission = userSubs.get(assignment.id);
+          const resultData = assignmentResultsMap.get(assignment.id);
+          const resultForAssignment: AssignmentResultInfo | undefined = resultData ? {
+              id: resultData.id,
+              score: resultData.score,
+              maxScore: resultData.maxScore,
+              grade: resultData.grade,
+              feedback: resultData.feedback,
+              dateOfAssessment: resultData.dateOfAssessment,
+          } : undefined;
+
           let submissionStatus: AssignmentData["submissionStatus"] = "Belum Dikerjakan";
           if (submission) {
-            submissionStatus = isPast(assignment.dueDate.toDate()) && !submission ? "Terlambat" : "Sudah Dikerjakan";
+            submissionStatus = "Sudah Dikerjakan";
           } else if (isPast(assignment.dueDate.toDate())) {
             submissionStatus = "Terlambat";
           }
@@ -265,7 +339,8 @@ export default function AssignmentsPage() {
             ...assignment, 
             submissionStatus,
             studentSubmissionLink: submission?.submissionLink,
-            submissionTimestamp: submission?.submittedAt
+            submissionTimestamp: submission?.submittedAt,
+            result: resultForAssignment,
           };
         });
 
@@ -437,7 +512,7 @@ export default function AssignmentsPage() {
           teacherName 
       };
       if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        updateData.meetingNumber = null; // Or deleteField() if you want to remove it completely
+        updateData.meetingNumber = null; 
       }
       
       await updateDoc(assignmentDocRef, updateData);
@@ -535,6 +610,11 @@ export default function AssignmentsPage() {
     }
   };
 
+  const handleOpenViewResultDialog = (assignment: AssignmentData) => {
+    setSelectedAssignmentForViewingResult(assignment);
+    setIsViewResultDialogOpen(true);
+  };
+
 
   if (authLoading || (!user && !authLoading)) { 
     return <div className="space-y-6"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -620,9 +700,9 @@ export default function AssignmentsPage() {
                           <TableCell>
                             {assignment.fileURL ? (
                               <Button variant="outline" size="icon" asChild>
-                                <Link href={assignment.fileURL} target="_blank" rel="noopener noreferrer" aria-label={`Unduh file tugas ${assignment.title}`}>
+                                <NextLink href={assignment.fileURL} target="_blank" rel="noopener noreferrer" aria-label={`Unduh file tugas ${assignment.title}`}>
                                   <DownloadCloud className="h-4 w-4" />
-                                </Link>
+                                </NextLink>
                               </Button>
                             ) : "-"}
                           </TableCell>
@@ -663,7 +743,8 @@ export default function AssignmentsPage() {
                           </>
                         )}
                         {isStudentRole && (
-                           assignment.submissionStatus === "Sudah Dikerjakan" ? (
+                          <div className="flex justify-end space-x-2">
+                           {assignment.submissionStatus === "Sudah Dikerjakan" ? (
                              <Button variant="outline" size="sm" onClick={() => handleOpenSubmitAssignmentDialog(assignment)}>
                                 Lihat/Edit Pengumpulan
                              </Button>
@@ -671,7 +752,13 @@ export default function AssignmentsPage() {
                              <Button size="sm" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
                                 <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
                              </Button>
-                           )
+                           )}
+                           {assignment.result && (
+                             <Button variant="secondary" size="sm" onClick={() => handleOpenViewResultDialog(assignment)}>
+                                <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
+                             </Button>
+                           )}
+                          </div>
                         )}
                       </TableCell>
                     </TableRow>
@@ -715,9 +802,9 @@ export default function AssignmentsPage() {
                 {selectedAssignmentForSubmission.description && <div className="mt-2 whitespace-pre-line">{selectedAssignmentForSubmission.description}</div>}
                 {selectedAssignmentForSubmission.fileURL && (
                     <Button variant="link" asChild className="p-0 h-auto mt-2">
-                        <Link href={selectedAssignmentForSubmission.fileURL} target="_blank" rel="noopener noreferrer">
+                        <NextLink href={selectedAssignmentForSubmission.fileURL} target="_blank" rel="noopener noreferrer">
                             <DownloadCloud className="mr-2 h-4 w-4"/> Unduh File Tugas dari Guru
-                        </Link>
+                        </NextLink>
                     </Button>
                 )}
               </DialogDescription>
@@ -769,7 +856,7 @@ export default function AssignmentsPage() {
                                         <TableCell>{sub.studentName}</TableCell>
                                         <TableCell>
                                             <Button variant="link" asChild className="p-0 h-auto text-sm">
-                                                <Link href={sub.submissionLink} target="_blank" rel="noopener noreferrer">Lihat File</Link>
+                                                <NextLink href={sub.submissionLink} target="_blank" rel="noopener noreferrer">Lihat File</NextLink>
                                             </Button>
                                         </TableCell>
                                         <TableCell>{format(sub.submittedAt.toDate(), "dd MMM yy, HH:mm", { locale: indonesiaLocale })}</TableCell>
@@ -788,6 +875,54 @@ export default function AssignmentsPage() {
             </DialogContent>
         </Dialog>
        )}
+
+      {isStudentRole && selectedAssignmentForViewingResult && selectedAssignmentForViewingResult.result && (
+        <Dialog open={isViewResultDialogOpen} onOpenChange={(isOpen) => { setIsViewResultDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForViewingResult(null); }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Hasil Tugas: {selectedAssignmentForViewingResult.title}</DialogTitle>
+              <DialogDescription>
+                Mata Pelajaran: {selectedAssignmentForViewingResult.subjectName}
+                {selectedAssignmentForViewingResult.result.dateOfAssessment && (
+                    <span className="block text-xs">Tanggal Penilaian: {format(selectedAssignmentForViewingResult.result.dateOfAssessment.toDate(), "dd MMMM yyyy", {locale: indonesiaLocale})}</span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                {selectedAssignmentForViewingResult.studentSubmissionLink && (
+                    <div className="flex items-center space-x-2">
+                        <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                        <Button variant="link" asChild className="p-0 h-auto">
+                            <NextLink href={selectedAssignmentForViewingResult.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
+                                Lihat Pengumpulan Saya
+                            </NextLink>
+                        </Button>
+                    </div>
+                )}
+              <div className="space-y-1">
+                <Label className="text-sm text-muted-foreground">Nilai</Label>
+                <p className="text-2xl font-bold">
+                  {selectedAssignmentForViewingResult.result.score ?? 'N/A'}
+                  {selectedAssignmentForViewingResult.result.maxScore && selectedAssignmentForViewingResult.result.maxScore !== 100 ? ` / ${selectedAssignmentForViewingResult.result.maxScore}` : ' / 100'}
+                  {selectedAssignmentForViewingResult.result.grade && ` (${selectedAssignmentForViewingResult.result.grade})`}
+                </p>
+              </div>
+              {selectedAssignmentForViewingResult.result.feedback && (
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">Feedback Guru</Label>
+                  <p className="text-sm whitespace-pre-line bg-muted/50 p-3 rounded-md">{selectedAssignmentForViewingResult.result.feedback}</p>
+                </div>
+              )}
+              {!selectedAssignmentForViewingResult.result.feedback && (
+                 <p className="text-sm text-muted-foreground italic">Belum ada feedback dari guru.</p>
+              )}
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
