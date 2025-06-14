@@ -892,6 +892,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
         return { id: docSnap.id, subjectName: data.subjectName, dayOfWeek: data.dayOfWeek, startTime: data.startTime, endTime: data.endTime };
       });
       
+      const currentRunRecordsMap = new Map<string, StudentSelfAttendanceRecord>();
       if (fetchedLessons.length > 0) {
         const lessonIds = fetchedLessons.map(l => l.id);
         const attendanceQueryInstance = query(
@@ -901,18 +902,15 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
           where("lessonId", "in", lessonIds.length > 0 ? lessonIds : ["_empty_"]) 
         );
         const attendanceSnapshot = await getDocs(attendanceQueryInstance);
-        const recordsMap = new Map<string, StudentSelfAttendanceRecord>();
         attendanceSnapshot.forEach(docSnap => {
           const data = docSnap.data() as Omit<StudentSelfAttendanceRecord, 'id'>; 
-          recordsMap.set(data.lessonId, { id: docSnap.id, ...data });
+          currentRunRecordsMap.set(data.lessonId, { id: docSnap.id, ...data });
         });
-        setAttendanceRecords(recordsMap);
-      } else {
-        setAttendanceRecords(new Map());
       }
+      setAttendanceRecords(currentRunRecordsMap);
       
       const lessonsWithStatus = fetchedLessons.map(lesson => {
-         const statusInfo = getLessonStatus(lesson, recordsMap, currentTime); 
+         const statusInfo = getLessonStatus(lesson, currentRunRecordsMap, currentTime); 
          return {...lesson, statusText: statusInfo.text, statusIcon: statusInfo.icon }
       });
       setTodayLessons(lessonsWithStatus);
@@ -931,7 +929,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     } else if (!authLoading && !studentToView.id){
         setIsLoadingView(false);
     }
-  }, [authLoading, studentToView.id, studentToView.classId, currentTime]); // Added currentTime to re-evaluate status
+  }, [authLoading, studentToView.id, studentToView.classId, currentTime]); 
 
   const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>, timeToCheck: Date) => {
     const now = timeToCheck;
@@ -1183,3 +1181,4 @@ export default function AttendancePageWrapper() {
     );
   }
 }
+
