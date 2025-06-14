@@ -60,7 +60,7 @@ import {
   query,
   orderBy,
   where,
-  documentId // Added for 'in' queries on document IDs
+  documentId
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
@@ -73,7 +73,7 @@ interface ClassMin {
 interface Student {
   id: string; 
   name: string;
-  nis: string; 
+  nis?: string; 
   email?: string; 
   classId: string; 
   className?: string; 
@@ -96,7 +96,7 @@ type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 export default function StudentsPage() {
   const { user: authUser, role: authRole, loading: authLoading } = useAuth(); 
   const [students, setStudents] = useState<Student[]>([]);
-  const [allClasses, setAllClasses] = useState<ClassMin[]>([]); // For admins, all classes. For teachers, classes they teach.
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
@@ -119,7 +119,6 @@ export default function StudentsPage() {
     resolver: zodResolver(editStudentFormSchema),
   });
 
-  // Fetches classes relevant to the current user's role
   const fetchClassesForUserRole = async () => {
     setIsLoadingClasses(true);
     try {
@@ -129,41 +128,50 @@ export default function StudentsPage() {
         const querySnapshot = await getDocs(q);
         setAllClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
       } else if (authRole === 'guru' && authUser?.uid) {
-        // 1. Find subjects taught by this teacher
         const subjectsQuery = query(collection(db, "subjects"), where("teacherUid", "==", authUser.uid));
         const subjectsSnapshot = await getDocs(subjectsQuery);
         const teacherSubjectIds = subjectsSnapshot.docs.map(doc => doc.id);
 
         if (teacherSubjectIds.length === 0) {
           setAllClasses([]);
+          setIsLoadingClasses(false);
           return;
         }
+        
+        const CHUNK_SIZE_SUBJECTS = 30; // Firestore 'in' query limit
+        let teacherClassIdsSet = new Set<string>();
 
-        // 2. Find lessons for these subjects
-        const lessonsQuery = query(collection(db, "lessons"), where("subjectId", "in", teacherSubjectIds));
-        const lessonsSnapshot = await getDocs(lessonsQuery);
-        const teacherClassIds = Array.from(new Set(lessonsSnapshot.docs.map(doc => doc.data().classId as string).filter(id => id)));
+        for (let i = 0; i < teacherSubjectIds.length; i += CHUNK_SIZE_SUBJECTS) {
+            const subjectChunk = teacherSubjectIds.slice(i, i + CHUNK_SIZE_SUBJECTS);
+            if (subjectChunk.length > 0) {
+                const lessonsQuery = query(collection(db, "lessons"), where("subjectId", "in", subjectChunk));
+                const lessonsSnapshot = await getDocs(lessonsQuery);
+                lessonsSnapshot.docs.forEach(doc => {
+                    const classId = doc.data().classId as string;
+                    if (classId) teacherClassIdsSet.add(classId);
+                });
+            }
+        }
+        const teacherClassIds = Array.from(teacherClassIdsSet);
         
         if (teacherClassIds.length === 0) {
           setAllClasses([]);
+          setIsLoadingClasses(false);
           return;
         }
         
-        // 3. Fetch details for these classes (in chunks if necessary)
-        const CHUNK_SIZE = 30;
+        const CHUNK_SIZE_CLASSES = 30;
         const fetchedClasses: ClassMin[] = [];
-        for (let i = 0; i < teacherClassIds.length; i += CHUNK_SIZE) {
-            const chunk = teacherClassIds.slice(i, i + CHUNK_SIZE);
+        for (let i = 0; i < teacherClassIds.length; i += CHUNK_SIZE_CLASSES) {
+            const chunk = teacherClassIds.slice(i, i + CHUNK_SIZE_CLASSES);
             if (chunk.length > 0) {
-                 const classesQuery = query(collection(db, "classes"), where(documentId(), "in", chunk), orderBy("name", "asc"));
+                 const classesQuery = query(collection(db, "classes"), where(documentId(), "in", chunk));
                  const classDetailsSnapshot = await getDocs(classesQuery);
                  classDetailsSnapshot.forEach(doc => fetchedClasses.push({ id: doc.id, name: doc.data().name }));
             }
         }
         setAllClasses(fetchedClasses.sort((a,b) => a.name.localeCompare(b.name)));
-
       } else {
-        // For siswa or other roles, no classes needed for dropdowns they don't see.
         setAllClasses([]);
       }
     } catch (error) {
@@ -179,86 +187,91 @@ export default function StudentsPage() {
     if (authLoading) return;
     setIsLoadingStudents(true);
     try {
-      const studentsCollectionRef = collection(db, "students");
+      const usersCollectionRef = collection(db, "users");
       let studentsQuery;
+      let finalFetchedStudents: Student[] = [];
 
       if (authRole === 'siswa' && authUser?.classId) {
-        studentsQuery = query(studentsCollectionRef, where("classId", "==", authUser.classId), orderBy("name", "asc"));
+        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("name", "asc"));
+        const querySnapshot = await getDocs(studentsQuery);
+        finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          name: docSnap.data().name,
+          nis: docSnap.data().nis,
+          email: docSnap.data().email,
+          classId: docSnap.data().classId,
+          className: docSnap.data().className,
+          createdAt: docSnap.data().createdAt,
+        }));
       } else if (authRole === 'guru' && authUser?.uid) {
-        // Use 'allClasses' which is already filtered for the teacher
         if (allClasses.length > 0) {
           const classIdsForTeacher = allClasses.map(c => c.id);
-          // Firestore 'in' query limitation: max 30 elements. Chunk if necessary.
           const CHUNK_SIZE = 30;
-          const fetchedStudentsPromises = [];
+          const studentPromises = [];
+
           for (let i = 0; i < classIdsForTeacher.length; i += CHUNK_SIZE) {
-              const chunk = classIdsForTeacher.slice(i, i + CHUNK_SIZE);
-              if (chunk.length > 0) {
-                fetchedStudentsPromises.push(
-                    getDocs(query(studentsCollectionRef, where("classId", "in", chunk), orderBy("name", "asc")))
-                );
-              }
+            const chunk = classIdsForTeacher.slice(i, i + CHUNK_SIZE);
+            if (chunk.length > 0) {
+              studentPromises.push(
+                getDocs(query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", chunk), orderBy("name", "asc")))
+              );
+            }
           }
-          const snapshots = await Promise.all(fetchedStudentsPromises);
-          const fetchedStudents: Student[] = [];
+          const snapshots = await Promise.all(studentPromises);
           snapshots.forEach(snapshot => {
             snapshot.docs.forEach(docSnap => {
-                fetchedStudents.push({
-                    id: docSnap.id,
-                    name: docSnap.data().name,
-                    nis: docSnap.data().nis,
-                    email: docSnap.data().email,
-                    classId: docSnap.data().classId,
-                    className: docSnap.data().className, 
-                    createdAt: docSnap.data().createdAt,
-                });
+              finalFetchedStudents.push({
+                id: docSnap.id,
+                name: docSnap.data().name,
+                nis: docSnap.data().nis,
+                email: docSnap.data().email,
+                classId: docSnap.data().classId,
+                className: docSnap.data().className,
+                createdAt: docSnap.data().createdAt,
+              });
             });
           });
-          setStudents(fetchedStudents.sort((a,b) => a.name.localeCompare(b.name)));
-          setIsLoadingStudents(false);
-          return; // Exit early as students are fetched based on filtered classes
-
-        } else { // Teacher teaches no classes based on their subjects
-          setStudents([]);
-          setIsLoadingStudents(false);
-          return;
+          finalFetchedStudents.sort((a,b) => a.name.localeCompare(b.name));
+        } else {
+          // Teacher teaches no classes, so no students to show
         }
       } else if (authRole === 'admin') {
-        studentsQuery = query(studentsCollectionRef, orderBy("name", "asc"));
-      } else {
-        setStudents([]);
-        setIsLoadingStudents(false);
-        return;
+        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+        const querySnapshot = await getDocs(studentsQuery);
+        finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
+          id: docSnap.id,
+          name: docSnap.data().name,
+          nis: docSnap.data().nis,
+          email: docSnap.data().email,
+          classId: docSnap.data().classId,
+          className: docSnap.data().className,
+          createdAt: docSnap.data().createdAt,
+        }));
       }
-
-      const querySnapshot = await getDocs(studentsQuery);
-      const fetchedStudents: Student[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        name: docSnap.data().name,
-        nis: docSnap.data().nis,
-        email: docSnap.data().email,
-        classId: docSnap.data().classId,
-        className: docSnap.data().className, 
-        createdAt: docSnap.data().createdAt,
-      }));
-      setStudents(fetchedStudents);
+      setStudents(finalFetchedStudents);
     } catch (error) {
       console.error("Error fetching students: ", error);
       toast({ title: "Gagal Memuat Data Murid", variant: "destructive" });
+      setStudents([]);
     } finally {
       setIsLoadingStudents(false);
     }
   };
-
+  
   useEffect(() => {
     const initializePageData = async () => {
       if (!authLoading) {
-        await fetchClassesForUserRole(); // Fetch classes first
-        await fetchStudents();           // Then fetch students (which might depend on classes for teachers)
+        await fetchClassesForUserRole();
       }
     };
     initializePageData();
-  }, [authRole, authUser, authLoading]); // Rerun if role or user changes
+  }, [authRole, authUser, authLoading]);
+
+  useEffect(() => {
+    if (!authLoading && !isLoadingClasses) { // Fetch students after classes are loaded/determined
+        fetchStudents();
+    }
+  }, [authLoading, isLoadingClasses, allClasses]);
 
 
   useEffect(() => {
@@ -266,7 +279,7 @@ export default function StudentsPage() {
       editStudentForm.reset({
         id: selectedStudent.id,
         name: selectedStudent.name,
-        nis: selectedStudent.nis,
+        nis: selectedStudent.nis || "",
         email: selectedStudent.email || "",
         classId: selectedStudent.classId,
       });
@@ -274,6 +287,10 @@ export default function StudentsPage() {
   }, [selectedStudent, isEditStudentDialogOpen, editStudentForm]);
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
+    if (authRole !== 'admin' && authRole !== 'guru') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menambahkan murid.", variant: "destructive"});
+        return;
+    }
     addStudentForm.clearErrors();
     
     const selectedClassObj = allClasses.find(c => c.id === data.classId);
@@ -282,21 +299,44 @@ export default function StudentsPage() {
         return;
     }
 
+    // Add student to 'users' collection with role 'siswa'
+    // This functionality overlaps with UserAdministration. For now, we'll assume this page
+    // is primarily for managing the student profile data aspects (like NIS, class assignment)
+    // rather than creating the Firebase Auth user itself.
+    // A more robust system might create Auth user first, then create profile here, or link.
+    // For now, let's assume an Auth user with 'siswa' role could be created elsewhere or this action
+    // just creates/updates the Firestore profile part.
+    // Given the current structure, we will add to the 'users' collection.
+
     try {
-      const studentsCollectionRef = collection(db, "students");
-      await addDoc(studentsCollectionRef, {
+      // Check if a user with this email already exists for simplicity, though full auth creation is complex here.
+      // This page should ideally link to an existing Auth user or manage a separate student profile list.
+      // For now, we will proceed as if adding to 'users' but acknowledge overlap.
+      
+      const studentDataForUsersCollection = {
         name: data.name,
         nis: data.nis,
         email: data.email,
         classId: selectedClassObj.id, 
         className: selectedClassObj.name, 
+        role: 'siswa', // Explicitly set role
+        // uid: will be set if integrated with User Auth creation which is not done here
         createdAt: serverTimestamp(),
-      });
+      };
+
+      // This would ideally be a new document in a 'students' collection, or an update to an existing
+      // 'users' collection document IF we had the user's UID.
+      // Since "Tambah Murid" implies creating a new student record, and we don't handle Auth creation here,
+      // this will add a new document to the 'users' collection. This might lead to users without Auth.
+      // This needs to be reconciled with User Administration.
+      // For the scope of this page as "Manajemen Murid", we'll proceed with adding to 'users'.
+
+      await addDoc(collection(db, "users"), studentDataForUsersCollection);
       
-      toast({ title: "Murid Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
+      toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
       addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
-      fetchStudents(); 
+      fetchStudents(); // Re-fetch to show the new student
     } catch (error: any) {
       console.error("Error adding student:", error);
       let errorMessage = "Gagal menambahkan murid.";
@@ -313,6 +353,10 @@ export default function StudentsPage() {
 
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
+     if (authRole !== 'admin' && authRole !== 'guru') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat mengedit murid.", variant: "destructive"});
+        return;
+    }
     editStudentForm.clearErrors();
     const selectedClass = allClasses.find(c => c.id === data.classId);
     if (!selectedClass) {
@@ -320,7 +364,8 @@ export default function StudentsPage() {
         return;
     }
     try {
-      const studentDocRef = doc(db, "students", data.id);
+      // selectedStudent.id here refers to the document ID in the 'users' collection (which is the UID)
+      const studentDocRef = doc(db, "users", selectedStudent.id); 
       await updateDoc(studentDocRef, {
         name: data.name,
         nis: data.nis,
@@ -343,13 +388,15 @@ export default function StudentsPage() {
   };
 
   const handleDeleteStudent = async (studentId: string, studentName?: string) => {
-    if (authRole === 'siswa') {
-        toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus murid.", variant: "destructive"});
+    if (authRole !== 'admin' && authRole !== 'guru') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menghapus murid.", variant: "destructive"});
         return;
     }
+    // This should delete the document from the 'users' collection.
+    // Deleting Firebase Auth user is a separate, more complex operation usually handled in User Admin.
     try {
-      await deleteDoc(doc(db, "students", studentId));
-      toast({ title: "Data Murid Dihapus", description: `${studentName || 'Murid'} berhasil dihapus.` });
+      await deleteDoc(doc(db, "users", studentId));
+      toast({ title: "Data Murid Dihapus dari Profil", description: `${studentName || 'Murid'} berhasil dihapus dari daftar profil.` });
       setSelectedStudent(null); 
       fetchStudents();
     } catch (error) {
@@ -362,11 +409,10 @@ export default function StudentsPage() {
   };
 
   const openEditDialog = (student: Student) => {
-    if (authRole === 'siswa') {
+    if (authRole !== 'admin' && authRole !== 'guru') {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit murid.", variant: "destructive"});
         return;
     }
-    // Ensure classes are loaded for the dropdown if they weren't already
     if (allClasses.length === 0 && !isLoadingClasses && (authRole === 'admin' || authRole === 'guru')) {
       fetchClassesForUserRole(); 
     }
@@ -375,7 +421,7 @@ export default function StudentsPage() {
   };
   
   const openDeleteDialog = (student: Student) => {
-    if (authRole === 'siswa') {
+     if (authRole !== 'admin' && authRole !== 'guru') {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus murid.", variant: "destructive"});
         return;
     }
@@ -487,7 +533,7 @@ export default function StudentsPage() {
                 <DialogHeader>
                   <DialogTitle>Tambah Murid Baru</DialogTitle>
                   <DialogDescription>
-                    Isi detail murid untuk menambahkan data baru.
+                    Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -506,7 +552,7 @@ export default function StudentsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoadingStudents || authLoading || isLoadingClasses ? (
+          {isLoadingStudents || authLoading || (authRole !== 'siswa' && isLoadingClasses) ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -528,7 +574,7 @@ export default function StudentsPage() {
                   {students.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{student.nis}</TableCell>
+                      <TableCell>{student.nis || "-"}</TableCell>
                       <TableCell>{student.email || "-"}</TableCell>
                       <TableCell>{student.className || student.classId}</TableCell>
                       {(authRole === 'admin' || authRole === 'guru') && (
@@ -547,7 +593,7 @@ export default function StudentsPage() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis}). Data yang dihapus tidak dapat dikembalikan.
+                                    Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
