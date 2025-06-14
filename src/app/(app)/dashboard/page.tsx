@@ -57,13 +57,28 @@ interface Announcement {
   targetAudience: string[];
 }
 
+interface DashboardStats {
+  // Admin specific
+  adminTotalStudents: number;
+  adminTotalTeachers: number;
+  adminTotalSubjects: number;
+  adminTotalClasses: number;
+  // Teacher specific
+  teacherTotalStudentsTaught: number;
+  teacherTotalClassesTaught: number;
+  teacherTotalSubjectsTaught: number;
+}
+
 export default function DashboardPage() {
   const { user, role } = useAuth();
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    totalTeachers: 0,
-    totalSubjects: 0,
-    totalClasses: 0,
+  const [stats, setStats] = useState<DashboardStats>({
+    adminTotalStudents: 0,
+    adminTotalTeachers: 0,
+    adminTotalSubjects: 0,
+    adminTotalClasses: 0,
+    teacherTotalStudentsTaught: 0,
+    teacherTotalClassesTaught: 0,
+    teacherTotalSubjectsTaught: 0,
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
@@ -71,25 +86,57 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      setLoadingStats(true);
+      const statsUpdate: Partial<DashboardStats> = {};
+
       try {
-        const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
-        const teacherQuery = query(collection(db, "users"), where("role", "==", "guru"));
-        const subjectsQuery = collection(db, "subjects");
-        const classesQuery = collection(db, "classes");
+        if (role === 'admin') {
+          const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
+          const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru")); // Querying users collection for teachers
+          const subjectsQuery = collection(db, "subjects");
+          const classesQuery = collection(db, "classes");
 
-        const [studentSnap, teacherSnap, subjectSnap, classSnap] = await Promise.all([
-          getDocs(studentQuery),
-          getDocs(teacherQuery),
-          getDocs(subjectsQuery),
-          getDocs(classesQuery),
-        ]);
+          const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
+            getDocs(studentQuery),
+            getDocs(teacherUserQuery),
+            getDocs(subjectsQuery),
+            getDocs(classesQuery),
+          ]);
 
-        setStats({
-          totalStudents: studentSnap.size,
-          totalTeachers: teacherSnap.size,
-          totalSubjects: subjectSnap.size,
-          totalClasses: classSnap.size,
-        });
+          statsUpdate.adminTotalStudents = studentSnap.size;
+          statsUpdate.adminTotalTeachers = teacherUserSnap.size;
+          statsUpdate.adminTotalSubjects = subjectSnap.size;
+          statsUpdate.adminTotalClasses = classSnap.size;
+        } else if (role === 'guru' && user?.uid) {
+          const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", user.uid));
+          const lessonsSnapshot = await getDocs(lessonsQuery);
+          
+          const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
+          const taughtClassIds = new Set<string>();
+          const taughtSubjectIds = new Set<string>();
+
+          teacherLessonsData.forEach(lesson => {
+            if (lesson.classId) taughtClassIds.add(lesson.classId);
+            if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
+          });
+
+          statsUpdate.teacherTotalClassesTaught = taughtClassIds.size;
+          statsUpdate.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+
+          if (taughtClassIds.size > 0) {
+            const studentClassesArray = Array.from(taughtClassIds);
+            // Firestore 'in' queries are limited. If more than 30 classes, chunking is needed.
+            // For simplicity, assuming fewer than 30 classes taught by one teacher for now.
+            const studentsTaughtQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "in", studentClassesArray));
+            const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
+            statsUpdate.teacherTotalStudentsTaught = studentsTaughtSnapshot.size;
+          } else {
+            statsUpdate.teacherTotalStudentsTaught = 0;
+          }
+        }
+        
+        setStats(prevStats => ({ ...prevStats, ...statsUpdate }));
+
       } catch (error) {
         console.error("Error fetching stats: ", error);
       } finally {
@@ -103,11 +150,9 @@ export default function DashboardPage() {
         const announcementsRef = collection(db, "announcements");
         let q;
         if (role && user?.classId && (role === 'siswa' || role === 'orangtua')) {
-          // More complex query if we need to filter by targetAudience and targetClassIds for students/parents
-          // For simplicity, showing general announcements or those targeted broadly to their role
            q = query(
             announcementsRef,
-            where("targetAudience", "array-contains-any", [role, "semua"]), // "semua" is a hypothetical general target
+            where("targetAudience", "array-contains-any", [role, "semua"]), 
             orderBy("date", "desc"),
             limit(3)
           );
@@ -115,7 +160,6 @@ export default function DashboardPage() {
            q = query(
             announcementsRef,
              where("targetAudience", "array-contains", "guru"),
-            // or where("createdById", "==", user.uid) if teachers only see their own
             orderBy("date", "desc"),
             limit(3)
           );
@@ -137,10 +181,14 @@ export default function DashboardPage() {
       }
     };
 
-
-    fetchStats();
-    fetchRecentAnnouncements();
-  }, [role, user]);
+    if (user) { // Fetch stats only if user is available
+        fetchStats();
+        fetchRecentAnnouncements();
+    } else if (!user && !loadingStats) { // If no user and not loading, set loading to false
+        setLoadingStats(false);
+        setLoadingAnnouncements(false);
+    }
+  }, [role, user, loadingStats]); // Added loadingStats to dependency to prevent re-fetch if already loaded
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -164,23 +212,35 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Section */}
-      {(role === 'admin' || role === 'guru') && (
+      {role === 'admin' && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Siswa" value={stats.totalStudents} icon={Users} loading={loadingStats} href="/students" />
-            <StatCard title="Total Guru" value={stats.totalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
-            <StatCard title="Total Kelas" value={stats.totalClasses} icon={School} loading={loadingStats} href="/classes" />
-            <StatCard title="Total Mata Pelajaran" value={stats.totalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
+            <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
+            <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
+            <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
+            <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
           </div>
         </section>
       )}
+
+      {role === 'guru' && (
+        <section>
+          <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Pengajaran Anda</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Adjusted to 3 columns for teacher */}
+            <StatCard title="Total Siswa Diajar" value={stats.teacherTotalStudentsTaught} icon={Users} loading={loadingStats} />
+            <StatCard title="Total Kelas Diajar" value={stats.teacherTotalClassesTaught} icon={School} loading={loadingStats} />
+            <StatCard title="Total Mapel Diajar" value={stats.teacherTotalSubjectsTaught} icon={Library} loading={loadingStats} />
+          </div>
+        </section>
+      )}
+
 
       {/* Quick Access Links */}
       <section>
         <h2 className="text-2xl font-semibold mb-4 font-headline">Akses Cepat</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quickLinks.slice(0, role === 'siswa' ? 5 : 3).map((link) => (
+          {quickLinks.slice(0, role === 'siswa' ? 5 : (role === 'guru' ? 3 : 3)).map((link) => ( // Adjusted slice for guru
             <Card key={link.title} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-medium">{link.title}</CardTitle>
@@ -222,7 +282,7 @@ export default function DashboardPage() {
                      {format(announcement.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}
                      {announcement.targetAudience && announcement.targetAudience.length > 0 && (
                         <span className="text-xs text-muted-foreground ml-2">
-                            (Untuk: {announcement.targetAudience.join(", ")})
+                            (Untuk: {announcement.targetAudience.map(aud => aud.charAt(0).toUpperCase() + aud.slice(1)).join(", ")})
                         </span>
                      )}
                   </CardDescription>
