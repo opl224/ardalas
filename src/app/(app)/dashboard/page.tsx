@@ -85,11 +85,25 @@ export default function DashboardPage() {
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchAllData = async () => {
+      if (!user || !role) {
+        setLoadingStats(false);
+        setLoadingAnnouncements(false);
+        setStats({ // Reset stats if no user/role
+            adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
+            teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
+        });
+        setRecentAnnouncements([]);
+        return;
+      }
+
       setLoadingStats(true);
+      setLoadingAnnouncements(true);
+      
       const statsUpdate: Partial<DashboardStats> = {};
 
       try {
+        // Fetch Stats
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
           const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
@@ -107,30 +121,68 @@ export default function DashboardPage() {
           statsUpdate.adminTotalTeachers = teacherUserSnap.size;
           statsUpdate.adminTotalSubjects = subjectSnap.size;
           statsUpdate.adminTotalClasses = classSnap.size;
-        } else if (role === 'guru' && user?.uid) {
-          const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", user.uid));
-          const lessonsSnapshot = await getDocs(lessonsQuery);
-          
-          const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
-          const taughtClassIds = new Set<string>();
-          const taughtSubjectIds = new Set<string>();
 
-          teacherLessonsData.forEach(lesson => {
-            if (lesson.classId) taughtClassIds.add(lesson.classId);
-            if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
-          });
+        } else if (role === 'guru' && user.uid && user.email) {
+            // Step 1: Find teacher profile in 'teachers' collection using email from Auth user
+            const teacherProfileQuery = query(collection(db, "teachers"), where("email", "==", user.email), limit(1));
+            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
-          statsUpdate.teacherTotalClassesTaught = taughtClassIds.size;
-          statsUpdate.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+            if (!teacherProfileSnapshot.empty) {
+                const teacherProfileDocId = teacherProfileSnapshot.docs[0].id;
 
-          if (taughtClassIds.size > 0) {
-            const studentClassesArray = Array.from(taughtClassIds);
-            const studentsTaughtQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "in", studentClassesArray));
-            const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
-            statsUpdate.teacherTotalStudentsTaught = studentsTaughtSnapshot.size;
-          } else {
+                // Step 2: Query lessons using the found teacherProfileDocId
+                const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileDocId));
+                const lessonsSnapshot = await getDocs(lessonsQuery);
+              
+                const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
+                const taughtClassIds = new Set<string>();
+                const taughtSubjectIds = new Set<string>();
+
+                teacherLessonsData.forEach(lesson => {
+                    if (lesson.classId) taughtClassIds.add(lesson.classId);
+                    if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
+                });
+
+                statsUpdate.teacherTotalClassesTaught = taughtClassIds.size;
+                statsUpdate.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+
+                // Step 3: Count unique students taught
+                if (taughtClassIds.size > 0) {
+                    const studentClassesArray = Array.from(taughtClassIds);
+                    const allStudentIds = new Set<string>();
+                    const CHUNK_SIZE = 30; // Firestore 'in' query limit (actually 30 in v9, but 10 was for older versions)
+
+                    for (let i = 0; i < studentClassesArray.length; i += CHUNK_SIZE) {
+                        const chunk = studentClassesArray.slice(i, i + CHUNK_SIZE);
+                        if (chunk.length > 0) {
+                            const studentsTaughtQuery = query(
+                                collection(db, "users"), 
+                                where("role", "==", "siswa"), 
+                                where("classId", "in", chunk)
+                            );
+                            const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
+                            studentsTaughtSnapshot.forEach(doc => allStudentIds.add(doc.id));
+                        }
+                    }
+                    statsUpdate.teacherTotalStudentsTaught = allStudentIds.size;
+                } else {
+                    statsUpdate.teacherTotalStudentsTaught = 0;
+                }
+            } else {
+                // Teacher profile not found in 'teachers' collection by email
+                statsUpdate.teacherTotalStudentsTaught = 0;
+                statsUpdate.teacherTotalClassesTaught = 0;
+                statsUpdate.teacherTotalSubjectsTaught = 0;
+            }
+        } else {
+             // Default to 0 if role is not admin or guru, or required user info is missing
             statsUpdate.teacherTotalStudentsTaught = 0;
-          }
+            statsUpdate.teacherTotalClassesTaught = 0;
+            statsUpdate.teacherTotalSubjectsTaught = 0;
+            statsUpdate.adminTotalStudents = 0;
+            statsUpdate.adminTotalTeachers = 0;
+            statsUpdate.adminTotalSubjects = 0;
+            statsUpdate.adminTotalClasses = 0;
         }
         
         setStats(prevStats => ({ ...prevStats, ...statsUpdate }));
@@ -140,33 +192,35 @@ export default function DashboardPage() {
       } finally {
         setLoadingStats(false);
       }
-    };
 
-    const fetchRecentAnnouncements = async () => {
-      setLoadingAnnouncements(true);
+      // Fetch Recent Announcements
       try {
         const announcementsRef = collection(db, "announcements");
-        let q;
+        let announcementsQuery;
+        // Basic filtering for announcements (can be made more sophisticated)
         if (role && user?.classId && (role === 'siswa' || role === 'orangtua')) {
-           q = query(
+           announcementsQuery = query(
             announcementsRef,
-            where("targetAudience", "array-contains-any", [role, "semua"]), 
+            // Example: target all, or target specific role, or target specific class (if applicable)
+            // This requires announcements to have 'targetAudience' (array of roles) 
+            // and potentially 'targetClassIds' (array of class IDs)
+            where("targetAudience", "array-contains-any", [role, "semua", user.classId]), // Simplistic example
             orderBy("date", "desc"),
             limit(3)
           );
         } else if (role === 'guru' && user?.uid) {
-           q = query(
+           announcementsQuery = query(
             announcementsRef,
-             where("targetAudience", "array-contains", "guru"),
+             where("targetAudience", "array-contains", "guru"), // or "array-contains-any" with "semua"
             orderBy("date", "desc"),
             limit(3)
           );
         }
-        else {
-         q = query(announcementsRef, orderBy("date", "desc"), limit(3));
+        else { // Admin or other general cases
+         announcementsQuery = query(announcementsRef, orderBy("date", "desc"), limit(3));
         }
 
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(announcementsQuery);
         const fetchedAnnouncements = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -178,26 +232,10 @@ export default function DashboardPage() {
         setLoadingAnnouncements(false);
       }
     };
+    
+    fetchAllData();
 
-    if (user) {
-        fetchStats();
-        fetchRecentAnnouncements();
-    } else {
-        // Reset states and set loading to false if no user
-        setStats({
-          adminTotalStudents: 0,
-          adminTotalTeachers: 0,
-          adminTotalSubjects: 0,
-          adminTotalClasses: 0,
-          teacherTotalStudentsTaught: 0,
-          teacherTotalClassesTaught: 0,
-          teacherTotalSubjectsTaught: 0,
-        });
-        setRecentAnnouncements([]);
-        setLoadingStats(false);
-        setLoadingAnnouncements(false);
-    }
-  }, [role, user]);
+  }, [user, role]); // Re-run if user or role changes
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -226,7 +264,7 @@ export default function DashboardPage() {
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
-            <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
+            <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/admin/user-administration" />
             <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
             <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
           </div>
@@ -236,7 +274,7 @@ export default function DashboardPage() {
       {role === 'guru' && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Pengajaran Anda</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Adjusted to 3 columns for teacher */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <StatCard title="Total Siswa Diajar" value={stats.teacherTotalStudentsTaught} icon={Users} loading={loadingStats} />
             <StatCard title="Total Kelas Diajar" value={stats.teacherTotalClassesTaught} icon={School} loading={loadingStats} />
             <StatCard title="Total Mapel Diajar" value={stats.teacherTotalSubjectsTaught} icon={Library} loading={loadingStats} />
@@ -249,7 +287,7 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-2xl font-semibold mb-4 font-headline">Akses Cepat</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quickLinks.slice(0, role === 'siswa' ? 5 : (role === 'guru' ? 3 : 3)).map((link) => ( // Adjusted slice for guru
+          {quickLinks.slice(0, role === 'siswa' ? 5 : (role === 'guru' ? 3 : 3)).map((link) => ( 
             <Card key={link.title} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-medium">{link.title}</CardTitle>
