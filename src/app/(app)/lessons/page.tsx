@@ -60,7 +60,8 @@ import {
   Timestamp,
   query,
   orderBy,
-  where
+  where,
+  limit,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -69,7 +70,7 @@ import Link from "next/link";
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
 interface ClassMin { id: string; name: string; }
-interface TeacherMin { id: string; name: string; }
+interface TeacherMin { id: string; name: string; } // Represents documents from 'teachers' collection
 
 interface LessonData {
   id: string;
@@ -77,7 +78,7 @@ interface LessonData {
   subjectName?: string; // Denormalized
   classId: string;
   className?: string; // Denormalized
-  teacherId: string;
+  teacherId: string; // This should be the Document ID from the 'teachers' collection
   teacherName?: string; // Denormalized
   dayOfWeek: string; // e.g., "Senin", "Selasa"
   startTime: string; // HH:MM
@@ -94,7 +95,7 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 const baseLessonObjectSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   classId: z.string({ required_error: "Pilih kelas." }),
-  teacherId: z.string({ required_error: "Pilih guru." }),
+  teacherId: z.string({ required_error: "Pilih guru." }), // This will store the Document ID from 'teachers' collection
   dayOfWeek: z.enum(DAYS_OF_WEEK, { required_error: "Pilih hari." }),
   startTime: z.string().regex(timeRegex, { message: "Format waktu mulai JJ:MM (e.g., 07:00)." }),
   endTime: z.string().regex(timeRegex, { message: "Format waktu selesai JJ:MM (e.g., 08:30)." }),
@@ -103,10 +104,9 @@ const baseLessonObjectSchema = z.object({
 });
 
 const lessonTimeRefinement = (data: { startTime: string; endTime: string; }) => {
-  // Basic validation: endTime must be after startTime
   const [startH, startM] = data.startTime.split(':').map(Number);
   const [endH, endM] = data.endTime.split(':').map(Number);
-  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return false; // Invalid time format handled by regex, but good to be safe
+  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return false; 
   if (endH < startH || (endH === startH && endM <= startM)) {
       return false;
   }
@@ -130,11 +130,11 @@ const editLessonFormSchema = baseLessonObjectSchema.extend({
 type EditLessonFormValues = z.infer<typeof editLessonFormSchema>;
 
 export default function LessonsPage() {
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
   const [lessons, setLessons] = useState<LessonData[]>([]);
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
-  const [teachers, setTeachers] = useState<TeacherMin[]>([]);
+  const [teachers, setTeachers] = useState<TeacherMin[]>([]); // Stores profiles from 'teachers' collection
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -162,37 +162,57 @@ export default function LessonsPage() {
   });
 
   const fetchDropdownData = async () => {
+    if (role !== "admin" && role !== "guru") return;
     try {
       const [subjectsSnapshot, classesSnapshot, teachersSnapshot] = await Promise.all([
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
+        getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))), // Fetch from 'teachers' collection
       ]);
       setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }))); // Store teacher profiles
     } catch (error) {
       console.error("Error fetching dropdown data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung", description: "Terjadi kesalahan saat memuat data subjek, kelas, atau guru.", variant: "destructive" });
+      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
     }
   };
   
   const fetchLessons = async () => {
+    if (authLoading) return;
     setIsLoading(true);
     try {
       if (role === "admin" || role === "guru") {
-        await fetchDropdownData(); // Ensure dropdowns are loaded for admin/teacher
+        await fetchDropdownData();
       }
       const lessonsCollectionRef = collection(db, "lessons");
       let q;
+
       if (role === "siswa" && user?.classId) {
         q = query(lessonsCollectionRef, where("classId", "==", user.classId));
       } else if (role === "orangtua" && user?.linkedStudentClassId) {
         q = query(lessonsCollectionRef, where("classId", "==", user.linkedStudentClassId));
-      }
-       else {
+      } else if (role === "guru" && user?.uid) {
+        // Find the teacher's profile document ID from 'teachers' collection using their Auth UID
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+        if (!teacherProfileSnapshot.empty) {
+          const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+          q = query(lessonsCollectionRef, where("teacherId", "==", teacherProfileId));
+        } else {
+          // No teacher profile found for this UID, so no lessons to show
+          setLessons([]);
+          setIsLoading(false);
+          return;
+        }
+      } else if (role === "admin") {
          q = query(lessonsCollectionRef, orderBy("createdAt", "desc"));
+      } else {
+        setLessons([]);
+        setIsLoading(false);
+        return;
       }
+      
       const querySnapshot = await getDocs(q);
 
       const fetchedLessons: LessonData[] = querySnapshot.docs.map(docSnap => {
@@ -203,7 +223,7 @@ export default function LessonsPage() {
           subjectName: data.subjectName,
           classId: data.classId,
           className: data.className,
-          teacherId: data.teacherId,
+          teacherId: data.teacherId, // This is the ID from 'teachers' collection
           teacherName: data.teacherName,
           dayOfWeek: data.dayOfWeek,
           startTime: data.startTime,
@@ -216,7 +236,7 @@ export default function LessonsPage() {
       setLessons(fetchedLessons);
     } catch (error) {
       console.error("Error fetching lessons: ", error);
-      toast({ title: "Gagal Memuat Jadwal Pelajaran", description: "Terjadi kesalahan.", variant: "destructive" });
+      toast({ title: "Gagal Memuat Jadwal Pelajaran", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -224,7 +244,7 @@ export default function LessonsPage() {
 
   useEffect(() => {
     fetchLessons();
-  }, [role, user]);
+  }, [role, user, authLoading]);
 
   useEffect(() => {
     if (selectedLesson && isEditDialogOpen) {
@@ -232,7 +252,7 @@ export default function LessonsPage() {
         id: selectedLesson.id,
         subjectId: selectedLesson.subjectId,
         classId: selectedLesson.classId,
-        teacherId: selectedLesson.teacherId,
+        teacherId: selectedLesson.teacherId, // teacherId here is doc ID from 'teachers'
         dayOfWeek: selectedLesson.dayOfWeek as typeof DAYS_OF_WEEK[number],
         startTime: selectedLesson.startTime,
         endTime: selectedLesson.endTime,
@@ -245,7 +265,7 @@ export default function LessonsPage() {
   const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
     const subject = subjects.find(s => s.id === data.subjectId);
     const aClass = classes.find(c => c.id === data.classId);
-    const teacher = teachers.find(t => t.id === data.teacherId);
+    const teacher = teachers.find(t => t.id === data.teacherId); // Find teacher by their document ID
     return {
       subjectName: subject?.name,
       className: aClass?.name,
@@ -264,7 +284,7 @@ export default function LessonsPage() {
 
     try {
       await addDoc(collection(db, "lessons"), {
-        ...data,
+        ...data, // data.teacherId is the doc ID from 'teachers' collection
         subjectName,
         className,
         teacherName,
@@ -276,7 +296,7 @@ export default function LessonsPage() {
       fetchLessons();
     } catch (error: any) {
       console.error("Error adding lesson:", error);
-      toast({ title: "Gagal Menambahkan Pelajaran", description: "Terjadi kesalahan.", variant: "destructive" });
+      toast({ title: "Gagal Menambahkan Pelajaran", variant: "destructive" });
     }
   };
 
@@ -293,7 +313,7 @@ export default function LessonsPage() {
     try {
       const lessonDocRef = doc(db, "lessons", data.id);
       await updateDoc(lessonDocRef, {
-        ...data, // id will be part of data
+        ...data, 
         subjectName,
         className,
         teacherName,
@@ -304,7 +324,7 @@ export default function LessonsPage() {
       fetchLessons();
     } catch (error) {
       console.error("Error editing lesson:", error);
-      toast({ title: "Gagal Memperbarui Pelajaran", description: "Terjadi kesalahan.", variant: "destructive" });
+      toast({ title: "Gagal Memperbarui Pelajaran", variant: "destructive" });
     }
   };
 
@@ -316,7 +336,7 @@ export default function LessonsPage() {
       fetchLessons();
     } catch (error) {
       console.error("Error deleting lesson:", error);
-      toast({ title: "Gagal Menghapus Pelajaran", description: "Terjadi kesalahan.", variant: "destructive" });
+      toast({ title: "Gagal Menghapus Pelajaran", variant: "destructive" });
     }
   };
 
@@ -452,7 +472,7 @@ export default function LessonsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || authLoading ? (
             <div className="space-y-2 mt-4">
               {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
@@ -524,7 +544,9 @@ export default function LessonsPage() {
             </div>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Belum ada jadwal pelajaran yang ditambahkan.
+              {role === "guru" ? "Tidak ada pelajaran yang ditugaskan kepada Anda." : 
+               (role === "siswa" || role === "orangtua") ? "Tidak ada jadwal pelajaran untuk kelas Anda saat ini." :
+               "Belum ada jadwal pelajaran yang ditambahkan."}
             </div>
           )}
         </CardContent>
