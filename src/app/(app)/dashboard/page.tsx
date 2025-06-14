@@ -92,7 +92,7 @@ export default function DashboardPage() {
       try {
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
-          const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru")); // Querying users collection for teachers
+          const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
           const subjectsQuery = collection(db, "subjects");
           const classesQuery = collection(db, "classes");
 
@@ -125,8 +125,6 @@ export default function DashboardPage() {
 
           if (taughtClassIds.size > 0) {
             const studentClassesArray = Array.from(taughtClassIds);
-            // Firestore 'in' queries are limited. If more than 30 classes, chunking is needed.
-            // For simplicity, assuming fewer than 30 classes taught by one teacher for now.
             const studentsTaughtQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "in", studentClassesArray));
             const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
             statsUpdate.teacherTotalStudentsTaught = studentsTaughtSnapshot.size;
@@ -181,14 +179,25 @@ export default function DashboardPage() {
       }
     };
 
-    if (user) { // Fetch stats only if user is available
+    if (user) {
         fetchStats();
         fetchRecentAnnouncements();
-    } else if (!user && !loadingStats) { // If no user and not loading, set loading to false
+    } else {
+        // Reset states and set loading to false if no user
+        setStats({
+          adminTotalStudents: 0,
+          adminTotalTeachers: 0,
+          adminTotalSubjects: 0,
+          adminTotalClasses: 0,
+          teacherTotalStudentsTaught: 0,
+          teacherTotalClassesTaught: 0,
+          teacherTotalSubjectsTaught: 0,
+        });
+        setRecentAnnouncements([]);
         setLoadingStats(false);
         setLoadingAnnouncements(false);
     }
-  }, [role, user, loadingStats]); // Added loadingStats to dependency to prevent re-fetch if already loaded
+  }, [role, user]);
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
