@@ -913,8 +913,6 @@ export default function AssignmentsPage() {
                 <Label className="text-sm text-muted-foreground">Nilai</Label>
                 <p className="text-2xl font-bold">
                   {selectedAssignmentForViewingResult.result.score ?? 'N/A'}
-                  {selectedAssignmentForViewingResult.result.maxScore && selectedAssignmentForViewingResult.result.maxScore !== 100 ? ` / ${selectedAssignmentForViewingResult.result.maxScore}` : ' / 100'}
-                  {selectedAssignmentForViewingResult.result.grade && ` (${selectedAssignmentForViewingResult.result.grade})`}
                 </p>
               </div>
               {selectedAssignmentForViewingResult.result.feedback && (
