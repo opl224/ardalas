@@ -71,17 +71,17 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import NextLink from "next/link"; // Renamed to avoid conflict
+import NextLink from "next/link"; 
 import { cn } from "@/lib/utils";
 
-// Minimal interfaces for dropdowns
+
 interface SubjectMin { id: string; name: string; }
 interface ClassMin { id: string; name: string; }
 interface TeacherMin { id: string; name: string; }
 
-// Minimal interface for result info needed in assignments page
+
 interface AssignmentResultInfo {
-  id?: string; // Result document ID
+  id?: string; 
   score?: number;
   maxScore?: number;
   grade?: string;
@@ -103,18 +103,18 @@ interface AssignmentData {
   fileURL?: string;
   meetingNumber?: number;
   createdAt?: Timestamp;
-  // For student view
+
   submissionStatus?: "Belum Dikerjakan" | "Sudah Dikerjakan" | "Terlambat";
   studentSubmissionLink?: string;
   submissionTimestamp?: Timestamp;
-  result?: AssignmentResultInfo; // Store the fetched result data here
-  // For teacher view
+  result?: AssignmentResultInfo; 
+  
   submissionCount?: number;
-  totalStudentsInClass?: number; // For "X/Y submitted"
+  totalStudentsInClass?: number; 
 }
 
 interface AssignmentSubmission {
-  id?: string; // Firestore document ID
+  id?: string; 
   assignmentId: string;
   studentId: string;
   studentName: string;
@@ -126,7 +126,7 @@ interface AssignmentSubmission {
   teacherFileURL?: string;
 }
 
-// Interface similar to ResultData from results page, for type casting
+
 interface FetchedResultData {
   id: string;
   studentId: string;
@@ -135,7 +135,7 @@ interface FetchedResultData {
   className: string;
   subjectId: string;
   subjectName: string;
-  assessmentType: string; // Assuming string type for simplicity here
+  assessmentType: string; 
   assessmentTitle: string;
   score: number;
   maxScore?: number;
@@ -275,7 +275,7 @@ export default function AssignmentsPage() {
         } else {
           setAssignments([]); setIsLoading(false); return;
         }
-      } else if (!isTeacherOrAdminRole) { // If not student, parent, teacher, or admin
+      } else if (!isTeacherOrAdminRole) { 
          setAssignments([]); setIsLoading(false); return;
       }
 
@@ -312,7 +312,7 @@ export default function AssignmentsPage() {
         const assignmentIdsForResultsQuery = fetchedAssignments.map(a => a.id);
         const assignmentResultsMap = new Map<string, FetchedResultData>();
 
-        if (assignmentIdsForResultsQuery.length > 0) {
+        if (assignmentIdsForResultsQuery.length > 0 && studentToQueryId) {
           const resultsPromises = [];
           for (let i = 0; i < assignmentIdsForResultsQuery.length; i += 30) {
               const chunk = assignmentIdsForResultsQuery.slice(i, i + 30);
@@ -397,7 +397,7 @@ export default function AssignmentsPage() {
       return;
     }
 
-    if (!user) {
+    if (!user || !user.uid) { // Add specific check for user.uid
       setIsLoading(false);
       setAssignments([]);
       return;
@@ -515,7 +515,7 @@ export default function AssignmentsPage() {
           teacherName
       };
       if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        updateData.meetingNumber = null; // Use null for Firestore to remove field if needed
+        updateData.meetingNumber = null; 
       }
 
       await updateDoc(assignmentDocRef, updateData);
@@ -640,7 +640,7 @@ export default function AssignmentsPage() {
           <div className="flex items-center gap-2">
             {(isStudentRole || isParentRole) && (
                  <Button size="sm" asChild>
-                    <NextLink href="/my-grades">
+                    <NextLink href="/assignments/my-results">
                         <GraduationCap className="mr-2 h-4 w-4" /> Lihat Hasil Belajar
                     </NextLink>
                 </Button>
@@ -943,3 +943,5 @@ export default function AssignmentsPage() {
     </div>
   );
 }
+
+    
