@@ -20,12 +20,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid, getDay } from "date-fns";
+import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid, getDay, isWithinInterval } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -47,6 +47,8 @@ import { useAuth } from "@/context/AuthContext";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import Link from "next/link";
+
 
 // --- Types for Teacher/Admin View ---
 const ATTENDANCE_STATUSES = ["Hadir", "Sakit", "Izin", "Alpa"] as const;
@@ -102,11 +104,11 @@ interface StudentLessonDisplay {
   dayOfWeek: string;
   startTime: string; 
   endTime: string;   
-  statusText?: string; // For export
-  statusIcon?: React.ReactNode; // For export (optional, might be hard to put in excel)
+  statusText?: string; 
+  statusIcon?: React.ReactNode; 
 }
 
-interface StudentSelfAttendanceRecord {
+export interface StudentSelfAttendanceRecord { // Exported this interface
   id?: string; 
   studentId: string;
   studentName: string;
@@ -845,7 +847,7 @@ function TeacherAdminAttendanceManagement() {
 
 
 function StudentAttendanceView({ targetStudentId, targetStudentName, targetStudentClassId }: StudentAttendanceViewProps) {
-  const { user: authUser, loading: authLoading } = useAuth();
+  const { user: authUser, loading: authLoading, role } = useAuth(); // Added role here
   const { toast } = useToast();
   const [todayLessons, setTodayLessons] = useState<StudentLessonDisplay[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<Map<string, StudentSelfAttendanceRecord>>(new Map());
@@ -857,10 +859,12 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     id: targetStudentId || authUser?.uid,
     name: targetStudentName || authUser?.displayName,
     classId: targetStudentClassId || authUser?.classId,
-    className: targetStudentClassId ? (authUser?.role === 'orangtua' ? authUser.linkedStudentClassName : authUser?.className) : authUser?.className,
+    className: targetStudentClassId 
+      ? (authUser?.role === 'orangtua' ? authUser.linkedStudentClassName : authUser?.className) 
+      : authUser?.className,
   };
   
-  const isParentView = !!targetStudentId;
+  const isParentView = !!targetStudentId; // True if targetStudentId is provided (parent viewing child's attendance)
 
 
   useEffect(() => {
@@ -912,10 +916,9 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
         setAttendanceRecords(new Map());
       }
       
-      // Add statusText to lessons for export
       const lessonsWithStatus = fetchedLessons.map(lesson => {
-         const statusInfo = getLessonStatus(lesson, attendanceRecords, currentTime); // Pass current maps and time
-         return {...lesson, statusText: statusInfo.text }
+         const statusInfo = getLessonStatus(lesson, attendanceRecords, currentTime); 
+         return {...lesson, statusText: statusInfo.text, statusIcon: statusInfo.icon }
       });
       setTodayLessons(lessonsWithStatus);
 
@@ -936,57 +939,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     }
   }, [authLoading, studentToView.id, studentToView.classId]);
 
-  const handleSelfAttend = async (lesson: StudentLessonDisplay) => {
-    if (isParentView || !authUser || !authUser.uid || !authUser.classId || !authUser.displayName || !authUser.className) {
-      toast({ title: "Aksi Gagal", description: "Operasi tidak diizinkan atau informasi pengguna tidak lengkap.", variant: "destructive" });
-      return;
-    }
-
-    const now = new Date(); 
-    const todayForCheck = startOfDay(now); 
-    
-    const lessonStartTime = parse(lesson.startTime, "HH:mm", todayForCheck);
-    const lessonEndTime = parse(lesson.endTime, "HH:mm", todayForCheck);
-
-    if (!isValid(lessonStartTime) || !isValid(lessonEndTime)) {
-        toast({title: "Jadwal Error", description: `Waktu pelajaran ${lesson.subjectName} tidak valid. Hubungi admin.`, variant: "destructive"});
-        return;
-    }
-    
-    if (now < lessonStartTime || now > lessonEndTime) {
-        toast({title: "Di Luar Waktu", description: "Anda hanya bisa absen selama jam pelajaran berlangsung.", variant: "destructive"});
-        return;
-    }
-
-    const attendanceRecordData: Omit<StudentSelfAttendanceRecord, 'id' | 'attendedAt'> & {attendedAt: any, date: any} = { 
-      studentId: authUser.uid,
-      studentName: authUser.displayName,
-      classId: authUser.classId,
-      className: authUser.className,
-      lessonId: lesson.id,
-      subjectName: lesson.subjectName,
-      lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
-      date: Timestamp.fromDate(startOfDay(new Date())), 
-      status: "Hadir",
-      attendedAt: serverTimestamp(),
-    };
-
-    try {
-      const docRef = await addDoc(collection(db, "studentAttendanceRecords"), attendanceRecordData);
-      
-      setAttendanceRecords(prev => new Map(prev).set(lesson.id, { 
-          ...attendanceRecordData, 
-          id: docRef.id, 
-          attendedAt: Timestamp.now(), 
-          date: attendanceRecordData.date 
-        } as StudentSelfAttendanceRecord ));
-      toast({ title: "Kehadiran Tercatat", description: `Anda berhasil absen untuk pelajaran ${lesson.subjectName}.` });
-      fetchStudentScheduleAndAttendance(); // Re-fetch to update statusText
-    } catch (error) {
-      console.error("Error recording self-attendance:", error);
-      toast({ title: "Gagal Absen", description: "Terjadi kesalahan. Coba lagi.", variant: "destructive" });
-    }
-  };
+  // Removed handleSelfAttend as it's moved to lesson detail page
 
   const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>, timeToCheck: Date) => {
     const now = timeToCheck;
@@ -996,24 +949,20 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     const lessonEnd = parse(lesson.endTime, "HH:mm", today);
 
     if (!isValid(lessonStart) || !isValid(lessonEnd)) {
-        return { text: "Jadwal Error", button: null, icon: <Info className="h-5 w-5 text-orange-400" /> };
+        return { text: "Jadwal Error", icon: <Info className="h-5 w-5 text-orange-400" /> };
     }
     
     const attendedRecord = currentAttendanceRecords.get(lesson.id);
     if (attendedRecord) {
-      return { text: `Hadir (${format(attendedRecord.attendedAt.toDate(), "HH:mm")})`, button: null, icon: <CheckCircle className="h-5 w-5 text-green-500" /> };
+      return { text: `Hadir (${format(attendedRecord.attendedAt.toDate(), "HH:mm")})`, icon: <CheckCircle className="h-5 w-5 text-green-500" /> };
     }
     if (now < lessonStart) {
-      return { text: "Belum Dimulai", button: null, icon: <Clock className="h-5 w-5 text-gray-400" /> };
+      return { text: "Belum Dimulai", icon: <Clock className="h-5 w-5 text-gray-400" /> };
     }
     if (now >= lessonStart && now <= lessonEnd) {
-      return {
-        text: "Sesi Absen Terbuka",
-        button: !isParentView ? <Button onClick={() => handleSelfAttend(lesson)} size="sm" className="bg-primary hover:bg-primary/90">Absen Sekarang</Button> : null,
-        icon: <Clock className="h-5 w-5 text-blue-500" />
-      };
+      return { text: "Sesi Berlangsung", icon: <Clock className="h-5 w-5 text-blue-500" /> };
     }
-    return { text: "Sesi Absen Berakhir", button: null, icon: <XCircle className="h-5 w-5 text-red-500" /> };
+    return { text: "Sesi Berakhir (Belum Absen)", icon: <XCircle className="h-5 w-5 text-red-500" /> };
   };
 
   const handleExportStudentDailyPdf = async () => {
@@ -1165,7 +1114,14 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
             return (
               <Card key={lesson.id} className="bg-card/80 backdrop-blur-sm border shadow-md flex flex-col">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{lesson.subjectName || "Pelajaran Tanpa Nama"}</CardTitle>
+                    <div className="flex justify-between items-start">
+                        <CardTitle className="text-lg">{lesson.subjectName || "Pelajaran Tanpa Nama"}</CardTitle>
+                         <Button variant="ghost" size="iconSm" asChild className="h-7 w-7 text-primary hover:bg-primary/10">
+                            <Link href={`/lessons/${lesson.id}`} aria-label={`Detail pelajaran ${lesson.subjectName}`}>
+                                <ExternalLink className="h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </div>
                   <p className="text-sm text-muted-foreground"> Waktu: {lesson.startTime} - {lesson.endTime} </p>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center space-y-2 pt-2 pb-4 flex-grow">
@@ -1173,7 +1129,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
                         {status.icon}
                         <span>{status.text}</span>
                     </div>
-                    {status.button}
+                    {/* Button is removed here, attendance is handled in detail page */}
                 </CardContent>
               </Card>
             );
@@ -1183,6 +1139,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
        <Card className="mt-6 bg-card/70 backdrop-blur-sm border-border shadow-sm">
             <CardHeader><CardTitle className="text-lg">Catatan Penting</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-1">
+                <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui ikon <ExternalLink className="inline-block h-4 w-4 align-text-bottom" /> di pojok kanan atas kartu pelajaran.</p>
                 <p>&bull; Pastikan Anda melakukan absen selama jam pelajaran berlangsung.</p>
                 <p>&bull; Jika ada kendala teknis atau alasan lain tidak bisa absen, segera hubungi guru mata pelajaran atau wali kelas Anda.</p>
             </CardContent>
@@ -1236,4 +1193,3 @@ export default function AttendancePageWrapper() {
   }
 }
 
-    

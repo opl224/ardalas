@@ -2,16 +2,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams }
-from "next/navigation";
-import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { useParams } from "next/navigation";
+import { doc, getDoc, Timestamp, addDoc, collection, serverTimestamp, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, BookOpen, User, Clock, Info, FileText } from "lucide-react";
+import { AlertCircle, BookOpen, User, Clock, Info, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { format, startOfDay, parse, isValid, isWithinInterval } from "date-fns";
+import { id as indonesiaLocale } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 interface LessonDetails {
   id: string;
@@ -23,16 +25,45 @@ interface LessonDetails {
   endTime?: string;
   topic?: string;
   materials?: string;
-  // Potentially add fields for assignments, resources, video links etc.
+  classId?: string; // Need classId for querying attendance
 }
+
+interface StudentSelfAttendanceRecord {
+  id?: string;
+  studentId: string;
+  studentName: string;
+  classId: string;
+  className: string;
+  lessonId: string;
+  subjectName?: string;
+  lessonTime: string;
+  date: Timestamp;
+  status: "Hadir";
+  attendedAt: Timestamp;
+}
+
 
 export default function LessonDetailPage() {
   const params = useParams();
   const lessonId = params.lessonId as string;
   const { user, role, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+
   const [lesson, setLesson] = useState<LessonDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [attendanceRecord, setAttendanceRecord] = useState<StudentSelfAttendanceRecord | null>(null);
+  const [isEligibleToAttend, setIsEligibleToAttend] = useState(false);
+  const [attendanceStatusMessage, setAttendanceStatusMessage] = useState<string | null>(null);
+  const [isCheckingAttendance, setIsCheckingAttendance] = useState(true);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Update time every 30s
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!lessonId || authLoading) {
@@ -41,6 +72,7 @@ export default function LessonDetailPage() {
 
     const fetchLessonDetails = async () => {
       setIsLoading(true);
+      setIsCheckingAttendance(true);
       setError(null);
       try {
         const lessonDocRef = doc(db, "lessons", lessonId);
@@ -48,25 +80,31 @@ export default function LessonDetailPage() {
 
         if (lessonDocSnap.exists()) {
           const data = lessonDocSnap.data();
-          // Basic access control: Ensure the lesson belongs to the student's class if they are a student
-          if (role === "siswa" && user?.classId && data.classId !== user.classId) {
+          const lessonData = { id: lessonDocSnap.id, ...data } as LessonDetails;
+
+          if ((role === "siswa" && user?.classId && data.classId !== user.classId) ||
+              (role === "orangtua" && user?.linkedStudentClassId && data.classId !== user.linkedStudentClassId)) {
             setError("Anda tidak memiliki akses ke detail pelajaran ini.");
             setLesson(null);
-          } else if (role === "orangtua" && user?.linkedStudentClassId && data.classId !== user.linkedStudentClassId){
-            setError("Anda tidak memiliki akses ke detail pelajaran ini.");
-            setLesson(null);
-          }
-          else {
-            setLesson({ id: lessonDocSnap.id, ...data } as LessonDetails);
+          } else {
+            setLesson(lessonData);
+            // After setting lesson, fetch attendance status if user is student
+            if (role === "siswa" && user?.uid && lessonData.id) {
+              fetchAttendanceStatus(user.uid, lessonData.id);
+            } else {
+              setIsCheckingAttendance(false);
+            }
           }
         } else {
           setError("Detail pelajaran tidak ditemukan.");
           setLesson(null);
+          setIsCheckingAttendance(false);
         }
       } catch (e) {
         console.error("Error fetching lesson details:", e);
         setError("Gagal memuat detail pelajaran.");
         setLesson(null);
+        setIsCheckingAttendance(false);
       } finally {
         setIsLoading(false);
       }
@@ -74,6 +112,102 @@ export default function LessonDetailPage() {
 
     fetchLessonDetails();
   }, [lessonId, authLoading, user, role]);
+
+
+  const fetchAttendanceStatus = async (studentUid: string, currentLessonId: string) => {
+    setIsCheckingAttendance(true);
+    try {
+      const todayStart = startOfDay(new Date());
+      const attendanceQuery = query(
+        collection(db, "studentAttendanceRecords"),
+        where("studentId", "==", studentUid),
+        where("lessonId", "==", currentLessonId),
+        where("date", "==", Timestamp.fromDate(todayStart))
+      );
+      const attendanceSnapshot = await getDocs(attendanceQuery);
+      if (!attendanceSnapshot.empty) {
+        const record = attendanceSnapshot.docs[0].data() as StudentSelfAttendanceRecord;
+        setAttendanceRecord(record);
+      } else {
+        setAttendanceRecord(null);
+      }
+    } catch (e) {
+      console.error("Error fetching attendance status:", e);
+      toast({ title: "Gagal Cek Status Absen", variant: "destructive" });
+    } finally {
+      setIsCheckingAttendance(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!lesson || role !== "siswa" || isCheckingAttendance) {
+      setIsEligibleToAttend(false);
+      setAttendanceStatusMessage(null);
+      return;
+    }
+
+    if (attendanceRecord) {
+      setIsEligibleToAttend(false);
+      setAttendanceStatusMessage(`Hadir (Absen pukul ${format(attendanceRecord.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })})`);
+      return;
+    }
+
+    const now = currentTime;
+    const today = startOfDay(now);
+    const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
+    const lessonEnd = lesson.endTime ? parse(lesson.endTime, "HH:mm", today) : null;
+
+    if (lessonStart && lessonEnd && isValid(lessonStart) && isValid(lessonEnd)) {
+      if (isWithinInterval(now, { start: lessonStart, end: lessonEnd })) {
+        setIsEligibleToAttend(true);
+        setAttendanceStatusMessage("Sesi absen sedang berlangsung.");
+      } else if (now < lessonStart) {
+        setIsEligibleToAttend(false);
+        setAttendanceStatusMessage(`Sesi absen akan dimulai pukul ${lesson.startTime}.`);
+      } else {
+        setIsEligibleToAttend(false);
+        setAttendanceStatusMessage("Sesi absen telah berakhir.");
+      }
+    } else {
+      setIsEligibleToAttend(false);
+      setAttendanceStatusMessage("Jadwal pelajaran tidak valid untuk absen.");
+    }
+  }, [lesson, attendanceRecord, currentTime, role, isCheckingAttendance]);
+
+
+  const handleSelfAttend = async () => {
+    if (!user || !lesson || !user.uid || !user.displayName || !user.className || !lesson.classId || !lesson.subjectName || !lesson.startTime || !lesson.endTime) {
+      toast({ title: "Aksi Gagal", description: "Data pengguna atau pelajaran tidak lengkap.", variant: "destructive" });
+      return;
+    }
+    if (!isEligibleToAttend || attendanceRecord) return;
+
+    setIsSubmittingAttendance(true);
+    const attendanceData: Omit<StudentSelfAttendanceRecord, 'id' | 'attendedAt'> & {attendedAt: any, date: any} = {
+      studentId: user.uid,
+      studentName: user.displayName,
+      classId: lesson.classId,
+      className: user.className, // Assuming student's className is correct for this lesson
+      lessonId: lesson.id,
+      subjectName: lesson.subjectName,
+      lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
+      date: Timestamp.fromDate(startOfDay(new Date())),
+      status: "Hadir",
+      attendedAt: serverTimestamp(),
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "studentAttendanceRecords"), attendanceData);
+      setAttendanceRecord({ ...attendanceData, id: docRef.id, attendedAt: Timestamp.now() }); // Optimistic update
+      toast({ title: "Kehadiran Tercatat", description: `Anda berhasil absen untuk pelajaran ${lesson.subjectName}.` });
+    } catch (error) {
+      console.error("Error recording self-attendance:", error);
+      toast({ title: "Gagal Absen", description: "Terjadi kesalahan. Coba lagi.", variant: "destructive" });
+    } finally {
+      setIsSubmittingAttendance(false);
+    }
+  };
+
 
   if (isLoading || authLoading) {
     return (
@@ -165,6 +299,34 @@ export default function LessonDetailPage() {
             </div>
           </div>
 
+          {role === "siswa" && !isCheckingAttendance && (
+            <div className="mt-6 p-4 border border-border rounded-md bg-background shadow">
+              <h3 className="text-lg font-semibold mb-2 flex items-center">
+                {attendanceRecord ? <CheckCircle className="h-5 w-5 text-green-500 mr-2" /> : 
+                 isEligibleToAttend ? <Clock className="h-5 w-5 text-blue-500 mr-2" /> :
+                 <XCircle className="h-5 w-5 text-red-500 mr-2" />}
+                Status Kehadiran Hari Ini
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">{attendanceStatusMessage || "Memeriksa status..."}</p>
+              {isEligibleToAttend && !attendanceRecord && (
+                <Button 
+                  onClick={handleSelfAttend} 
+                  disabled={isSubmittingAttendance}
+                  className="w-full sm:w-auto"
+                >
+                  {isSubmittingAttendance && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmittingAttendance ? "Memproses..." : "Absen Sekarang"}
+                </Button>
+              )}
+            </div>
+          )}
+           {role === "siswa" && isCheckingAttendance && (
+             <div className="mt-6 p-4 border border-border rounded-md bg-background shadow flex items-center justify-center">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat status kehadiran...
+             </div>
+           )}
+
+
           {lesson.topic && (
             <div className="p-3 bg-muted/30 rounded-md">
               <h3 className="text-sm font-semibold text-muted-foreground mb-1">Topik Pelajaran</h3>
@@ -178,7 +340,6 @@ export default function LessonDetailPage() {
               <p className="text-foreground whitespace-pre-line">
                 {lesson.materials}
               </p>
-              {/* You can add logic here to render links if materials contain URLs */}
             </div>
           )}
 
@@ -187,16 +348,12 @@ export default function LessonDetailPage() {
                 Tidak ada detail topik atau materi tambahan untuk pelajaran ini.
             </div>
           )}
-
-          {/* Placeholder for future content like assignments, resources, etc. */}
+          
           <div className="mt-6 pt-4 border-t border-border">
             <h3 className="text-lg font-semibold mb-2">Sumber Daya Terkait</h3>
             <p className="text-sm text-muted-foreground">
               (Area ini dapat digunakan untuk menampilkan tugas, kuis, atau tautan sumber daya yang relevan dengan pelajaran ini.)
             </p>
-            <div className="mt-3 flex gap-2">
-              {/* Example: <Button variant="outline" size="sm"><FileText className="mr-2 h-4 w-4" /> Lihat Tugas</Button> */}
-            </div>
           </div>
 
            <div className="mt-8 text-center">
@@ -211,3 +368,4 @@ export default function LessonDetailPage() {
     </div>
   );
 }
+
