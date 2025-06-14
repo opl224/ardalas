@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon } from "lucide-react";
+import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -248,31 +248,34 @@ export default function AssignmentsPage() {
   const fetchAssignments = async () => {
     setIsLoading(true);
     try {
+      if (!user || !role) {
+          setIsLoading(false);
+          setAssignments([]);
+          return;
+      }
+
       if (isTeacherOrAdminRole) {
         await fetchDropdownData();
       }
 
       let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
-      let studentToQueryId = null;
+      let studentToQueryId: string | null = null;
 
-      if (isStudentRole && user?.uid) {
+      if (isStudentRole && user.uid) {
         studentToQueryId = user.uid;
         if (user.classId && user.classId.trim() !== "") {
           assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
         } else {
           setAssignments([]); setIsLoading(false); return;
         }
-      } else if (isParentRole && user?.linkedStudentId) {
+      } else if (isParentRole && user.linkedStudentId) {
         studentToQueryId = user.linkedStudentId;
-         if (user.linkedStudentClassId && user.linkedStudentClassId.trim() !== "") { // Assuming parent user object might have linkedStudentClassId
+         if (user.linkedStudentClassId && user.linkedStudentClassId.trim() !== "") {
           assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.linkedStudentClassId), orderBy("dueDate", "desc"));
         } else {
-          // If parent isn't linked to a student with a class, or if linkedStudentClassId isn't available,
-          // they might not see any assignments. Or fetch all if that's the desired behavior.
-          // For now, assume they need a class context.
           setAssignments([]); setIsLoading(false); return;
         }
-      } else if (isStudentRole && (!user?.uid || !user?.classId)) {
+      } else if (!isTeacherOrAdminRole) { // If not student, parent, teacher, or admin
          setAssignments([]); setIsLoading(false); return;
       }
 
@@ -308,19 +311,20 @@ export default function AssignmentsPage() {
 
         const assignmentIdsForResultsQuery = fetchedAssignments.map(a => a.id);
         const assignmentResultsMap = new Map<string, FetchedResultData>();
+
         if (assignmentIdsForResultsQuery.length > 0) {
-          const resultsQueries = [];
+          const resultsPromises = [];
           for (let i = 0; i < assignmentIdsForResultsQuery.length; i += 30) {
-            const chunk = assignmentIdsForResultsQuery.slice(i, i + 30);
-            resultsQueries.push(
-              getDocs(query(
-                collection(db, "results"),
-                where("studentId", "==", studentToQueryId),
-                where("assignmentId", "in", chunk)
-              ))
-            );
+              const chunk = assignmentIdsForResultsQuery.slice(i, i + 30);
+              resultsPromises.push(
+                  getDocs(query(
+                      collection(db, "results"),
+                      where("studentId", "==", studentToQueryId),
+                      where("assignmentId", "in", chunk)
+                  ))
+              );
           }
-          const resultsSnapshots = await Promise.all(resultsQueries);
+          const resultsSnapshots = await Promise.all(resultsPromises);
           resultsSnapshots.forEach(snapshot => {
             snapshot.forEach(doc => {
               const result = doc.data() as FetchedResultData;
@@ -330,6 +334,7 @@ export default function AssignmentsPage() {
             });
           });
         }
+
 
         fetchedAssignments = fetchedAssignments.map(assignment => {
           const submission = userSubs.get(assignment.id);
@@ -397,29 +402,9 @@ export default function AssignmentsPage() {
       setAssignments([]);
       return;
     }
+    
+    fetchAssignments();
 
-    // Consolidate fetching logic
-    if ((isStudentRole && user.uid && user.classId) || 
-        (isParentRole && user.linkedStudentId && user.linkedStudentClassId) || 
-        isTeacherOrAdminRole) {
-        fetchAssignments();
-    } else {
-        if (isStudentRole && !user.classId) {
-            toast({
-                title: "Tidak Terdaftar di Kelas",
-                description: "Tugas tidak dapat ditampilkan. Pastikan Anda terdaftar di kelas.",
-                variant: "destructive",
-            });
-        } else if (isParentRole && !user.linkedStudentClassId) {
-             toast({
-                title: "Data Kelas Anak Tidak Ditemukan",
-                description: "Tidak dapat menampilkan tugas karena data kelas anak tidak ditemukan.",
-                variant: "destructive",
-            });
-        }
-        setAssignments([]);
-        setIsLoading(false);
-    }
   }, [authLoading, user, role]);
 
 
@@ -530,7 +515,7 @@ export default function AssignmentsPage() {
           teacherName
       };
       if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        updateData.meetingNumber = null;
+        updateData.meetingNumber = null; // Use null for Firestore to remove field if needed
       }
 
       await updateDoc(assignmentDocRef, updateData);
@@ -655,8 +640,8 @@ export default function AssignmentsPage() {
           <div className="flex items-center gap-2">
             {(isStudentRole || isParentRole) && (
                  <Button size="sm" asChild>
-                    <NextLink href="/results">
-                        <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Belajar
+                    <NextLink href="/my-grades">
+                        <GraduationCap className="mr-2 h-4 w-4" /> Lihat Hasil Belajar
                     </NextLink>
                 </Button>
             )}
@@ -780,7 +765,7 @@ export default function AssignmentsPage() {
                                 <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
                              </Button>
                            )}
-                           {isStudentRole && assignment.result && (
+                           {assignment.result && (
                              <Button variant="secondary" size="sm" onClick={() => handleOpenViewResultDialog(assignment)}>
                                 <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
                              </Button>
@@ -892,7 +877,7 @@ export default function AssignmentsPage() {
                                             </Button>
                                         </TableCell>
                                         <TableCell>{format(sub.submittedAt.toDate(), "dd MMM yy, HH:mm", { locale: indonesiaLocale })}</TableCell>
-                                        <TableCell className="text-xs max-w-xs truncate" title={sub.notes}>{sub.notes || "-"}</TableCell>
+                                        <TableCell className="text-xs max-w-xs truncate" title={sub.notes || undefined}>{sub.notes || "-"}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -958,5 +943,3 @@ export default function AssignmentsPage() {
     </div>
   );
 }
-
-    
