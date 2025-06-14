@@ -35,9 +35,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { BookOpen, PlusCircle, Edit, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -52,20 +59,31 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  where
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext";
+
+interface AuthUserMin {
+  id: string; // Firebase Auth UID
+  name: string;
+  email: string;
+}
 
 interface Subject {
   id: string; 
   name: string;
   description?: string;
+  teacherUid?: string; // UID of the responsible teacher from Auth
+  teacherName?: string; // Denormalized name of the responsible teacher
   createdAt?: Timestamp; 
 }
 
 const subjectFormSchema = z.object({
   name: z.string().min(3, { message: "Nama subjek minimal 3 karakter." }),
   description: z.string().optional(),
+  teacherUid: z.string().optional(), // To store the selected Firebase Auth UID
 });
 type SubjectFormValues = z.infer<typeof subjectFormSchema>;
 
@@ -74,12 +92,17 @@ const editSubjectFormSchema = subjectFormSchema.extend({
 });
 type EditSubjectFormValues = z.infer<typeof editSubjectFormSchema>;
 
+const NO_RESPONSIBLE_TEACHER = "_NONE_";
+
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [authGuruUsers, setAuthGuruUsers] = useState<AuthUserMin[]>([]);
+  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
+  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const { role } = useAuth();
 
   const { toast } = useToast();
 
@@ -88,6 +111,7 @@ export default function SubjectsPage() {
     defaultValues: {
       name: "",
       description: "",
+      teacherUid: undefined,
     },
   });
 
@@ -95,9 +119,40 @@ export default function SubjectsPage() {
     resolver: zodResolver(editSubjectFormSchema),
   });
 
-  const fetchSubjects = async () => {
-    setIsLoading(true);
+  const fetchAuthGuruUsers = async () => {
+    if (role !== "admin") {
+      setIsLoadingAuthUsers(false);
+      return;
+    }
+    setIsLoadingAuthUsers(true);
     try {
+      const usersCollectionRef = collection(db, "users");
+      const q = query(usersCollectionRef, where("role", "==", "guru"), orderBy("name", "asc"));
+      const querySnapshot = await getDocs(q);
+      const fetchedUsers: AuthUserMin[] = querySnapshot.docs.map(docSnap => ({
+        id: docSnap.data().uid, 
+        name: docSnap.data().name,
+        email: docSnap.data().email,
+      }));
+      setAuthGuruUsers(fetchedUsers);
+    } catch (error) {
+      console.error("Error fetching auth guru users: ", error);
+      toast({
+        title: "Gagal Memuat Akun Guru",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingAuthUsers(false);
+    }
+  };
+
+
+  const fetchSubjects = async () => {
+    setIsLoadingSubjects(true);
+    try {
+      if (role === "admin" && authGuruUsers.length === 0) {
+        await fetchAuthGuruUsers();
+      }
       const subjectsCollectionRef = collection(db, "subjects");
       const q = query(subjectsCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
@@ -105,6 +160,8 @@ export default function SubjectsPage() {
         id: docSnap.id,
         name: docSnap.data().name,
         description: docSnap.data().description,
+        teacherUid: docSnap.data().teacherUid,
+        teacherName: docSnap.data().teacherName,
         createdAt: docSnap.data().createdAt,
       }));
       setSubjects(fetchedSubjects);
@@ -112,34 +169,40 @@ export default function SubjectsPage() {
       console.error("Error fetching subjects: ", error);
       toast({
         title: "Gagal Memuat Subjek",
-        description: "Terjadi kesalahan saat mengambil data subjek.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsLoadingSubjects(false);
     }
   };
 
   useEffect(() => {
     fetchSubjects();
-  }, []);
+  }, [role]);
 
   useEffect(() => {
-    if (selectedSubject && isEditDialogOpen) {
+    if (selectedSubject && isEditDialogOpen && role === "admin") {
       editSubjectForm.reset({
         id: selectedSubject.id,
         name: selectedSubject.name,
         description: selectedSubject.description || "",
+        teacherUid: selectedSubject.teacherUid || undefined,
       });
     }
-  }, [selectedSubject, isEditDialogOpen, editSubjectForm]);
+  }, [selectedSubject, isEditDialogOpen, editSubjectForm, role]);
 
   const handleAddSubjectSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
+    if (role !== "admin") return;
     addSubjectForm.clearErrors();
+    const selectedTeacher = authGuruUsers.find(user => user.id === data.teacherUid);
+
     try {
       const subjectsCollectionRef = collection(db, "subjects");
       await addDoc(subjectsCollectionRef, {
-        ...data,
+        name: data.name,
+        description: data.description || null,
+        teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
+        teacherName: selectedTeacher?.name || null,
         createdAt: serverTimestamp(),
       });
       
@@ -151,20 +214,23 @@ export default function SubjectsPage() {
       console.error("Error adding subject:", error);
       toast({
         title: "Gagal Menambahkan Subjek",
-        description: "Terjadi kesalahan.",
         variant: "destructive",
       });
     }
   };
 
   const handleEditSubjectSubmit: SubmitHandler<EditSubjectFormValues> = async (data) => {
-    if (!selectedSubject) return;
+    if (role !== "admin" || !selectedSubject) return;
     editSubjectForm.clearErrors();
+    const selectedTeacher = authGuruUsers.find(user => user.id === data.teacherUid);
+
     try {
       const subjectDocRef = doc(db, "subjects", data.id);
       await updateDoc(subjectDocRef, {
         name: data.name,
-        description: data.description,
+        description: data.description || null,
+        teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
+        teacherName: selectedTeacher?.name || null,
       });
       
       toast({ title: "Subjek Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -175,13 +241,13 @@ export default function SubjectsPage() {
       console.error("Error editing subject:", error);
       toast({
         title: "Gagal Memperbarui Subjek",
-        description: "Terjadi kesalahan.",
         variant: "destructive",
       });
     }
   };
 
   const handleDeleteSubject = async (subjectId: string, subjectName?: string) => {
+    if (role !== "admin") return;
     try {
       await deleteDoc(doc(db, "subjects", subjectId));
       toast({ title: "Subjek Dihapus", description: `${subjectName || 'Subjek'} berhasil dihapus.` });
@@ -191,20 +257,72 @@ export default function SubjectsPage() {
       console.error("Error deleting subject:", error);
       toast({
         title: "Gagal Menghapus Subjek",
-        description: "Terjadi kesalahan.",
         variant: "destructive",
       });
     }
   };
 
   const openEditDialog = (subject: Subject) => {
+    if (role !== "admin") return;
     setSelectedSubject(subject);
     setIsEditDialogOpen(true);
   };
   
   const openDeleteDialog = (subject: Subject) => {
+     if (role !== "admin") return;
     setSelectedSubject(subject); 
   };
+
+  const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => (
+    <>
+      <div>
+        <Label htmlFor={`${formType}-subject-name`}>Nama Subjek</Label>
+        <Input id={`${formType}-subject-name`} {...formInstance.register("name")} className="mt-1" />
+        {formInstance.formState.errors.name && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-subject-description`}>Deskripsi (Opsional)</Label>
+        <Textarea id={`${formType}-subject-description`} {...formInstance.register("description")} className="mt-1" />
+      </div>
+      {role === "admin" && (
+        <div>
+          <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab (Opsional)</Label>
+          <Controller
+            name="teacherUid"
+            control={formInstance.control}
+            render={({ field }) => (
+              <Select
+                onValueChange={(value) => field.onChange(value === NO_RESPONSIBLE_TEACHER ? undefined : value)}
+                value={field.value || NO_RESPONSIBLE_TEACHER}
+                disabled={isLoadingAuthUsers}
+              >
+                <SelectTrigger id={`${formType}-subject-teacherUid`} className="mt-1">
+                  <SelectValue placeholder={isLoadingAuthUsers ? "Memuat guru..." : "Pilih guru"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingAuthUsers && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
+                  <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
+                  {authGuruUsers
+                    .filter(user => user && typeof user.id === 'string' && user.id.length > 0)
+                    .map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+           {formInstance.formState.errors.teacherUid && (
+            <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.teacherUid.message}</p>
+          )}
+        </div>
+      )}
+    </>
+  );
+
 
   return (
     <div className="space-y-6">
@@ -218,51 +336,45 @@ export default function SubjectsPage() {
             <BookOpen className="h-6 w-6 text-primary" />
             <span>Daftar Subjek</span>
           </CardTitle>
-          <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-            setIsAddDialogOpen(isOpen);
-            if (!isOpen) {
-              addSubjectForm.reset();
-              addSubjectForm.clearErrors();
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <PlusCircle className="mr-2 h-4 w-4" /> Tambah Subjek
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Tambah Subjek Baru</DialogTitle>
-                <DialogDescription>
-                  Isi detail subjek pelajaran baru.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4">
-                <div>
-                  <Label htmlFor="add-subject-name">Nama Subjek</Label>
-                  <Input id="add-subject-name" {...addSubjectForm.register("name")} className="mt-1" />
-                  {addSubjectForm.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">{addSubjectForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="add-subject-description">Deskripsi (Opsional)</Label>
-                  <Textarea id="add-subject-description" {...addSubjectForm.register("description")} className="mt-1" />
-                </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                     <Button type="button" variant="outline">Batal</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={addSubjectForm.formState.isSubmitting}>
-                    {addSubjectForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Subjek"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {role === "admin" && (
+            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+              setIsAddDialogOpen(isOpen);
+              if (!isOpen) {
+                addSubjectForm.reset();
+                addSubjectForm.clearErrors();
+              } else {
+                if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Subjek
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Tambah Subjek Baru</DialogTitle>
+                  <DialogDescription>
+                    Isi detail subjek pelajaran baru.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                  {renderSubjectFormFields(addSubjectForm, 'add')}
+                  <DialogFooter>
+                    <DialogClose asChild>
+                       <Button type="button" variant="outline">Batal</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
+                      {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Subjek"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoadingSubjects || (role === "admin" && isLoadingAuthUsers) ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -275,7 +387,8 @@ export default function SubjectsPage() {
                   <TableRow>
                     <TableHead>Nama Subjek</TableHead>
                     <TableHead>Deskripsi</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    {role === "admin" && <TableHead>Guru Penanggung Jawab</TableHead>}
+                    {role === "admin" && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -283,34 +396,37 @@ export default function SubjectsPage() {
                     <TableRow key={subject.id}>
                       <TableCell className="font-medium">{subject.name}</TableCell>
                       <TableCell>{subject.description || "-"}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => openEditDialog(subject)} aria-label={`Edit ${subject.name}`}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(subject)} aria-label={`Hapus ${subject.name}`}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          {selectedSubject && selectedSubject.id === subject.id && ( 
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tindakan ini akan menghapus subjek <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setSelectedSubject(null)}>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteSubject(selectedSubject.id, selectedSubject.name)}>
-                                  Ya, Hapus Subjek
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          )}
-                        </AlertDialog>
-                      </TableCell>
+                      {role === "admin" && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
+                      {role === "admin" && (
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="outline" size="icon" onClick={() => openEditDialog(subject)} aria-label={`Edit ${subject.name}`}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(subject)} aria-label={`Hapus ${subject.name}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            {selectedSubject && selectedSubject.id === subject.id && ( 
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tindakan ini akan menghapus subjek <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel onClick={() => setSelectedSubject(null)}>Batal</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteSubject(selectedSubject.id, selectedSubject.name)}>
+                                    Ya, Hapus Subjek
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            )}
+                          </AlertDialog>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -318,54 +434,44 @@ export default function SubjectsPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Tidak ada data subjek untuk ditampilkan. Klik "Tambah Subjek" untuk membuat data baru.
+              Tidak ada data subjek untuk ditampilkan. {role === "admin" && 'Klik "Tambah Subjek" untuk membuat data baru.'}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
-          setIsEditDialogOpen(isOpen);
-          if (!isOpen) {
-            setSelectedSubject(null);
-            editSubjectForm.clearErrors();
-          }
-      }}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Subjek</DialogTitle>
-            <DialogDescription>
-              Perbarui detail subjek pelajaran.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedSubject && (
-            <form onSubmit={editSubjectForm.handleSubmit(handleEditSubjectSubmit)} className="space-y-4 py-4">
-              <Input type="hidden" {...editSubjectForm.register("id")} />
-              <div>
-                <Label htmlFor="edit-subject-name">Nama Subjek</Label>
-                <Input id="edit-subject-name" {...editSubjectForm.register("name")} className="mt-1" />
-                {editSubjectForm.formState.errors.name && (
-                  <p className="text-sm text-destructive mt-1">{editSubjectForm.formState.errors.name.message}</p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="edit-subject-description">Deskripsi (Opsional)</Label>
-                <Textarea id="edit-subject-description" {...editSubjectForm.register("description")} className="mt-1" />
-              </div>
-              <DialogFooter>
-                 <DialogClose asChild>
-                    <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedSubject(null); }}>Batal</Button>
-                 </DialogClose>
-                <Button type="submit" disabled={editSubjectForm.formState.isSubmitting}>
-                  {editSubjectForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+      {role === "admin" && (
+        <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
+            setIsEditDialogOpen(isOpen);
+            if (!isOpen) {
+              setSelectedSubject(null);
+              editSubjectForm.clearErrors();
+            }
+        }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Subjek</DialogTitle>
+              <DialogDescription>
+                Perbarui detail subjek pelajaran.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedSubject && (
+              <form onSubmit={editSubjectForm.handleSubmit(handleEditSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <Input type="hidden" {...editSubjectForm.register("id")} />
+                {renderSubjectFormFields(editSubjectForm, 'edit')}
+                <DialogFooter>
+                   <DialogClose asChild>
+                      <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedSubject(null); }}>Batal</Button>
+                   </DialogClose>
+                  <Button type="submit" disabled={editSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
+                    {editSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Perubahan"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
-
-    
