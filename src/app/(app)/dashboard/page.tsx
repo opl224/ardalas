@@ -8,7 +8,7 @@ import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Li
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -89,7 +89,7 @@ export default function DashboardPage() {
       if (!user || !role) {
         setLoadingStats(false);
         setLoadingAnnouncements(false);
-        setStats({ // Reset stats
+        setStats({ 
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
         });
@@ -100,14 +100,9 @@ export default function DashboardPage() {
       setLoadingStats(true);
       setLoadingAnnouncements(true);
       
-      const newStats: DashboardStats = { // Initialize with all zeros for a clean slate
-        adminTotalStudents: 0,
-        adminTotalTeachers: 0,
-        adminTotalSubjects: 0,
-        adminTotalClasses: 0,
-        teacherTotalStudentsTaught: 0,
-        teacherTotalClassesTaught: 0,
-        teacherTotalSubjectsTaught: 0,
+      const newStats: DashboardStats = {
+        adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
+        teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
       };
 
       try {
@@ -130,52 +125,57 @@ export default function DashboardPage() {
           newStats.adminTotalClasses = classSnap.size;
 
         } else if (role === 'guru' && user.uid) {
-            // Directly use user.uid as teacherId to query lessons
-            const teacherIdToQuery = user.uid;
-            const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherIdToQuery));
-            const lessonsSnapshot = await getDocs(lessonsQuery);
-          
-            const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
-            const taughtClassIds = new Set<string>();
-            const taughtSubjectIds = new Set<string>();
+            const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
-            teacherLessonsData.forEach(lesson => {
-                if (lesson.classId) taughtClassIds.add(lesson.classId);
-                if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
-            });
+            if (!teacherProfileSnapshot.empty) {
+                const teacherProfileDoc = teacherProfileSnapshot.docs[0];
+                const teacherProfileId = teacherProfileDoc.id; // This is the Document ID from 'teachers' collection
 
-            newStats.teacherTotalClassesTaught = taughtClassIds.size;
-            newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+                const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
+                const lessonsSnapshot = await getDocs(lessonsQuery);
+              
+                const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
+                const taughtClassIds = new Set<string>();
+                const taughtSubjectIds = new Set<string>();
 
-            if (taughtClassIds.size > 0) {
-                const studentClassesArray = Array.from(taughtClassIds);
-                const allStudentIds = new Set<string>();
-                const CHUNK_SIZE = 30; 
+                teacherLessonsData.forEach(lesson => {
+                    if (lesson.classId) taughtClassIds.add(lesson.classId);
+                    if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
+                });
 
-                for (let i = 0; i < studentClassesArray.length; i += CHUNK_SIZE) {
-                    const chunk = studentClassesArray.slice(i, i + CHUNK_SIZE);
-                    if (chunk.length > 0) {
-                        const studentsTaughtQuery = query(
-                            collection(db, "users"), 
-                            where("role", "==", "siswa"), 
-                            where("classId", "in", chunk)
-                        );
-                        const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
-                        studentsTaughtSnapshot.forEach(doc => allStudentIds.add(doc.id));
+                newStats.teacherTotalClassesTaught = taughtClassIds.size;
+                newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
+
+                if (taughtClassIds.size > 0) {
+                    const studentClassesArray = Array.from(taughtClassIds);
+                    const allStudentIds = new Set<string>();
+                    const CHUNK_SIZE = 30; 
+
+                    for (let i = 0; i < studentClassesArray.length; i += CHUNK_SIZE) {
+                        const chunk = studentClassesArray.slice(i, i + CHUNK_SIZE);
+                        if (chunk.length > 0) {
+                            const studentsTaughtQuery = query(
+                                collection(db, "users"), 
+                                where("role", "==", "siswa"), 
+                                where("classId", "in", chunk)
+                            );
+                            const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
+                            studentsTaughtSnapshot.forEach(doc => allStudentIds.add(doc.id));
+                        }
                     }
+                    newStats.teacherTotalStudentsTaught = allStudentIds.size;
+                } else {
+                    newStats.teacherTotalStudentsTaught = 0;
                 }
-                newStats.teacherTotalStudentsTaught = allStudentIds.size;
             } else {
-                newStats.teacherTotalStudentsTaught = 0;
+                // No teacher profile found for this Auth UID, stats remain 0
+                console.warn(`No teacher profile found in 'teachers' collection for UID: ${user.uid}`);
             }
         }
-        // For other roles, stats remain 0 as initialized
-        
         setStats(newStats);
-
       } catch (error) {
         console.error("Error fetching stats: ", error);
-        // Set to initial zero state on error
         setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0,
@@ -220,9 +220,14 @@ export default function DashboardPage() {
       }
     };
     
-    fetchAllData();
+    if (user && role) { // Ensure user and role are available before fetching
+        fetchAllData();
+    } else if (!user && !loadingStats) { // If no user and not already loading, ensure loading is false
+        setLoadingStats(false);
+        setLoadingAnnouncements(false);
+    }
 
-  }, [user, role]);
+  }, [user, role]); // Removed loadingStats from dependency array
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
