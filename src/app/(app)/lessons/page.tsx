@@ -66,8 +66,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
-import { format, parse, getDay, isWithinInterval, isValid } from "date-fns"; // Added date-fns functions
-import { id as indonesiaLocale } from "date-fns/locale"; // For day name localization
+import { format, parse, getDay, isWithinInterval, isValid } from "date-fns"; 
+import { id as indonesiaLocale } from "date-fns/locale"; 
 import { cn } from "@/lib/utils";
 
 
@@ -206,14 +206,12 @@ export default function LessonsPage() {
       } else if (role === "orangtua" && user?.linkedStudentClassId) {
         q = query(lessonsCollectionRef, where("classId", "==", user.linkedStudentClassId));
       } else if (role === "guru" && user?.uid) {
-        // Find the teacher's profile document ID from 'teachers' collection using their Auth UID
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
         if (!teacherProfileSnapshot.empty) {
           const teacherProfileId = teacherProfileSnapshot.docs[0].id;
           q = query(lessonsCollectionRef, where("teacherId", "==", teacherProfileId));
         } else {
-          // No teacher profile found for this UID, so no lessons to show
           setLessons([]);
           setIsLoading(false);
           return;
@@ -236,7 +234,7 @@ export default function LessonsPage() {
           subjectName: data.subjectName,
           classId: data.classId,
           className: data.className,
-          teacherId: data.teacherId, // This is the ID from 'teachers' collection
+          teacherId: data.teacherId, 
           teacherName: data.teacherName,
           dayOfWeek: data.dayOfWeek,
           startTime: data.startTime,
@@ -265,7 +263,7 @@ export default function LessonsPage() {
         id: selectedLesson.id,
         subjectId: selectedLesson.subjectId,
         classId: selectedLesson.classId,
-        teacherId: selectedLesson.teacherId, // teacherId here is doc ID from 'teachers'
+        teacherId: selectedLesson.teacherId, 
         dayOfWeek: selectedLesson.dayOfWeek as typeof DAYS_OF_WEEK[number],
         startTime: selectedLesson.startTime,
         endTime: selectedLesson.endTime,
@@ -278,7 +276,7 @@ export default function LessonsPage() {
   const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
     const subject = subjects.find(s => s.id === data.subjectId);
     const aClass = classes.find(c => c.id === data.classId);
-    const teacher = teachers.find(t => t.id === data.teacherId); // Find teacher by their document ID
+    const teacher = teachers.find(t => t.id === data.teacherId); 
     return {
       subjectName: subject?.name,
       className: aClass?.name,
@@ -297,7 +295,7 @@ export default function LessonsPage() {
 
     try {
       await addDoc(collection(db, "lessons"), {
-        ...data, // data.teacherId is the doc ID from 'teachers' collection
+        ...data, 
         subjectName,
         className,
         teacherName,
@@ -534,11 +532,17 @@ export default function LessonsPage() {
                         {canManageLessons && <TableCell>{lesson.topic || "-"}</TableCell>}
                         {(isStudentOrParent || role === 'siswa') && (
                           <TableCell className="text-right">
-                            <Button asChild size="sm" variant="outline" disabled={!isActiveNow}>
-                              <Link href={`/lessons/${lesson.id}`}>
+                            {isActiveNow ? (
+                              <Button asChild size="sm" variant="outline">
+                                <Link href={`/lessons/${lesson.id}`}>
+                                  <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                </Link>
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" disabled>
                                 <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
-                              </Link>
-                            </Button>
+                              </Button>
+                            )}
                           </TableCell>
                         )}
                         {canManageLessons && (
