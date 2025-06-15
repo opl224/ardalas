@@ -35,18 +35,18 @@ import { cn } from "@/lib/utils";
 //   description: 'Lihat dan kelola informasi profil Anda.',
 // };
 
-const placeholderAvatars = [
-    { src: 'https://placehold.co/100x100/E9D5FF/4A044E.png', hint: 'abstract purple' , alt: 'Placeholder Avatar 1'},
-    { src: 'https://placehold.co/100x100/A7F3D0/065F46.png', hint: 'nature green', alt: 'Placeholder Avatar 2' },
-    { src: 'https://placehold.co/100x100/FBCFE8/831843.png', hint: 'geometric pink', alt: 'Placeholder Avatar 3' },
-    { src: 'https://placehold.co/100x100/BFDBFE/1E40AF.png', hint: 'space blue', alt: 'Placeholder Avatar 4' },
-    { src: 'https://placehold.co/100x100/FDE68A/78350F.png', hint: 'animal yellow', alt: 'Placeholder Avatar 5' },
-    { src: 'https://placehold.co/100x100/FECACA/991B1B.png', hint: 'city red', alt: 'Placeholder Avatar 6' },
+const localAvatars = [
+    { src: '/avatars/male-01.png', hint: 'avatar male cartoon', alt: 'Avatar Pria 1'},
+    { src: '/avatars/female-01.png', hint: 'avatar female illustration', alt: 'Avatar Wanita 1' },
+    { src: '/avatars/abstract-01.png', hint: 'abstract geometric pattern', alt: 'Avatar Abstrak 1' },
+    { src: '/avatars/animal-01.png', hint: 'cute animal character', alt: 'Avatar Hewan 1' },
+    { src: '/avatars/male-02.png', hint: 'avatar cool boy', alt: 'Avatar Pria 2' },
+    { src: '/avatars/female-02.png', hint: 'avatar girl glasses', alt: 'Avatar Wanita 2' },
 ];
 
 
 export default function ProfilePage() {
-  const { user, loading, role } = useAuth();
+  const { user, loading, role, refreshUser } = useAuth(); // Added refreshUser from context
   const { toast } = useToast();
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [selectedAvatarUrlInDialog, setSelectedAvatarUrlInDialog] = useState<string | null>(null);
@@ -81,9 +81,12 @@ export default function ProfilePage() {
       await updateProfile(auth.currentUser as FirebaseUserType, { photoURL: selectedAvatarUrlInDialog });
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, { photoURL: selectedAvatarUrlInDialog });
-
-      // The AuthContext's onAuthStateChanged listener should pick up the change
-      // and update the user object globally.
+      
+      // Manually trigger a refresh of user state in AuthContext
+      if (refreshUser) {
+        await refreshUser();
+      }
+      
       toast({ title: "Sukses", description: "Avatar berhasil diperbarui." });
       setIsAvatarDialogOpen(false);
     } catch (error) {
@@ -158,11 +161,11 @@ export default function ProfilePage() {
                 <DialogHeader>
                   <DialogTitle>Pilih Avatar Baru</DialogTitle>
                   <DialogDescription>
-                    Klik pada salah satu avatar di bawah ini untuk memilihnya.
+                    Klik pada salah satu avatar di bawah ini untuk memilihnya. Pastikan gambar tersedia di folder public/avatars.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-                  {placeholderAvatars.map((avatar) => (
+                  {localAvatars.map((avatar) => (
                     <button
                       key={avatar.src}
                       onClick={() => handleAvatarSelect(avatar.src)}
@@ -233,3 +236,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
