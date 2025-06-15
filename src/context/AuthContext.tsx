@@ -7,6 +7,8 @@ import type { Role } from "@/config/roles";
 import { doc, getDoc, Timestamp, query, collection, where, limit, getDocs } from "firebase/firestore";
 // Import React and other hooks/types explicitly
 import React, { useEffect, useContext, createContext, useState, type ReactNode, useCallback } from "react";
+import { signOut } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast"; // Added for session timeout toast
 
 interface UserProfile extends FirebaseUser {
   role?: Role;
@@ -33,10 +35,16 @@ const AuthContext = createContext<AuthContextType>({
   refreshUser: async () => {}, 
 });
 
+const LAST_ACTIVITY_STORAGE_KEY = 'lastUserActivityTimestamp';
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+// const INACTIVITY_TIMEOUT_MS = 10 * 1000; // For testing: 10 seconds
+
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<Role | null>(null);
+  const { toast } = useToast(); // Initialize toast
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -54,6 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(null);
       setRole(null);
       setLoading(false);
+      localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY); // Clear activity timestamp on logout
       return;
     }
 
@@ -160,6 +169,70 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [fetchUserProfile]);
 
+  // Inactivity timeout logic
+  useEffect(() => {
+    let activityInterval: NodeJS.Timeout | null = null;
+    const eventsToTrack: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+
+    const updateLastActivity = () => {
+      const now = Date.now().toString();
+      localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, now);
+    };
+
+    const handleActivity = () => {
+      updateLastActivity();
+    };
+
+    if (user && !loading) {
+      updateLastActivity(); // Initialize or update last activity timestamp on login/refresh
+
+      eventsToTrack.forEach(event => window.addEventListener(event, handleActivity, { passive: true }));
+
+      activityInterval = setInterval(() => {
+        const lastActivityTimestamp = localStorage.getItem(LAST_ACTIVITY_STORAGE_KEY);
+        if (lastActivityTimestamp) {
+          const lastActivityTime = parseInt(lastActivityTimestamp, 10);
+          if (Date.now() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
+            if (auth.currentUser) { // Check if user is still authenticated with Firebase
+              toast({
+                title: "Sesi Berakhir",
+                description: "Anda telah dikeluarkan secara otomatis karena tidak aktif selama 5 jam.",
+                variant: "default",
+              });
+              signOut(auth).catch(error => {
+                console.error("Error during automatic sign-out:", error);
+                toast({
+                  title: "Gagal Logout Otomatis",
+                  description: "Terjadi kesalahan saat mencoba logout otomatis.",
+                  variant: "destructive",
+                });
+              });
+              // No explicit redirect here, onAuthStateChanged in AppLayout handles it.
+              // Cleanup immediately after initiating signOut
+              if (activityInterval) clearInterval(activityInterval);
+              eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
+              localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
+            }
+          }
+        } else {
+          // If no timestamp but user exists, set it
+          updateLastActivity();
+        }
+      }, 60 * 1000); // Check every minute
+
+    } else if (!user && !loading) {
+      // User is logged out or was never logged in
+      if (activityInterval) clearInterval(activityInterval);
+      eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
+      localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
+    }
+
+    return () => { // Cleanup function for when the component unmounts or user/loading changes
+      if (activityInterval) clearInterval(activityInterval);
+      eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
+    };
+  }, [user, loading, toast]);
+
 
   return (
     <AuthContext.Provider value={{ user, loading, role, refreshUser }}>
@@ -175,3 +248,4 @@ export const useAuth = () => {
   }
   return context;
 };
+
