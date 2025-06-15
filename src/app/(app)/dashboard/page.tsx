@@ -56,7 +56,7 @@ interface Announcement {
   content: string;
   targetAudience: string[];
   targetClassIds?: string[];
-  createdById?: string; // Added for filtering announcements for teachers
+  createdById?: string; 
 }
 
 interface DashboardStats {
@@ -70,10 +70,15 @@ interface DashboardStats {
   teacherTotalClassesTaught: number;
   teacherTotalSubjectsTaught: number;
   teacherTotalAssignmentsGiven: number;
+  // Parent specific
+  parentChildClassStudentCount: number;
+  parentChildTotalLessons: number;
+  parentChildTotalAssignments: number;
+  parentChildAttendancePercentage: string; 
 }
 
 export default function DashboardPage() {
-  const { user, role, loading: authLoading } = useAuth(); // Changed from useAuth() to { user, role, loading: authLoading } for clarity
+  const { user, role, loading: authLoading } = useAuth(); 
   const [stats, setStats] = useState<DashboardStats>({
     adminTotalStudents: 0,
     adminTotalTeachers: 0,
@@ -83,6 +88,10 @@ export default function DashboardPage() {
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
     teacherTotalAssignmentsGiven: 0,
+    parentChildClassStudentCount: 0,
+    parentChildTotalLessons: 0,
+    parentChildTotalAssignments: 0,
+    parentChildAttendancePercentage: "0%",
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
@@ -96,6 +105,7 @@ export default function DashboardPage() {
         setStats({ 
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
+            parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
         });
         setRecentAnnouncements([]);
         return;
@@ -107,6 +117,7 @@ export default function DashboardPage() {
       const newStats: DashboardStats = {
         adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
         teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
+        parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
       };
 
       try {
@@ -118,7 +129,7 @@ export default function DashboardPage() {
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserQuery), // Corrected from teacherUserSnap to teacherUserQuery
+            getDocs(teacherUserQuery), 
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
@@ -180,6 +191,27 @@ export default function DashboardPage() {
             } else {
                  console.warn(`No teacher profile found in 'teachers' collection linked to Auth UID: ${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.`);
             }
+        } else if (role === 'orangtua' && user.uid && user.linkedStudentClassId) {
+            const classId = user.linkedStudentClassId;
+
+            const studentsInClassQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", classId));
+            const studentsInClassSnap = await getDocs(studentsInClassQuery);
+            newStats.parentChildClassStudentCount = studentsInClassSnap.size;
+
+            const lessonsInClassQuery = query(collection(db, "lessons"), where("classId", "==", classId));
+            const lessonsInClassSnap = await getDocs(lessonsInClassQuery);
+            newStats.parentChildTotalLessons = lessonsInClassSnap.size;
+            
+            // Fetch assignments for the child's class, then filter results for the child
+            if (user.linkedStudentId) {
+                const assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", classId));
+                const assignmentsSnap = await getDocs(assignmentsQuery);
+                newStats.parentChildTotalAssignments = assignmentsSnap.size; // This is total assignments for class, could be filtered
+            } else {
+                 newStats.parentChildTotalAssignments = 0;
+            }
+            // Kehadiran Anak akan diimplementasikan lebih detail nanti
+            newStats.parentChildAttendancePercentage = "0%"; 
         }
         setStats(newStats);
       } catch (error) {
@@ -187,6 +219,7 @@ export default function DashboardPage() {
         setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
+            parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
         });
       } finally {
         setLoadingStats(false);
@@ -322,8 +355,8 @@ export default function DashboardPage() {
                      <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                 </CardContent>
             </Card>
-             <StatCard title="Jumlah Tugas" value={"N/A"} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
-             <StatCard title="Kehadiran Bulan Ini" value={"N/A"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+             <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
+             <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
           </div>
         </section>
       )}
@@ -331,17 +364,26 @@ export default function DashboardPage() {
       {role === 'orangtua' && user && (
          <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Anak ({user.linkedStudentName || "Siswa"})</h2>
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
                 <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-bold">{user.linkedStudentClassName || (user.linkedStudentClassId ? user.linkedStudentClassId : "Belum Tertaut")}</div>
-                    <p className="text-xs text-muted-foreground pt-1">Informasi kelas anak Anda.</p>
-                    {user.linkedStudentClassId &&  <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/classes`}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
+                    <div className="text-3xl font-bold">
+                      {loadingStats ? <Skeleton className="h-8 w-32" /> : 
+                       `${user.linkedStudentClassName || user.linkedStudentClassId || 'Belum Tertaut'}`
+                      }
+                    </div>
+                    <p className="text-xs text-muted-foreground pt-1">
+                      {loadingStats ? <Skeleton className="h-4 w-24" /> : 
+                       `(${stats.parentChildClassStudentCount} siswa)`
+                      }
+                    </p>
+                    {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/classes`}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                 </CardContent>
             </Card>
-             <StatCard title="Tugas Anak" value={"N/A"} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif anak Anda." href="/assignments"/>
-             <StatCard title="Kehadiran Anak" value={"N/A"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+             <StatCard title="Jadwal Pelajaran Anak" value={stats.parentChildTotalLessons} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
+             <StatCard title="Tugas Anak" value={stats.parentChildTotalAssignments} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
+             <StatCard title="Kehadiran Anak" value={stats.parentChildAttendancePercentage} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
           </div>
         </section>
       )}
