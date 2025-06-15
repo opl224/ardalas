@@ -64,8 +64,6 @@ export default function ProfilePage() {
     if (user?.photoURL) {
       setSelectedAvatarUrlInDialog(user.photoURL);
     } else if (localAvatars.length > 0) {
-      // If user has no photoURL, select the first local avatar as default in dialog
-      // or ensure it's initialized if the previous photoURL was a local one but no longer exists/matches.
       if (!localAvatars.some(avatar => avatar.src === user?.photoURL)) {
          setSelectedAvatarUrlInDialog(localAvatars[0].src);
       } else {
@@ -100,7 +98,7 @@ export default function ProfilePage() {
       await updateDoc(userDocRef, { photoURL: selectedAvatarUrlInDialog });
       
       if (refreshUser) {
-        await refreshUser(); // Call refreshUser to update context
+        await refreshUser(); 
       }
       
       toast({ title: "Sukses", description: "Avatar berhasil diperbarui." });
@@ -253,15 +251,14 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
-          {user.role === 'orangtua' && user.linkedStudentClassId && (
+          {user.role === 'orangtua' && user.linkedStudentId && (
              <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-md">
                 <LinkIcon className="h-6 w-6 text-muted-foreground" />
                 <div>
                     <p className="text-xs text-muted-foreground">Anak Terhubung</p>
                     <p className="font-medium">
-                        {user.linkedStudentName || "Nama Siswa Tidak Ada"} - Kelas: {user.linkedStudentClassId ? 
-                        (user.linkedStudentName && allClasses.find(c => c.id === user.linkedStudentClassId)?.name) || user.linkedStudentClassId 
-                        : "Kelas Tidak Ada"}
+                        {user.linkedStudentName || "Nama Siswa Tidak Ada"}
+                        {user.linkedStudentClassName ? ` - Kelas: ${user.linkedStudentClassName}` : (user.linkedStudentClassId ? ` - Kelas: ${user.linkedStudentClassId}` : " - Kelas Tidak Ada")}
                     </p>
                 </div>
             </div>

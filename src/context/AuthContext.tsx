@@ -16,6 +16,7 @@ interface UserProfile extends FirebaseUser {
   linkedStudentId?: string; // For parents: UID of their child
   linkedStudentName?: string; // For parents: Name of their child
   linkedStudentClassId?: string; // For parents: Class ID of their child
+  linkedStudentClassName?: string; // For parents: Class Name of their child
 }
 
 interface AuthContextType {
@@ -44,9 +45,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         document.documentElement.classList.add("dark");
       } else {
         document.documentElement.classList.remove("dark");
-        // if (savedTheme !== "light") { // Ensure theme is set even if null/undefined
-        //     localStorage.setItem("theme", "light");
-        // }
       }
     }
   }, []);
@@ -105,16 +103,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const studentData = studentUserDocSnap.data();
                 userProfileData.linkedStudentName = studentData.name;
                 userProfileData.linkedStudentClassId = studentData.classId;
-                if (!studentData.classId) {
-                  console.warn(`AuthContext: Linked student ${studentData.name} (UID: ${parentData.studentId}) for parent ${firebaseUser.uid} does not have a classId in their 'users' document.`);
-                }
-                if(studentData.classId && !studentData.className) {
-                    const classDocRef = doc(db, "classes", studentData.classId);
-                    const classDocSnap = await getDoc(classDocRef);
-                    if (classDocSnap.exists()) {
-                        // UserProfileData already has className for student, but for parent, it's on linkedStudent. We don't directly set className for parent.
-                        // It will be user.linkedStudentClassId and user.linkedStudentName
+                
+                if (studentData.classId) {
+                    const studentClassDocRef = doc(db, "classes", studentData.classId);
+                    const studentClassDocSnap = await getDoc(studentClassDocRef);
+                    if (studentClassDocSnap.exists()) {
+                        userProfileData.linkedStudentClassName = studentClassDocSnap.data()?.name;
+                    } else {
+                        console.warn(`AuthContext: Class document with ID ${studentData.classId} (for linked student ${studentData.name}) not found.`);
+                        userProfileData.linkedStudentClassName = studentData.classId; // Fallback to classId if name not found
                     }
+                } else {
+                   console.warn(`AuthContext: Linked student ${studentData.name} (UID: ${parentData.studentId}) for parent ${firebaseUser.uid} does not have a classId in their 'users' document.`);
                 }
               } else {
                 console.warn(`AuthContext: Student document with UID ${parentData.studentId} (linked to parent ${firebaseUser.uid}) not found in 'users' collection.`);
