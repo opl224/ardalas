@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BookCopy, PlusCircle, Edit, Trash2, LogIn } from "lucide-react";
+import { BookCopy, PlusCircle, Edit, Trash2, LogIn, AlertCircle } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -205,6 +205,10 @@ export default function LessonsPage() {
         q = query(lessonsCollectionRef, where("classId", "==", user.classId));
       } else if (role === "orangtua" && user?.linkedStudentClassId) {
         q = query(lessonsCollectionRef, where("classId", "==", user.linkedStudentClassId));
+      } else if (role === "orangtua" && !user?.linkedStudentClassId) { // Parent role but no linked class
+        setLessons([]);
+        setIsLoading(false);
+        return;
       } else if (role === "guru" && user?.uid) {
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
@@ -389,6 +393,27 @@ export default function LessonsPage() {
     return isWithinInterval(now, { start: lessonStartTime, end: lessonEndTime });
   };
 
+  const getNoLessonsMessage = () => {
+    if (role === "guru") {
+      return "Tidak ada pelajaran yang ditugaskan kepada Anda.";
+    }
+    if (role === "siswa") {
+      return "Tidak ada jadwal pelajaran untuk kelas Anda saat ini.";
+    }
+    if (role === "orangtua") {
+      if (!user?.linkedStudentClassId) {
+        return (
+          <div className="flex flex-col items-center text-center">
+             <AlertCircle className="w-10 h-10 mb-2 text-destructive" />
+            <span className="font-semibold">Data Kelas Anak Tidak Ditemukan.</span>
+            <span>Pastikan anak sudah terdaftar di kelas dan akun orang tua sudah ditautkan dengan benar ke data siswa.</span>
+          </div>
+        );
+      }
+      return "Tidak ada jadwal pelajaran yang terdaftar untuk kelas anak Anda saat ini.";
+    }
+    return "Belum ada jadwal pelajaran yang ditambahkan.";
+  };
 
   return (
     <div className="space-y-6">
@@ -398,7 +423,7 @@ export default function LessonsPage() {
           {canManageLessons 
             ? "Kelola jadwal pelajaran, materi ajar, dan silabus."
             : isStudentOrParent
-            ? (role === "siswa" ? "Lihat jadwal pelajaran Anda." : "Lihat jadwal pelajaran anak Anda.")
+            ? (role === "siswa" ? "Lihat jadwal pelajaran Anda." : `Lihat jadwal pelajaran anak Anda (${user?.linkedStudentName || 'Siswa'}).`)
             : "Lihat jadwal pelajaran."
           }
         </p>
@@ -531,17 +556,19 @@ export default function LessonsPage() {
                         <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
                         {canManageLessons && <TableCell>{lesson.topic || "-"}</TableCell>}
                         {(isStudentOrParent || role === 'siswa') && (
-                          <TableCell className="text-right">
+                           <TableCell className="text-right">
                             {isActiveNow ? (
-                              <Button asChild size="sm" variant="outline">
-                                <Link href={`/lessons/${lesson.id}`}>
-                                  <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
-                                </Link>
-                              </Button>
+                               <Button asChild size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/10">
+                                  <Link href={`/lessons/${lesson.id}`}>
+                                    <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                  </Link>
+                                </Button>
                             ) : (
-                              <Button size="sm" variant="outline" disabled>
-                                <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
-                              </Button>
+                                <Button asChild size="sm" variant="outline" disabled>
+                                  <Link href={`/lessons/${lesson.id}`}>
+                                    <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                  </Link>
+                                </Button>
                             )}
                           </TableCell>
                         )}
@@ -581,9 +608,7 @@ export default function LessonsPage() {
             </div>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {role === "guru" ? "Tidak ada pelajaran yang ditugaskan kepada Anda." : 
-               (role === "siswa" || role === "orangtua") ? "Tidak ada jadwal pelajaran untuk kelas Anda saat ini." :
-               "Belum ada jadwal pelajaran yang ditambahkan."}
+              {getNoLessonsMessage()}
             </div>
           )}
         </CardContent>

@@ -4,7 +4,7 @@
 import type { User as FirebaseUser } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 import type { Role } from "@/config/roles";
-import { doc, getDoc, Timestamp, query, collection, where, limit, getDocs } from "firebase/firestore"; // Added getDocs here
+import { doc, getDoc, Timestamp, query, collection, where, limit, getDocs } from "firebase/firestore";
 // Import React and other hooks/types explicitly
 import React, { useEffect, useContext, createContext, useState, type ReactNode, useCallback } from "react";
 
@@ -44,9 +44,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         document.documentElement.classList.add("dark");
       } else {
         document.documentElement.classList.remove("dark");
-        if (savedTheme !== "light") {
-            localStorage.setItem("theme", "light");
-        }
+        // if (savedTheme !== "light") { // Ensure theme is set even if null/undefined
+        //     localStorage.setItem("theme", "light");
+        // }
       }
     }
   }, []);
@@ -93,46 +93,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               }
           }
         } else if (userProfileData.role === 'orangtua') {
-          // Fetch linked student for parent
           const parentProfileQuery = query(collection(db, "parents"), where("uid", "==", firebaseUser.uid), limit(1));
           const parentProfileSnapshot = await getDocs(parentProfileQuery);
           if (!parentProfileSnapshot.empty) {
             const parentData = parentProfileSnapshot.docs[0].data();
             userProfileData.linkedStudentId = parentData.studentId;
-            // Fetch student details if studentId is present
             if (parentData.studentId) {
-              const studentUserDocRef = doc(db, "users", parentData.studentId); // Student's UID is their doc ID in 'users'
+              const studentUserDocRef = doc(db, "users", parentData.studentId); 
               const studentUserDocSnap = await getDoc(studentUserDocRef);
               if (studentUserDocSnap.exists()) {
                 const studentData = studentUserDocSnap.data();
                 userProfileData.linkedStudentName = studentData.name;
                 userProfileData.linkedStudentClassId = studentData.classId;
-                // Optionally fetch student's className if needed widely, or handle on specific pages
+                if (!studentData.classId) {
+                  console.warn(`AuthContext: Linked student ${studentData.name} (UID: ${parentData.studentId}) for parent ${firebaseUser.uid} does not have a classId in their 'users' document.`);
+                }
                 if(studentData.classId && !studentData.className) {
                     const classDocRef = doc(db, "classes", studentData.classId);
                     const classDocSnap = await getDoc(classDocRef);
                     if (classDocSnap.exists()) {
-                        // Could add linkedStudentClassName to UserProfile if needed
+                        // UserProfileData already has className for student, but for parent, it's on linkedStudent. We don't directly set className for parent.
+                        // It will be user.linkedStudentClassId and user.linkedStudentName
                     }
                 }
+              } else {
+                console.warn(`AuthContext: Student document with UID ${parentData.studentId} (linked to parent ${firebaseUser.uid}) not found in 'users' collection.`);
               }
+            } else {
+               console.warn(`AuthContext: Parent profile for ${firebaseUser.uid} does not have a studentId linked.`);
             }
+          } else {
+             console.warn(`AuthContext: No parent profile found in 'parents' collection for Auth UID ${firebaseUser.uid}. Ensure a parent profile exists and its 'uid' field matches the Firebase Auth UID.`);
           }
         }
       } else {
-        // User exists in Auth but not in Firestore 'users' collection
-        // This case should ideally be handled during registration, but as a fallback:
         userProfileData.displayName = firebaseUser.displayName || null;
         userProfileData.photoURL = firebaseUser.photoURL;
-        // Role would be unknown, could prompt for role selection or assign a default guest/pending role
       }
       setUser(userProfileData);
       setRole(userProfileData.role || null);
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      // Fallback to basic FirebaseUser info if Firestore fetch fails
       setUser({ ...firebaseUser } as UserProfile);
-      setRole(null); // Role is unknown if Firestore fetch fails
+      setRole(null); 
     } finally {
       setLoading(false);
     }
@@ -172,6 +175,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-
-    
