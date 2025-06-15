@@ -56,7 +56,7 @@ interface Announcement {
   content: string;
   targetAudience: string[];
   targetClassIds?: string[];
-  createdById?: string; 
+  createdById?: string;
 }
 
 interface DashboardStats {
@@ -74,11 +74,11 @@ interface DashboardStats {
   parentChildClassStudentCount: number;
   parentChildTotalLessons: number;
   parentChildTotalAssignments: number;
-  parentChildAttendancePercentage: string; 
+  parentChildAttendancePercentage: string;
 }
 
 export default function DashboardPage() {
-  const { user, role, loading: authLoading } = useAuth(); 
+  const { user, role, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     adminTotalStudents: 0,
     adminTotalTeachers: 0,
@@ -102,7 +102,7 @@ export default function DashboardPage() {
       if (!user || !role) {
         setLoadingStats(false);
         setLoadingAnnouncements(false);
-        setStats({ 
+        setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
             parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
@@ -113,7 +113,7 @@ export default function DashboardPage() {
 
       setLoadingStats(true);
       setLoadingAnnouncements(true);
-      
+
       const newStats: DashboardStats = {
         adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
         teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
@@ -129,13 +129,13 @@ export default function DashboardPage() {
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserQuery), 
+            getDocs(teacherUserQuery),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
 
           newStats.adminTotalStudents = studentSnap.size;
-          newStats.adminTotalTeachers = teacherUserSnap.size; 
+          newStats.adminTotalTeachers = teacherUserSnap.size;
           newStats.adminTotalSubjects = subjectSnap.size;
           newStats.adminTotalClasses = classSnap.size;
 
@@ -145,11 +145,11 @@ export default function DashboardPage() {
 
             if (!teacherProfileSnapshot.empty) {
                 const teacherProfileDoc = teacherProfileSnapshot.docs[0];
-                const teacherProfileId = teacherProfileDoc.id; 
+                const teacherProfileId = teacherProfileDoc.id;
 
                 const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
                 const lessonsSnapshot = await getDocs(lessonsQuery);
-              
+
                 const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
                 const taughtClassIds = new Set<string>();
                 const taughtSubjectIds = new Set<string>();
@@ -162,7 +162,7 @@ export default function DashboardPage() {
                 newStats.teacherTotalClassesTaught = taughtClassIds.size;
                 newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
 
-                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId)); 
+                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId));
                 const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
                 newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
 
@@ -170,14 +170,14 @@ export default function DashboardPage() {
                 if (taughtClassIds.size > 0) {
                     const studentClassesArray = Array.from(taughtClassIds);
                     const allStudentIds = new Set<string>();
-                    const CHUNK_SIZE = 30; 
+                    const CHUNK_SIZE = 30;
 
                     for (let i = 0; i < studentClassesArray.length; i += CHUNK_SIZE) {
                         const chunk = studentClassesArray.slice(i, i + CHUNK_SIZE);
                         if (chunk.length > 0) {
                             const studentsTaughtQuery = query(
-                                collection(db, "users"), 
-                                where("role", "==", "siswa"), 
+                                collection(db, "users"),
+                                where("role", "==", "siswa"),
                                 where("classId", "in", chunk)
                             );
                             const studentsTaughtSnapshot = await getDocs(studentsTaughtQuery);
@@ -201,22 +201,21 @@ export default function DashboardPage() {
             const lessonsInClassQuery = query(collection(db, "lessons"), where("classId", "==", classId));
             const lessonsInClassSnap = await getDocs(lessonsInClassQuery);
             newStats.parentChildTotalLessons = lessonsInClassSnap.size;
-            
-            // Fetch assignments for the child's class, then filter results for the child
+
             if (user.linkedStudentId) {
                 const assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", classId));
                 const assignmentsSnap = await getDocs(assignmentsQuery);
-                newStats.parentChildTotalAssignments = assignmentsSnap.size; // This is total assignments for class, could be filtered
+                newStats.parentChildTotalAssignments = assignmentsSnap.size;
             } else {
                  newStats.parentChildTotalAssignments = 0;
             }
-            // Kehadiran Anak akan diimplementasikan lebih detail nanti
-            newStats.parentChildAttendancePercentage = "0%"; 
+            // Placeholder for attendance - this would need more complex logic
+            newStats.parentChildAttendancePercentage = "N/A";
         }
         setStats(newStats);
       } catch (error) {
         console.error("Error fetching stats: ", error);
-        setStats({
+        setStats({ // Reset to default on error
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
             parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
@@ -228,27 +227,27 @@ export default function DashboardPage() {
       try {
         const announcementsRef = collection(db, "announcements");
         let announcementsQueryInstance;
-        
+
         if (role === 'siswa' && user?.classId) {
            announcementsQueryInstance = query(
             announcementsRef,
-            orderBy("date", "desc"), 
-            limit(10) 
+            orderBy("date", "desc"),
+            limit(10) // Fetch more initially to ensure enough after filtering
           );
-        } else if (role === 'orangtua' && user?.linkedStudentClassId) { 
+        } else if (role === 'orangtua' && user?.linkedStudentClassId) {
            announcementsQueryInstance = query(
             announcementsRef,
             orderBy("date", "desc"),
             limit(10)
           );
-        } else if (role === 'guru') { 
+        } else if (role === 'guru') {
            announcementsQueryInstance = query(
             announcementsRef,
             orderBy("date", "desc"),
-            limit(10) 
+            limit(10)
           );
         }
-        else { 
+        else { // Admin or other roles
          announcementsQueryInstance = query(announcementsRef, orderBy("date", "desc"), limit(3));
         }
 
@@ -258,53 +257,55 @@ export default function DashboardPage() {
           ...doc.data()
         })) as Announcement[];
 
+        // Client-side filtering based on role and class if needed
         if (user) {
             if (role === 'siswa' && user.classId) {
-                fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
-                    ann.targetAudience.includes(role!) || 
-                    (ann.targetClassIds && ann.targetClassIds.includes(user.classId!))
-                ).slice(0,3);
+                fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
+                    ann.targetAudience.includes(role!) || // Target audience includes 'siswa'
+                    (ann.targetClassIds && ann.targetClassIds.includes(user.classId!)) // Or target class includes student's class
+                ).slice(0,3); // Then take top 3
             } else if (role === 'orangtua' && user.linkedStudentClassId) {
-                 fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
-                    ann.targetAudience.includes(role!) || 
+                 fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
+                    ann.targetAudience.includes(role!) ||
                     (ann.targetClassIds && ann.targetClassIds.includes(user.linkedStudentClassId!))
                 ).slice(0,3);
-            } else if (role === 'guru') {
+            } else if (role === 'guru') { // For teachers, show if target is 'guru', 'semua', or created by them
                 fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
                     ann.targetAudience.includes('guru') ||
-                    ann.targetAudience.includes('semua') || 
-                    ann.createdById === user.uid 
+                    ann.targetAudience.includes('semua') || // 'semua' might need to be a defined role or constant
+                    ann.createdById === user.uid
                 ).slice(0, 3);
             }
         }
-        
+
         setRecentAnnouncements(fetchedAnnouncements);
       } catch (error) {
         console.error("Error fetching announcements:", error);
+        // setRecentAnnouncements([]); // Clear or handle error appropriately
       } finally {
         setLoadingAnnouncements(false);
       }
     };
-    
-    if (user && role) {
+
+    if (user && role) { // Ensure user and role are available
         fetchAllData();
-    } else if (!user && !authLoading) { 
+    } else if (!user && !authLoading) { // If not loading and no user, stop loading indicators
         setLoadingStats(false);
         setLoadingAnnouncements(false);
     }
 
-  }, [user, role, authLoading]); 
+  }, [user, role, authLoading]);
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
     { title: "Jadwal Pelajaran", href: "/lessons", icon: BookCopy, description: "Lihat jadwal pelajaran." },
     { title: "Acara Sekolah", href: "/events", icon: CalendarDays, description: "Jadwal kegiatan penting." },
   ];
-  
+
   if (role === 'siswa') {
     quickLinks.push({ title: "Tugas Saya", href: "/assignments", icon: ClipboardCheck, description: "Lihat dan kerjakan tugas." });
     quickLinks.push({ title: "Nilai Saya", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajarmu." });
-  } else if (role === 'orangtua') { 
+  } else if (role === 'orangtua') {
     quickLinks.push({ title: "Tugas Anak", href: "/assignments", icon: ClipboardCheck, description: "Lihat tugas anak Anda." });
     quickLinks.push({ title: "Nilai Anak", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajar anak." });
   }
@@ -342,7 +343,7 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
-      
+
       {role === 'siswa' && user && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Siswa</h2>
@@ -355,6 +356,7 @@ export default function DashboardPage() {
                      <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                 </CardContent>
             </Card>
+             {/* Placeholder, actual data to be fetched */}
              <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
              <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
           </div>
@@ -369,21 +371,21 @@ export default function DashboardPage() {
                 <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
                 <CardContent>
                     <div className="text-3xl font-bold">
-                      {loadingStats ? <Skeleton className="h-8 w-32" /> : 
-                       `${user.linkedStudentClassName || user.linkedStudentClassId || 'Belum Tertaut'}`
+                      {loadingStats ? <Skeleton className="h-8 w-32" /> :
+                       (user.linkedStudentClassName || user.linkedStudentClassId || "0")
                       }
                     </div>
-                    <p className="text-xs text-muted-foreground pt-1">
-                      {loadingStats ? <Skeleton className="h-4 w-24" /> : 
-                       `(${stats.parentChildClassStudentCount} siswa)`
+                    <div className="text-xs text-muted-foreground pt-1">
+                      {loadingStats ? <Skeleton className="h-4 w-24" /> :
+                       `(${stats.parentChildClassStudentCount || 0} siswa)`
                       }
-                    </p>
+                    </div>
                     {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/classes`}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                 </CardContent>
             </Card>
-             <StatCard title="Jadwal Pelajaran Anak" value={stats.parentChildTotalLessons} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
-             <StatCard title="Tugas Anak" value={stats.parentChildTotalAssignments} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
-             <StatCard title="Kehadiran Anak" value={stats.parentChildAttendancePercentage} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+             <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : stats.parentChildTotalLessons || 0} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
+             <StatCard title="Tugas Anak" value={loadingStats ? "" : stats.parentChildTotalAssignments || 0} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
+             <StatCard title="Kehadiran Anak" value={loadingStats ? "" : stats.parentChildAttendancePercentage || "0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
           </div>
         </section>
       )}
@@ -392,7 +394,7 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-2xl font-semibold mb-4 font-headline">Akses Cepat</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quickLinks.slice(0, (role === 'siswa' || role === 'orangtua') ? 5 : (role === 'guru' ? 3 : 3)).map((link) => ( 
+          {quickLinks.slice(0, (role === 'siswa' || role === 'orangtua') ? 5 : (role === 'guru' ? 3 : 3)).map((link) => (
             <Card key={link.title} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-medium">{link.title}</CardTitle>
@@ -462,6 +464,5 @@ export default function DashboardPage() {
   );
 }
 
-    
 
     
