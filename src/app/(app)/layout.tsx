@@ -9,7 +9,8 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
-import { Sheet } from "@/components/ui/sheet"; // Import Sheet
+import { Sheet } from "@/components/ui/sheet"; 
+import LottieLoader from "@/components/ui/LottieLoader";
 
 // Internal component to consume sidebar context
 function AppLayoutInternal({ children }: { children: ReactNode }) {
@@ -45,24 +46,24 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="space-y-4 p-4">
-            <div className="flex items-center space-x-4">
-              <Skeleton className="h-12 w-12 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-[250px]" />
-                <Skeleton className="h-4 w-[200px]" />
-              </div>
-            </div>
-            <Skeleton className="h-[300px] w-[300px] rounded-md" />
+        <div className="flex flex-col items-center space-y-4 p-4">
+            <LottieLoader width={150} height={150} />
+            <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
+            <p className="text-muted-foreground">Silakan tunggu sebentar.</p>
         </div>
       </div>
     );
   }
 
   if (!user) {
+    // This state is usually very brief as the router.push above will trigger.
+    // Show a loader here as well for a smoother transition.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <p>Redirecting to login...</p>
+        <div className="flex flex-col items-center space-y-4 p-4">
+          <LottieLoader width={150} height={150} />
+          <h1 className="text-xl font-semibold text-muted-foreground">Mengalihkan ke halaman login...</h1>
+        </div>
       </div>
     );
   }
