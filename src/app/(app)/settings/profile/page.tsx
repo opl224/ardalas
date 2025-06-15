@@ -65,7 +65,12 @@ export default function ProfilePage() {
       setSelectedAvatarUrlInDialog(user.photoURL);
     } else if (localAvatars.length > 0) {
       // If user has no photoURL, select the first local avatar as default in dialog
-      setSelectedAvatarUrlInDialog(localAvatars[0].src);
+      // or ensure it's initialized if the previous photoURL was a local one but no longer exists/matches.
+      if (!localAvatars.some(avatar => avatar.src === user?.photoURL)) {
+         setSelectedAvatarUrlInDialog(localAvatars[0].src);
+      } else {
+         setSelectedAvatarUrlInDialog(user?.photoURL || localAvatars[0].src);
+      }
     } else {
       setSelectedAvatarUrlInDialog(null);
     }
@@ -148,21 +153,20 @@ export default function ProfilePage() {
 
       <Card className="max-w-2xl mx-auto bg-card/80 backdrop-blur-md border shadow-lg">
         <CardHeader className="items-center text-center pb-4 border-b">
-          <div className="relative group">
-            <Avatar className="h-24 w-24 mb-3 border-2 border-primary group-hover:opacity-80 transition-opacity">
+          <div className="relative">
+            <Avatar className="h-24 w-24 mb-3 border-2 border-primary transition-opacity">
               <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile picture" />
               <AvatarFallback className="text-3xl bg-muted">{getInitials(user.displayName)}</AvatarFallback>
             </Avatar>
             <Dialog open={isAvatarDialogOpen} onOpenChange={(open) => {
               setIsAvatarDialogOpen(open);
-              // Reset selection to current user's avatar or first local if dialog closes
               if (!open) setSelectedAvatarUrlInDialog(user.photoURL || (localAvatars.length > 0 ? localAvatars[0].src : null)); 
             }}>
               <DialogTrigger asChild>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="absolute bottom-2 right-0 transform translate-x-1/4 translate-y-1/4 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-background hover:bg-muted"
+                  className="absolute bottom-2 right-0 transform translate-x-1/4 translate-y-1/4 h-8 w-8 rounded-full transition-opacity bg-background hover:bg-muted"
                   aria-label="Ubah avatar"
                   onClick={() => setIsAvatarDialogOpen(true)}
                 >
