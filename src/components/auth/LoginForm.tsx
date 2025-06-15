@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +23,7 @@ import { useRouter } from "next/navigation";
 import type { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
+import LottieLoader from "@/components/ui/LottieLoader";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Format email tidak valid." }),
@@ -120,7 +122,14 @@ export function LoginForm() {
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Memproses..." : "Login"}
+              {isLoading ? (
+                <>
+                  <LottieLoader width={20} height={20} className="mr-2" />
+                  Memproses...
+                </>
+              ) : (
+                "Login"
+              )}
               {!isLoading && <LogInIcon className="ml-2 h-4 w-4" />}
             </Button>
           </form>
