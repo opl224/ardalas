@@ -11,7 +11,7 @@ import Link from "next/link"; // Added Link import
 
 // Cannot export metadata from client component directly, will be handled by parent or layout
 // export const metadata: Metadata = {
-//   title: 'Kelas Saya - SDN',
+//   title: 'Kelas Saya - Ardalas',
 //   description: 'Informasi mengenai kelas Anda saat ini.',
 // };
 
@@ -111,3 +111,4 @@ export default function MyClassPage() {
     </div>
   );
 }
+

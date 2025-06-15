@@ -73,7 +73,7 @@ export function LoginForm() {
   return (
     <Card className="bg-card/80 backdrop-blur-md border shadow-lg">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline text-center">Login SDN</CardTitle>
+        <CardTitle className="text-2xl font-headline text-center">Login Ardalas</CardTitle>
         <CardDescription className="text-center">
           Masuk ke akun Anda untuk melanjutkan.
         </CardDescription>

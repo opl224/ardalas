@@ -210,7 +210,7 @@ export default function DashboardPage() {
                  newStats.parentChildTotalAssignments = 0;
             }
             // Placeholder for attendance - this would need more complex logic
-            newStats.parentChildAttendancePercentage = "N/A";
+            newStats.parentChildAttendancePercentage = "0%";
         }
         setStats(newStats);
       } catch (error) {
@@ -317,7 +317,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold font-headline">
           Selamat Datang{user?.displayName ? `, ${user.displayName}` : ''}!
         </h1>
-        <p className="text-muted-foreground">Platform manajemen informasi sekolah Anda.</p>
+        <p className="text-muted-foreground">Platform manajemen informasi sekolah Ardalas.</p>
       </div>
 
       {role === 'admin' && (
@@ -383,9 +383,9 @@ export default function DashboardPage() {
                     {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/classes`}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                 </CardContent>
             </Card>
-             <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : stats.parentChildTotalLessons || 0} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
-             <StatCard title="Tugas Anak" value={loadingStats ? "" : stats.parentChildTotalAssignments || 0} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
-             <StatCard title="Kehadiran Anak" value={loadingStats ? "" : stats.parentChildAttendancePercentage || "0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+             <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
+             <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
+             <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
           </div>
         </section>
       )}
@@ -463,6 +463,5 @@ export default function DashboardPage() {
     </div>
   );
 }
-
 
     

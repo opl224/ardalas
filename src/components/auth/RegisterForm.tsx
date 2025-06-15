@@ -109,7 +109,7 @@ export function RegisterForm() {
   return (
     <Card className="bg-card/80 backdrop-blur-md border shadow-lg">
       <CardHeader>
-        <CardTitle className="text-2xl font-headline text-center">Daftar Akun SDN</CardTitle>
+        <CardTitle className="text-2xl font-headline text-center">Daftar Akun Ardalas</CardTitle>
         <CardDescription className="text-center">
           Buat akun baru untuk mengakses sistem.
         </CardDescription>

@@ -291,7 +291,7 @@ export function AppHeader() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar(); 
   const currentNavItem = navItems.find(item => item.href === pathname || (item.href !== "/dashboard" && pathname.startsWith(item.href)));
-  const pageTitle = currentNavItem?.title || "SDN";
+  const pageTitle = currentNavItem?.title || "Ardalas";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-4 sm:px-8">
@@ -315,3 +315,4 @@ export function AppHeader() {
     </header>
   );
 }
+

@@ -29,9 +29,10 @@ export default function HomePage() {
             <Skeleton className="h-4 w-[150px]" />
           </div>
         </div>
-        <h1 className="text-2xl font-semibold">Memuat SDN...</h1>
+        <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
         <p className="text-muted-foreground">Silakan tunggu sebentar.</p>
       </div>
     </div>
   );
 }
+

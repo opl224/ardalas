@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 // Metadata tidak bisa diekspor dari client component secara langsung, 
 // akan lebih baik jika diatur oleh layout induk jika diperlukan secara statis.
 // export const metadata: Metadata = {
-//   title: 'Profil Pengguna - SDN',
+//   title: 'Profil Pengguna - Ardalas',
 //   description: 'Lihat dan kelola informasi profil Anda.',
 // };
 
@@ -146,7 +146,7 @@ export default function ProfilePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">Profil Saya</h1>
-        <p className="text-muted-foreground">Informasi akun Anda di sistem SDN.</p>
+        <p className="text-muted-foreground">Informasi akun Anda di sistem Ardalas.</p>
       </div>
 
       <Card className="max-w-2xl mx-auto bg-card/80 backdrop-blur-md border shadow-lg">

@@ -2,8 +2,8 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Login - SDN",
-  description: "Login ke akun SDN Anda.",
+  title: "Login - Ardalas",
+  description: "Login ke akun Ardalas Anda.",
 };
 
 export default function LoginPage() {
