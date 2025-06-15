@@ -1,0 +1,8 @@
+[build]
+  command = "next build"
+  publish = ".next"
+
+# Plugin ini penting agar fitur-fitur Next.js berfungsi dengan baik di Netlify.
+# Biasanya terinstal otomatis, tetapi menambahkannya di sini memastikan plugin tersebut digunakan.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
