@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,8 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"; 
-import { Users, PlusCircle, Edit, Trash2 } from "lucide-react";
-import { useState, useEffect, type ReactNode } from "react";
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon } from "lucide-react"; // Added Search and FilterIcon
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -102,6 +101,9 @@ export default function StudentsPage() {
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
 
   const { toast } = useToast();
 
@@ -128,49 +130,42 @@ export default function StudentsPage() {
         const querySnapshot = await getDocs(q);
         setAllClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
       } else if (authRole === 'guru' && authUser?.uid) {
-        const subjectsQuery = query(collection(db, "subjects"), where("teacherUid", "==", authUser.uid));
-        const subjectsSnapshot = await getDocs(subjectsQuery);
-        const teacherSubjectIds = subjectsSnapshot.docs.map(doc => doc.id);
+        // For teachers, get classes they teach in by looking at lessons
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
-        if (teacherSubjectIds.length === 0) {
-          setAllClasses([]);
-          setIsLoadingClasses(false);
-          return;
+        if (teacherProfileSnapshot.empty) {
+            setAllClasses([]);
+            setIsLoadingClasses(false);
+            return;
         }
+        const teacherProfileId = teacherProfileSnapshot.docs[0].id;
         
-        const CHUNK_SIZE_SUBJECTS = 30; // Firestore 'in' query limit
-        let teacherClassIdsSet = new Set<string>();
-
-        for (let i = 0; i < teacherSubjectIds.length; i += CHUNK_SIZE_SUBJECTS) {
-            const subjectChunk = teacherSubjectIds.slice(i, i + CHUNK_SIZE_SUBJECTS);
-            if (subjectChunk.length > 0) {
-                const lessonsQuery = query(collection(db, "lessons"), where("subjectId", "in", subjectChunk));
-                const lessonsSnapshot = await getDocs(lessonsQuery);
-                lessonsSnapshot.docs.forEach(doc => {
-                    const classId = doc.data().classId as string;
-                    if (classId) teacherClassIdsSet.add(classId);
-                });
-            }
-        }
+        const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
+        const lessonsSnapshot = await getDocs(lessonsQuery);
+        
+        const teacherClassIdsSet = new Set<string>();
+        lessonsSnapshot.docs.forEach(doc => {
+            const classId = doc.data().classId as string;
+            if (classId) teacherClassIdsSet.add(classId);
+        });
         const teacherClassIds = Array.from(teacherClassIdsSet);
         
         if (teacherClassIds.length === 0) {
           setAllClasses([]);
-          setIsLoadingClasses(false);
-          return;
-        }
-        
-        const CHUNK_SIZE_CLASSES = 30;
-        const fetchedClasses: ClassMin[] = [];
-        for (let i = 0; i < teacherClassIds.length; i += CHUNK_SIZE_CLASSES) {
-            const chunk = teacherClassIds.slice(i, i + CHUNK_SIZE_CLASSES);
-            if (chunk.length > 0) {
-                 const classesQuery = query(collection(db, "classes"), where(documentId(), "in", chunk));
-                 const classDetailsSnapshot = await getDocs(classesQuery);
-                 classDetailsSnapshot.forEach(doc => fetchedClasses.push({ id: doc.id, name: doc.data().name }));
+        } else {
+            const CHUNK_SIZE_CLASSES = 30;
+            const fetchedClasses: ClassMin[] = [];
+            for (let i = 0; i < teacherClassIds.length; i += CHUNK_SIZE_CLASSES) {
+                const chunk = teacherClassIds.slice(i, i + CHUNK_SIZE_CLASSES);
+                if (chunk.length > 0) {
+                     const classesQuery = query(collection(db, "classes"), where(documentId(), "in", chunk));
+                     const classDetailsSnapshot = await getDocs(classesQuery);
+                     classDetailsSnapshot.forEach(doc => fetchedClasses.push({ id: doc.id, name: doc.data().name }));
+                }
             }
+            setAllClasses(fetchedClasses.sort((a,b) => a.name.localeCompare(b.name)));
         }
-        setAllClasses(fetchedClasses.sort((a,b) => a.name.localeCompare(b.name)));
       } else {
         setAllClasses([]);
       }
@@ -232,8 +227,6 @@ export default function StudentsPage() {
             });
           });
           finalFetchedStudents.sort((a,b) => a.name.localeCompare(b.name));
-        } else {
-          // Teacher teaches no classes, so no students to show
         }
       } else if (authRole === 'admin') {
         studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
@@ -268,7 +261,7 @@ export default function StudentsPage() {
   }, [authRole, authUser, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && !isLoadingClasses) { // Fetch students after classes are loaded/determined
+    if (!authLoading && !isLoadingClasses) { 
         fetchStudents();
     }
   }, [authLoading, isLoadingClasses, allClasses]);
@@ -285,6 +278,23 @@ export default function StudentsPage() {
       });
     }
   }, [selectedStudent, isEditStudentDialogOpen, editStudentForm]);
+  
+  const displayedStudents = useMemo(() => {
+    let filtered = students;
+    if (selectedClassFilter !== "all") {
+      filtered = filtered.filter(student => student.classId === selectedClassFilter);
+    }
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      filtered = filtered.filter(student =>
+        student.name.toLowerCase().includes(lowerSearchTerm) ||
+        (student.nis && student.nis.toLowerCase().includes(lowerSearchTerm)) ||
+        (student.email && student.email.toLowerCase().includes(lowerSearchTerm))
+      );
+    }
+    return filtered;
+  }, [students, searchTerm, selectedClassFilter]);
+
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
     if (authRole !== 'admin' && authRole !== 'guru') {
@@ -298,45 +308,21 @@ export default function StudentsPage() {
         toast({ title: "Kelas tidak valid", description: "Silakan pilih kelas yang valid untuk murid.", variant: "destructive" });
         return;
     }
-
-    // Add student to 'users' collection with role 'siswa'
-    // This functionality overlaps with UserAdministration. For now, we'll assume this page
-    // is primarily for managing the student profile data aspects (like NIS, class assignment)
-    // rather than creating the Firebase Auth user itself.
-    // A more robust system might create Auth user first, then create profile here, or link.
-    // For now, let's assume an Auth user with 'siswa' role could be created elsewhere or this action
-    // just creates/updates the Firestore profile part.
-    // Given the current structure, we will add to the 'users' collection.
-
     try {
-      // Check if a user with this email already exists for simplicity, though full auth creation is complex here.
-      // This page should ideally link to an existing Auth user or manage a separate student profile list.
-      // For now, we will proceed as if adding to 'users' but acknowledge overlap.
-      
       const studentDataForUsersCollection = {
         name: data.name,
         nis: data.nis,
         email: data.email,
         classId: selectedClassObj.id, 
         className: selectedClassObj.name, 
-        role: 'siswa', // Explicitly set role
-        // uid: will be set if integrated with User Auth creation which is not done here
+        role: 'siswa', 
         createdAt: serverTimestamp(),
       };
-
-      // This would ideally be a new document in a 'students' collection, or an update to an existing
-      // 'users' collection document IF we had the user's UID.
-      // Since "Tambah Murid" implies creating a new student record, and we don't handle Auth creation here,
-      // this will add a new document to the 'users' collection. This might lead to users without Auth.
-      // This needs to be reconciled with User Administration.
-      // For the scope of this page as "Manajemen Murid", we'll proceed with adding to 'users'.
-
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
-      
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
       addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
-      fetchStudents(); // Re-fetch to show the new student
+      fetchStudents(); 
     } catch (error: any) {
       console.error("Error adding student:", error);
       let errorMessage = "Gagal menambahkan murid.";
@@ -364,7 +350,6 @@ export default function StudentsPage() {
         return;
     }
     try {
-      // selectedStudent.id here refers to the document ID in the 'users' collection (which is the UID)
       const studentDocRef = doc(db, "users", selectedStudent.id); 
       await updateDoc(studentDocRef, {
         name: data.name,
@@ -392,8 +377,6 @@ export default function StudentsPage() {
         toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menghapus murid.", variant: "destructive"});
         return;
     }
-    // This should delete the document from the 'users' collection.
-    // Deleting Firebase Auth user is a separate, more complex operation usually handled in User Admin.
     try {
       await deleteDoc(doc(db, "users", studentId));
       toast({ title: "Data Murid Dihapus dari Profil", description: `${studentName || 'Murid'} berhasil dihapus dari daftar profil.` });
@@ -498,6 +481,7 @@ export default function StudentsPage() {
     ? `Daftar teman sekelas Anda.`
     : (authRole === 'guru' ? "Daftar siswa dari kelas-kelas yang mata pelajarannya Anda ampu." : "Kelola data murid, absensi, nilai, dan informasi terkait.");
 
+  const showClassFilter = (authRole === 'admin' && allClasses.length > 0) || (authRole === 'guru' && allClasses.length > 1);
 
   return (
     <div className="space-y-6">
@@ -509,7 +493,7 @@ export default function StudentsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-6 w-6 text-primary" />
-            <span>Daftar Murid {isLoadingStudents ? '' : `(${students.length} siswa)`}</span>
+            <span>Daftar Murid {isLoadingStudents ? '' : `(${displayedStudents.length} siswa)`}</span>
           </CardTitle>
           { (authRole === 'admin' || authRole === 'guru') && ( 
             <Dialog 
@@ -552,13 +536,45 @@ export default function StudentsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoadingStudents || authLoading || (authRole !== 'siswa' && isLoadingClasses) ? (
+          {(authRole === 'admin' || authRole === 'guru') && (
+            <div className="my-4 flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari nama, NIS, atau email..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+              {showClassFilter && (
+                <Select
+                  value={selectedClassFilter}
+                  onValueChange={setSelectedClassFilter}
+                  disabled={isLoadingClasses}
+                >
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                    <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Filter per Kelas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Kelas</SelectItem>
+                    {allClasses.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+
+          {isLoadingStudents || authLoading || ( (authRole === 'admin' || authRole === 'guru') && isLoadingClasses) ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
              </div>
-          ) : students.length > 0 ? (
+          ) : displayedStudents.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -571,7 +587,7 @@ export default function StudentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((student) => (
+                  {displayedStudents.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell>{student.nis || "-"}</TableCell>
@@ -614,9 +630,12 @@ export default function StudentsPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {authRole === 'siswa' ? "Tidak ada siswa lain di kelas Anda." : 
-               authRole === 'guru' ? "Tidak ada data siswa di kelas yang mata pelajarannya Anda ajar." : 
-               "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru."}
+              {searchTerm || selectedClassFilter !== "all"
+                ? "Tidak ada murid yang cocok dengan filter atau pencarian Anda."
+                : (authRole === 'siswa' ? "Tidak ada siswa lain di kelas Anda." : 
+                   authRole === 'guru' ? "Tidak ada data siswa di kelas yang mata pelajarannya Anda ajar atau filter yang dipilih tidak memiliki data." : 
+                   "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.")
+              }
             </div>
           )}
         </CardContent>
