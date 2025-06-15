@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check } from "lucide-react";
+import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check, LinkIcon } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import type { Metadata } from 'next';
 import Link from "next/link";
@@ -210,7 +210,16 @@ export default function ProfilePage() {
             </Dialog>
           </div>
           <CardTitle className="text-2xl font-semibold">{user.displayName || "Pengguna"}</CardTitle>
-          {role && <CardDescription className="text-primary font-medium">{roleDisplayNames[role]}</CardDescription>}
+          {role && (
+            <CardDescription className="text-primary font-medium">
+              {roleDisplayNames[role]}
+              {role === 'orangtua' && user.linkedStudentName && (
+                <span className="block text-sm text-muted-foreground mt-0.5">
+                  (Orang Tua dari: {user.linkedStudentName})
+                </span>
+              )}
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent className="pt-6 space-y-5">
           <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-md">
@@ -242,6 +251,19 @@ export default function ProfilePage() {
                 <p className="text-xs text-muted-foreground">Kelas</p>
                 <p className="font-medium">{user.className}</p>
               </div>
+            </div>
+          )}
+          {user.role === 'orangtua' && user.linkedStudentClassId && (
+             <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-md">
+                <LinkIcon className="h-6 w-6 text-muted-foreground" />
+                <div>
+                    <p className="text-xs text-muted-foreground">Anak Terhubung</p>
+                    <p className="font-medium">
+                        {user.linkedStudentName || "Nama Siswa Tidak Ada"} - Kelas: {user.linkedStudentClassId ? 
+                        (user.linkedStudentName && allClasses.find(c => c.id === user.linkedStudentClassId)?.name) || user.linkedStudentClassId 
+                        : "Kelas Tidak Ada"}
+                    </p>
+                </div>
             </div>
           )}
            <p className="text-xs text-muted-foreground text-center pt-2">
