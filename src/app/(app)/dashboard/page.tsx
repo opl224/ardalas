@@ -55,6 +55,7 @@ interface Announcement {
   date: Timestamp;
   content: string;
   targetAudience: string[];
+  targetClassIds?: string[];
 }
 
 interface DashboardStats {
@@ -116,7 +117,7 @@ export default function DashboardPage() {
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserSnap),
+            getDocs(teacherUserQuery), // Corrected this line
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
@@ -127,15 +128,13 @@ export default function DashboardPage() {
           newStats.adminTotalClasses = classSnap.size;
 
         } else if (role === 'guru' && user.uid) {
-            // Query for the teacher's profile in 'teachers' collection using their Auth UID
             const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
             if (!teacherProfileSnapshot.empty) {
                 const teacherProfileDoc = teacherProfileSnapshot.docs[0];
-                const teacherProfileId = teacherProfileDoc.id; // This is the Document ID from 'teachers' collection
+                const teacherProfileId = teacherProfileDoc.id; 
 
-                // Fetch lessons taught by this teacher using the teacher's profile ID
                 const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
                 const lessonsSnapshot = await getDocs(lessonsQuery);
               
@@ -151,7 +150,6 @@ export default function DashboardPage() {
                 newStats.teacherTotalClassesTaught = taughtClassIds.size;
                 newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
 
-                // Fetch total assignments given by this teacher
                 const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId));
                 const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
                 newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
@@ -179,14 +177,12 @@ export default function DashboardPage() {
                     newStats.teacherTotalStudentsTaught = 0;
                 }
             } else {
-                // No teacher profile found for this Auth UID, stats remain 0
                  console.warn(`No teacher profile found in 'teachers' collection linked to Auth UID: ${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.`);
             }
         }
         setStats(newStats);
       } catch (error) {
         console.error("Error fetching stats: ", error);
-        // Reset stats on error to avoid displaying stale or incorrect data
         setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
@@ -199,13 +195,12 @@ export default function DashboardPage() {
         const announcementsRef = collection(db, "announcements");
         let announcementsQueryInstance;
         
-        // Adjusting announcement query based on user role and context
         if (role === 'siswa' && user?.classId) {
            announcementsQueryInstance = query(
             announcementsRef,
-            where("targetAudience", "array-contains-any", [role, "semua"]), // Simpler general query first
+            where("targetAudience", "array-contains-any", [role, "semua"]),
             orderBy("date", "desc"),
-            limit(10) // Fetch more initially to filter client-side for class-specific ones if needed
+            limit(10) 
           );
         } else if (role === 'orangtua' && user?.linkedStudentClassId) {
            announcementsQueryInstance = query(
@@ -222,7 +217,7 @@ export default function DashboardPage() {
             limit(3)
           );
         }
-        else { // Admin or general fallback
+        else { 
          announcementsQueryInstance = query(announcementsRef, orderBy("date", "desc"), limit(3));
         }
 
@@ -232,7 +227,6 @@ export default function DashboardPage() {
           ...doc.data()
         })) as Announcement[];
 
-        // Client-side filtering for class-specific announcements if needed
         if (role === 'siswa' && user?.classId) {
             fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
                 ann.targetAudience.includes(role) || 
