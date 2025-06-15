@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Skeleton } from "@/components/ui/skeleton";
+import LottieLoader from "@/components/ui/LottieLoader"; // Import LottieLoader
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -21,18 +22,11 @@ export default function HomePage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
-      <div className="space-y-4">
-        <div className="flex items-center space-x-4">
-          <Skeleton className="h-12 w-12 rounded-full" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-[200px]" />
-            <Skeleton className="h-4 w-[150px]" />
-          </div>
-        </div>
+      <div className="flex flex-col items-center space-y-4">
+        <LottieLoader width={150} height={150} /> 
         <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
         <p className="text-muted-foreground">Silakan tunggu sebentar.</p>
       </div>
     </div>
   );
 }
-
