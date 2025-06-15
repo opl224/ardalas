@@ -38,7 +38,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CalendarDays, PlusCircle, Edit, Trash2, Loader2, AlertCircle, Save } from "lucide-react";
+import { CalendarDays, PlusCircle, Edit, Trash2, AlertCircle, Save } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -263,7 +264,7 @@ export default function EventsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Manajemen Acara Sekolah</h1>
-        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6 flex items-center justify-center p-8"><Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />Memuat...</CardContent></Card>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6 flex items-center justify-center p-8"><LottieLoader width={32} height={32} className="mr-2" />Memuat...</CardContent></Card>
       </div>
     );
   }
@@ -394,7 +395,7 @@ export default function EventsPage() {
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                     <Button type="submit" disabled={addEventForm.formState.isSubmitting}>
-                      {addEventForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {addEventForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
                       Simpan Acara
                     </Button>
                   </DialogFooter>
@@ -472,7 +473,7 @@ export default function EventsPage() {
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                 <Button type="submit" disabled={editEventForm.formState.isSubmitting}>
-                  {editEventForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editEventForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
                   Simpan Perubahan</Button>
               </DialogFooter>
             </form>
@@ -483,4 +484,5 @@ export default function EventsPage() {
     </div>
   );
 }
+
 

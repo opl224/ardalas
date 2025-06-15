@@ -44,7 +44,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Loader2, Save, Filter, Link as LinkIcon } from "lucide-react";
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -618,7 +619,7 @@ export default function ResultsPage() {
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardContent className="pt-6">
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
+              <LottieLoader width={32} height={32} className="mr-2" />
               Memuat data pendukung...
             </div>
           </CardContent>
@@ -860,7 +861,7 @@ export default function ResultsPage() {
                         </div>
                          <DialogFooter className="pt-4 border-t mt-auto">
                             <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                            <Button type="submit" form="addResultDialogForm" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
+                            <Button type="submit" form="addResultDialogForm" disabled={addResultForm.formState.isSubmitting}>{addResultForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}{addResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Hasil"}</Button>
                         </DialogFooter>
                       </form>
                   </Form>
@@ -1005,7 +1006,7 @@ export default function ResultsPage() {
                     </div>
                     <DialogFooter className="pt-4 border-t mt-auto">
                         <DialogClose asChild><Button type="button" variant="outline" onClick={() => {setIsEditDialogOpen(false); setSelectedResult(null);}}>Batal</Button></DialogClose>
-                        <Button type="submit" form="editResultDialogForm" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+                        <Button type="submit" form="editResultDialogForm" disabled={editResultForm.formState.isSubmitting}>{editResultForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}{editResultForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
                     </DialogFooter>
                   </form>
                 </Form>

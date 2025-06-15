@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -480,7 +481,8 @@ export default function ParentsPage() {
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
                     <Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>
-                      {addParentForm.formState.isSubmitting || isLoadingData ? "Menyimpan..." : "Simpan Data"}
+                      {(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                      {(addParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Data"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -626,6 +628,7 @@ export default function ParentsPage() {
                       <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedParent(null); }}>Batal</Button>
                    </DialogClose>
                   <Button type="submit" disabled={editParentForm.formState.isSubmitting || isLoadingData}>
+                    {(editParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
                     {(editParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>

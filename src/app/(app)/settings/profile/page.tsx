@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check, LinkIcon } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import { roleDisplayNames } from "@/config/roles";
 import type { Metadata } from 'next';
 import Link from "next/link";
@@ -201,6 +202,7 @@ export default function ProfilePage() {
                 <DialogFooter>
                   <DialogClose asChild><Button variant="outline">Batal</Button></DialogClose>
                   <Button onClick={handleSaveAvatar} disabled={isUpdatingAvatar || !selectedAvatarUrlInDialog || selectedAvatarUrlInDialog === user.photoURL}>
+                    {isUpdatingAvatar && <LottieLoader width={16} height={16} className="mr-2" />}
                     {isUpdatingAvatar ? "Menyimpan..." : "Simpan Avatar"}
                   </Button>
                 </DialogFooter>
@@ -271,4 +273,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
 

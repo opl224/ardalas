@@ -20,7 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarCheck, CalendarIcon, AlertCircle, Loader2, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -916,7 +917,7 @@ function TeacherAdminAttendanceManagement() {
             {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingStudents && !isLoadingExistingAttendance && (
               <div className="flex justify-end mt-6">
                 <Button type="submit" disabled={isSubmitting || isLoadingExistingAttendance || isLoadingStudents}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
                   {isSubmitting ? "Menyimpan..." : (existingAttendanceDocId ? "Perbarui Kehadiran" : "Simpan Kehadiran")}
                   {!isSubmitting && <Save className="ml-2 h-4 w-4" />}
                 </Button>
@@ -959,7 +960,7 @@ function TeacherAdminAttendanceManagement() {
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting}>{isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
+          <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting}>{isExporting && <LottieLoader width={16} height={16} className="mr-2" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
@@ -1196,7 +1197,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" disabled={isExporting || todayLessons.length === 0}>
-                        {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isExporting && <LottieLoader width={16} height={16} className="mr-2" />}
                         <FileDown className="mr-2 h-4 w-4" /> Ekspor
                     </Button>
                 </DropdownMenuTrigger>
@@ -1268,7 +1269,7 @@ export default function AttendancePageWrapper() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Kehadiran</h1>
-        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6"><div className="flex items-center justify-center p-8"><Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />Memuat...</div></CardContent></Card>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6"><div className="flex items-center justify-center p-8"><LottieLoader width={32} height={32} className="mr-2" />Memuat...</div></CardContent></Card>
       </div>
     );
   }

@@ -8,7 +8,8 @@ import { db } from "@/lib/firebase/config";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, BookOpen, User, Clock, Info, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { AlertCircle, BookOpen, User, Clock, Info, FileText, CheckCircle, XCircle } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { format, startOfDay, parse, isValid, isWithinInterval } from "date-fns";
@@ -314,7 +315,7 @@ export default function LessonDetailPage() {
                   disabled={isSubmittingAttendance}
                   className="w-full sm:w-auto"
                 >
-                  {isSubmittingAttendance && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmittingAttendance && <LottieLoader width={16} height={16} className="mr-2" />}
                   {isSubmittingAttendance ? "Memproses..." : "Absen Sekarang"}
                 </Button>
               )}
@@ -322,7 +323,7 @@ export default function LessonDetailPage() {
           )}
            {role === "siswa" && isCheckingAttendance && (
              <div className="mt-6 p-4 border border-border rounded-md bg-background shadow flex items-center justify-center">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Memuat status kehadiran...
+                <LottieLoader width={24} height={24} className="mr-2" /> Memuat status kehadiran...
              </div>
            )}
 
@@ -368,4 +369,5 @@ export default function LessonDetailPage() {
     </div>
   );
 }
+
 

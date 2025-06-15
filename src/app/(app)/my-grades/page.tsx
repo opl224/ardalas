@@ -23,7 +23,8 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { useState, useEffect } from "react";
-import { BarChart3, AlertCircle, Loader2, Link as LinkIcon } from "lucide-react";
+import { BarChart3, AlertCircle, Link as LinkIcon } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -180,7 +181,7 @@ export default function MyGradesPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
+              <LottieLoader width={32} height={32} className="mr-2" />
               Memuat nilai tugas...
             </div>
           </CardContent>
@@ -299,3 +300,4 @@ export default function MyGradesPage() {
     </div>
   );
 }
+

@@ -3,7 +3,8 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Filter, Search, Megaphone, Edit, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { PlusCircle, Filter, Search, Megaphone, Edit, Trash2, AlertCircle } from "lucide-react";
+import LottieLoader from "@/components/ui/LottieLoader";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,6 +54,7 @@ import {
   where,
   documentId,
   writeBatch, 
+  limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -386,7 +388,7 @@ export default function AnnouncementsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-3xl font-bold font-headline">Pengumuman Sekolah</h1>
-        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6 flex items-center justify-center p-8"><Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />Memuat...</CardContent></Card>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6 flex items-center justify-center p-8"><LottieLoader width={32} height={32} className="mr-2" />Memuat...</CardContent></Card>
       </div>
     );
   }
@@ -543,7 +545,7 @@ export default function AnnouncementsPage() {
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                   <Button type="submit" disabled={addAnnouncementForm.formState.isSubmitting}>
-                    {addAnnouncementForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {addAnnouncementForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
                     Publikasikan
                   </Button>
                 </DialogFooter>
@@ -657,7 +659,7 @@ export default function AnnouncementsPage() {
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                 <Button type="submit" disabled={editAnnouncementForm.formState.isSubmitting}>
-                  {editAnnouncementForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editAnnouncementForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
                   Simpan Perubahan</Button>
               </DialogFooter>
             </form>

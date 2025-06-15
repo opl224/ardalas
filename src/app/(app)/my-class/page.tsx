@@ -4,7 +4,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { School, AlertCircle, Loader2, Users } from "lucide-react"; // Added Users icon
+import { School, AlertCircle, Users } from "lucide-react"; // Added Users icon
+import LottieLoader from "@/components/ui/LottieLoader";
 import type { Metadata } from 'next';
 import { Button } from "@/components/ui/button"; // Added Button import
 import Link from "next/link"; // Added Link import
@@ -29,7 +30,7 @@ export default function MyClassPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-center p-8">
-              <Loader2 className="w-8 h-8 mr-2 animate-spin text-primary" />
+              <LottieLoader width={32} height={32} className="mr-2" />
               Memuat informasi kelas...
             </div>
           </CardContent>
@@ -111,4 +112,5 @@ export default function MyClassPage() {
     </div>
   );
 }
+
 
