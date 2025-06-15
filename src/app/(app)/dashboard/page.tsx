@@ -118,7 +118,7 @@ export default function DashboardPage() {
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserQuery),
+            getDocs(teacherUserQuery), // Corrected from teacherUserSnap to teacherUserQuery
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
@@ -335,9 +335,9 @@ export default function DashboardPage() {
             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
                 <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
                 <CardContent>
-                    <div className="text-3xl font-bold">{user.linkedStudentClassId ? "Lihat Kelas" : "Belum Tertaut"}</div>
+                    <div className="text-3xl font-bold">{user.linkedStudentClassName || (user.linkedStudentClassId ? user.linkedStudentClassId : "Belum Tertaut")}</div>
                     <p className="text-xs text-muted-foreground pt-1">Informasi kelas anak Anda.</p>
-                    {user.linkedStudentClassId &&  <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/lessons`}>Jadwal Pelajaran <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
+                    {user.linkedStudentClassId &&  <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/classes`}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                 </CardContent>
             </Card>
              <StatCard title="Tugas Anak" value={"N/A"} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif anak Anda." href="/assignments"/>
