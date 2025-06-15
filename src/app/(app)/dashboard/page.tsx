@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School } from "lucide-react";
+import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
@@ -56,6 +56,7 @@ interface Announcement {
   content: string;
   targetAudience: string[];
   targetClassIds?: string[];
+  createdById?: string; // Added for filtering announcements for teachers
 }
 
 interface DashboardStats {
@@ -150,8 +151,7 @@ export default function DashboardPage() {
                 newStats.teacherTotalClassesTaught = taughtClassIds.size;
                 newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
 
-                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId)); // Use teacherProfileId if assignments store teacher profile ID
-                // If assignments store teacher Auth UID, then use: where("teacherId", "==", user.uid)
+                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId)); 
                 const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
                 newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
 
@@ -199,10 +199,10 @@ export default function DashboardPage() {
         if (role === 'siswa' && user?.classId) {
            announcementsQueryInstance = query(
             announcementsRef,
-            orderBy("date", "desc"), // Fetch more initially to filter client-side
+            orderBy("date", "desc"), 
             limit(10) 
           );
-        } else if (role === 'orangtua' && user?.linkedStudentClassId) { // Use linkedStudentClassId for parents
+        } else if (role === 'orangtua' && user?.linkedStudentClassId) { 
            announcementsQueryInstance = query(
             announcementsRef,
             orderBy("date", "desc"),
@@ -212,7 +212,7 @@ export default function DashboardPage() {
            announcementsQueryInstance = query(
             announcementsRef,
             orderBy("date", "desc"),
-            limit(10) // Fetch a bit more for client-side filtering for teachers
+            limit(10) 
           );
         }
         else { 
@@ -225,7 +225,6 @@ export default function DashboardPage() {
           ...doc.data()
         })) as Announcement[];
 
-        // Client-side filtering based on role and classId/linkedStudentClassId
         if (user) {
             if (role === 'siswa' && user.classId) {
                 fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
@@ -238,13 +237,10 @@ export default function DashboardPage() {
                     (ann.targetClassIds && ann.targetClassIds.includes(user.linkedStudentClassId!))
                 ).slice(0,3);
             } else if (role === 'guru') {
-                // Logic for teachers: show if targeted to 'guru', 'semua', created by them, or targets one of their classes
-                // Assuming teacherClasses state exists or can be fetched/derived if needed for more complex class targeting
                 fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
                     ann.targetAudience.includes('guru') ||
-                    ann.targetAudience.includes('semua') || // "semua" if used
-                    ann.createdById === user.uid // Announcements they created
-                    // Add more complex logic here if teachers should see announcements for specific classes they teach
+                    ann.targetAudience.includes('semua') || 
+                    ann.createdById === user.uid 
                 ).slice(0, 3);
             }
         }
@@ -259,12 +255,12 @@ export default function DashboardPage() {
     
     if (user && role) {
         fetchAllData();
-    } else if (!user && !authLoading) { // Ensure loading is also false for non-user case
+    } else if (!user && !authLoading) { 
         setLoadingStats(false);
         setLoadingAnnouncements(false);
     }
 
-  }, [user, role, authLoading]); // Added authLoading to dependency array
+  }, [user, role, authLoading]); 
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -275,7 +271,7 @@ export default function DashboardPage() {
   if (role === 'siswa') {
     quickLinks.push({ title: "Tugas Saya", href: "/assignments", icon: ClipboardCheck, description: "Lihat dan kerjakan tugas." });
     quickLinks.push({ title: "Nilai Saya", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajarmu." });
-  } else if (role === 'orangtua') { // Added quick links for parents
+  } else if (role === 'orangtua') { 
     quickLinks.push({ title: "Tugas Anak", href: "/assignments", icon: ClipboardCheck, description: "Lihat tugas anak Anda." });
     quickLinks.push({ title: "Nilai Anak", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajar anak." });
   }
