@@ -6,10 +6,27 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { UserCircle, Mail, Shield, Edit3, KeyRound, School } from "lucide-react"; // Added School here
+import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import type { Metadata } from 'next';
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import Image from "next/image";
+import { useToast } from "@/hooks/use-toast";
+import { auth, db } from "@/lib/firebase/config";
+import { updateProfile, type User as FirebaseUserType } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { cn } from "@/lib/utils";
 
 // Metadata tidak bisa diekspor dari client component secara langsung, 
 // akan lebih baik jika diatur oleh layout induk jika diperlukan secara statis.
@@ -18,8 +35,30 @@ import Link from "next/link";
 //   description: 'Lihat dan kelola informasi profil Anda.',
 // };
 
+const placeholderAvatars = [
+    { src: 'https://placehold.co/100x100/E9D5FF/4A044E.png', hint: 'abstract purple' , alt: 'Placeholder Avatar 1'},
+    { src: 'https://placehold.co/100x100/A7F3D0/065F46.png', hint: 'nature green', alt: 'Placeholder Avatar 2' },
+    { src: 'https://placehold.co/100x100/FBCFE8/831843.png', hint: 'geometric pink', alt: 'Placeholder Avatar 3' },
+    { src: 'https://placehold.co/100x100/BFDBFE/1E40AF.png', hint: 'space blue', alt: 'Placeholder Avatar 4' },
+    { src: 'https://placehold.co/100x100/FDE68A/78350F.png', hint: 'animal yellow', alt: 'Placeholder Avatar 5' },
+    { src: 'https://placehold.co/100x100/FECACA/991B1B.png', hint: 'city red', alt: 'Placeholder Avatar 6' },
+];
+
+
 export default function ProfilePage() {
   const { user, loading, role } = useAuth();
+  const { toast } = useToast();
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [selectedAvatarUrlInDialog, setSelectedAvatarUrlInDialog] = useState<string | null>(null);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+
+  useEffect(() => {
+    if (user?.photoURL) {
+      setSelectedAvatarUrlInDialog(user.photoURL);
+    } else {
+      setSelectedAvatarUrlInDialog(null);
+    }
+  }, [user?.photoURL]);
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -27,6 +66,34 @@ export default function ProfilePage() {
     if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
     return (names[0][0] + names[names.length - 1][0]).toUpperCase();
   };
+
+  const handleAvatarSelect = (avatarUrl: string) => {
+    setSelectedAvatarUrlInDialog(avatarUrl);
+  };
+
+  const handleSaveAvatar = async () => {
+    if (!selectedAvatarUrlInDialog || !user || !auth.currentUser) {
+      toast({ title: "Gagal", description: "Tidak ada avatar dipilih atau pengguna tidak ditemukan.", variant: "destructive" });
+      return;
+    }
+    setIsUpdatingAvatar(true);
+    try {
+      await updateProfile(auth.currentUser as FirebaseUserType, { photoURL: selectedAvatarUrlInDialog });
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, { photoURL: selectedAvatarUrlInDialog });
+
+      // The AuthContext's onAuthStateChanged listener should pick up the change
+      // and update the user object globally.
+      toast({ title: "Sukses", description: "Avatar berhasil diperbarui." });
+      setIsAvatarDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating avatar:", error);
+      toast({ title: "Error", description: "Gagal memperbarui avatar.", variant: "destructive" });
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -67,10 +134,62 @@ export default function ProfilePage() {
 
       <Card className="max-w-2xl mx-auto bg-card/80 backdrop-blur-md border shadow-lg">
         <CardHeader className="items-center text-center pb-4 border-b">
-           <Avatar className="h-24 w-24 mb-3 border-2 border-primary">
-            <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile picture" />
-            <AvatarFallback className="text-3xl">{getInitials(user.displayName)}</AvatarFallback>
-          </Avatar>
+          <div className="relative group">
+            <Avatar className="h-24 w-24 mb-3 border-2 border-primary group-hover:opacity-80 transition-opacity">
+              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile picture" />
+              <AvatarFallback className="text-3xl bg-muted">{getInitials(user.displayName)}</AvatarFallback>
+            </Avatar>
+            <Dialog open={isAvatarDialogOpen} onOpenChange={(open) => {
+              setIsAvatarDialogOpen(open);
+              if (!open) setSelectedAvatarUrlInDialog(user.photoURL || null); // Reset selection on close
+            }}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="absolute bottom-2 right-0 transform translate-x-1/4 translate-y-1/4 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-background hover:bg-muted"
+                  aria-label="Ubah avatar"
+                  onClick={() => setIsAvatarDialogOpen(true)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Pilih Avatar Baru</DialogTitle>
+                  <DialogDescription>
+                    Klik pada salah satu avatar di bawah ini untuk memilihnya.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                  {placeholderAvatars.map((avatar) => (
+                    <button
+                      key={avatar.src}
+                      onClick={() => handleAvatarSelect(avatar.src)}
+                      className={cn(
+                        "relative aspect-square rounded-full overflow-hidden border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                        selectedAvatarUrlInDialog === avatar.src ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent hover:border-primary/50"
+                      )}
+                      aria-label={`Pilih ${avatar.alt}`}
+                    >
+                      <Image src={avatar.src} alt={avatar.alt} layout="fill" objectFit="cover" data-ai-hint={avatar.hint}/>
+                      {selectedAvatarUrlInDialog === avatar.src && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                          <Check className="h-8 w-8 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild><Button variant="outline">Batal</Button></DialogClose>
+                  <Button onClick={handleSaveAvatar} disabled={isUpdatingAvatar || !selectedAvatarUrlInDialog || selectedAvatarUrlInDialog === user.photoURL}>
+                    {isUpdatingAvatar ? "Menyimpan..." : "Simpan Avatar"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           <CardTitle className="text-2xl font-semibold">{user.displayName || "Pengguna"}</CardTitle>
           {role && <CardDescription className="text-primary font-medium">{roleDisplayNames[role]}</CardDescription>}
         </CardHeader>
