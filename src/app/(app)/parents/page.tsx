@@ -60,20 +60,19 @@ import {
   query,
   orderBy,
   where,
-  documentId // Ensure documentId is imported if used for querying classes
+  documentId
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 
-// Student interface for dropdown and filtering
 interface StudentForDialog {
-  id: string; // UID of the student from 'users' collection (which is Firebase Auth UID)
+  id: string; 
   name: string;
-  classId?: string; // Firestore document ID of the class
+  classId?: string;
 }
 
 interface ClassMin {
-  id: string; // Firestore document ID of the class
+  id: string;
   name: string;
 }
 
@@ -82,8 +81,8 @@ interface Parent {
   name: string;
   email?: string; 
   phone?: string;
-  studentId: string; // UID of the student (from 'users' collection)
-  studentName: string; // Denormalized for easy display
+  studentId: string; 
+  studentName: string; 
   createdAt?: Timestamp; 
 }
 
@@ -100,6 +99,8 @@ const editParentFormSchema = parentFormSchema.extend({
 });
 type EditParentFormValues = z.infer<typeof editParentFormSchema>;
 
+const NO_AUTH_USER_SELECTED = "_NO_AUTH_USER_"; // Placeholder for consistency, though not directly used for parent-student link
+
 export default function ParentsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const [parents, setParents] = useState<Parent[]>([]);
@@ -112,7 +113,6 @@ export default function ParentsPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
-
 
   const { toast } = useToast();
 
@@ -131,7 +131,7 @@ export default function ParentsPage() {
   });
 
   const fetchPageData = async () => {
-    if (authLoading && role !== 'admin') return; // Admin needs data regardless of authLoading state for initial setup
+    if (authLoading && role !== 'admin') return; 
     setIsLoadingData(true);
     try {
       const promises = [];
@@ -154,12 +154,16 @@ export default function ParentsPage() {
 
       const [studentsSnapshot, classesSnapshot, parentsSnapshot] = await Promise.all(promises);
 
-      const fetchedStudents: StudentForDialog[] = (studentsSnapshot as any).docs.map((docSnap: any) => ({
+      const fetchedStudentsRaw = (studentsSnapshot as any).docs.map((docSnap: any) => ({
         id: docSnap.data().uid, 
         name: docSnap.data().name,
         classId: docSnap.data().classId,
       }));
-      setStudentsForDialog(fetchedStudents);
+      const validFetchedStudents = fetchedStudentsRaw.filter(
+        (student: any) => student.id && typeof student.id === 'string'
+      );
+      setStudentsForDialog(validFetchedStudents);
+
 
       if (role === 'admin' && classesSnapshot) {
         setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
@@ -191,7 +195,6 @@ export default function ParentsPage() {
   useEffect(() => {
     fetchPageData();
   }, [authLoading, role]);
-
 
   useEffect(() => {
     if (selectedParent && isEditDialogOpen) {
@@ -606,5 +609,3 @@ export default function ParentsPage() {
     </div>
   );
 }
-
-    
