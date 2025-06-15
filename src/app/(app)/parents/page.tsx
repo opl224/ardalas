@@ -59,20 +59,21 @@ import {
   Timestamp,
   query,
   orderBy,
-  where
+  where,
+  documentId // Ensure documentId is imported if used for querying classes
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 
 // Student interface for dropdown and filtering
 interface StudentForDialog {
-  id: string; // UID of the student
+  id: string; // UID of the student from 'users' collection (which is Firebase Auth UID)
   name: string;
-  classId?: string;
+  classId?: string; // Firestore document ID of the class
 }
 
 interface ClassMin {
-  id: string;
+  id: string; // Firestore document ID of the class
   name: string;
 }
 
@@ -81,7 +82,7 @@ interface Parent {
   name: string;
   email?: string; 
   phone?: string;
-  studentId: string; // UID of the student
+  studentId: string; // UID of the student (from 'users' collection)
   studentName: string; // Denormalized for easy display
   createdAt?: Timestamp; 
 }
@@ -104,7 +105,7 @@ export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [studentsForDialog, setStudentsForDialog] = useState<StudentForDialog[]>([]); 
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true); // Combined loading state
+  const [isLoadingData, setIsLoadingData] = useState(true); 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
@@ -130,46 +131,40 @@ export default function ParentsPage() {
   });
 
   const fetchPageData = async () => {
-    if (authLoading) return;
+    if (authLoading && role !== 'admin') return; // Admin needs data regardless of authLoading state for initial setup
     setIsLoadingData(true);
     try {
       const promises = [];
 
-      // Fetch students (from users collection)
       const usersCollectionRef = collection(db, "users");
-      const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
-      promises.push(getDocs(studentsQuery));
+      const studentsQueryInstance = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+      promises.push(getDocs(studentsQueryInstance));
 
-      // Fetch classes (for admin filter)
       if (role === 'admin') {
         const classesCollectionRef = collection(db, "classes");
         const classesQueryInstance = query(classesCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(classesQueryInstance));
       } else {
-        promises.push(Promise.resolve(null)); // Placeholder for non-admin
+        promises.push(Promise.resolve(null)); 
       }
       
-      // Fetch parents
       const parentsCollectionRef = collection(db, "parents");
       const parentsQueryInstance = query(parentsCollectionRef, orderBy("name", "asc"));
       promises.push(getDocs(parentsQueryInstance));
 
       const [studentsSnapshot, classesSnapshot, parentsSnapshot] = await Promise.all(promises);
 
-      // Process students
       const fetchedStudents: StudentForDialog[] = (studentsSnapshot as any).docs.map((docSnap: any) => ({
-        id: docSnap.data().uid, // Student's Auth UID
+        id: docSnap.data().uid, 
         name: docSnap.data().name,
         classId: docSnap.data().classId,
       }));
       setStudentsForDialog(fetchedStudents);
 
-      // Process classes for admin
       if (role === 'admin' && classesSnapshot) {
         setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
       }
       
-      // Process parents
       const fetchedParents: Parent[] = (parentsSnapshot as any).docs.map((docSnap: any) => ({
         id: docSnap.id,
         name: docSnap.data().name,
@@ -388,9 +383,9 @@ export default function ParentsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {isLoadingData ? (
-                                <SelectItem value="loading-students" disabled>Memuat murid...</SelectItem>
+                                <SelectItem key="loading-students-item-add" value="loading-students" disabled>Memuat murid...</SelectItem>
                             ) : studentsForDialog.length === 0 ? (
-                                <SelectItem value="no-students" disabled>Tidak ada murid terdaftar</SelectItem>
+                                <SelectItem key="no-students-item-add" value="no-students" disabled>Tidak ada murid terdaftar</SelectItem>
                             ) : (
                               studentsForDialog.map((student) => (
                                 <SelectItem key={student.id} value={student.id}>
@@ -442,8 +437,8 @@ export default function ParentsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Kelas</SelectItem>
-                  {isLoadingData && <SelectItem value="loading-classes" disabled>Memuat kelas...</SelectItem>}
-                  {!isLoadingData && allClasses.length === 0 && <SelectItem value="no-classes" disabled>Tidak ada kelas</SelectItem>}
+                  {isLoadingData && <SelectItem key="loading-classes-filter" value="loading-classes" disabled>Memuat kelas...</SelectItem>}
+                  {!isLoadingData && allClasses.length === 0 && <SelectItem key="no-classes-filter" value="no-classes" disabled>Tidak ada kelas</SelectItem>}
                   {allClasses.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                   ))}
@@ -577,9 +572,9 @@ export default function ParentsPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 {isLoadingData ? (
-                                    <SelectItem value="loading-students-edit" disabled>Memuat murid...</SelectItem>
+                                    <SelectItem key="loading-students-item-edit" value="loading-students-edit" disabled>Memuat murid...</SelectItem>
                                 ) : studentsForDialog.length === 0 ? (
-                                    <SelectItem value="no-students-edit" disabled>Tidak ada murid terdaftar</SelectItem>
+                                    <SelectItem key="no-students-item-edit" value="no-students-edit" disabled>Tidak ada murid terdaftar</SelectItem>
                                 ) : (
                                 studentsForDialog.map((student) => (
                                     <SelectItem key={student.id} value={student.id}>
@@ -600,7 +595,7 @@ export default function ParentsPage() {
                       <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedParent(null); }}>Batal</Button>
                    </DialogClose>
                   <Button type="submit" disabled={editParentForm.formState.isSubmitting || isLoadingData}>
-                    {editParentForm.formState.isSubmitting || isLoadingData ? "Menyimpan..." : "Simpan Perubahan"}
+                    {(editParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>
               </form>
