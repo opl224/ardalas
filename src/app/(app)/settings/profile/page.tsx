@@ -46,7 +46,7 @@ const localAvatars = [
 
 
 export default function ProfilePage() {
-  const { user, loading, role, refreshUser } = useAuth(); // Added refreshUser from context
+  const { user, loading, role, refreshUser } = useAuth(); 
   const { toast } = useToast();
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [selectedAvatarUrlInDialog, setSelectedAvatarUrlInDialog] = useState<string | null>(null);
@@ -56,7 +56,8 @@ export default function ProfilePage() {
     if (user?.photoURL) {
       setSelectedAvatarUrlInDialog(user.photoURL);
     } else {
-      setSelectedAvatarUrlInDialog(null);
+      // If user has no photoURL, select the first local avatar as default in dialog, or none
+      setSelectedAvatarUrlInDialog(localAvatars.length > 0 ? localAvatars[0].src : null);
     }
   }, [user?.photoURL]);
 
@@ -82,7 +83,6 @@ export default function ProfilePage() {
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, { photoURL: selectedAvatarUrlInDialog });
       
-      // Manually trigger a refresh of user state in AuthContext
       if (refreshUser) {
         await refreshUser();
       }
@@ -144,7 +144,7 @@ export default function ProfilePage() {
             </Avatar>
             <Dialog open={isAvatarDialogOpen} onOpenChange={(open) => {
               setIsAvatarDialogOpen(open);
-              if (!open) setSelectedAvatarUrlInDialog(user.photoURL || null); // Reset selection on close
+              if (!open) setSelectedAvatarUrlInDialog(user.photoURL || (localAvatars.length > 0 ? localAvatars[0].src : null)); 
             }}>
               <DialogTrigger asChild>
                 <Button
