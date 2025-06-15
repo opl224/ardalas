@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon } from "lucide-react";
+import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon } from "lucide-react";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,6 +71,12 @@ interface StudentForDialog {
   classId?: string;
 }
 
+interface AuthUserMin { // For Auth users with role 'orangtua'
+  id: string; // Firebase Auth UID
+  name: string;
+  email: string;
+}
+
 interface ClassMin {
   id: string;
   name: string;
@@ -83,6 +89,7 @@ interface Parent {
   phone?: string;
   studentId: string; 
   studentName: string; 
+  uid?: string; // Firebase Auth UID of the parent, if linked
   createdAt?: Timestamp; 
 }
 
@@ -91,6 +98,7 @@ const parentFormSchema = z.object({
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   studentId: z.string({ required_error: "Pilih murid terkait (UID)." }),
+  authUserId: z.string().optional(), // UID of the parent's auth account
 });
 type ParentFormValues = z.infer<typeof parentFormSchema>;
 
@@ -99,12 +107,13 @@ const editParentFormSchema = parentFormSchema.extend({
 });
 type EditParentFormValues = z.infer<typeof editParentFormSchema>;
 
-const NO_AUTH_USER_SELECTED = "_NO_AUTH_USER_"; // Placeholder for consistency, though not directly used for parent-student link
+const NO_AUTH_USER_SELECTED = "_NO_AUTH_USER_";
 
 export default function ParentsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const [parents, setParents] = useState<Parent[]>([]);
   const [studentsForDialog, setStudentsForDialog] = useState<StudentForDialog[]>([]); 
+  const [authOrangtuaUsers, setAuthOrangtuaUsers] = useState<AuthUserMin[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true); 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -123,6 +132,7 @@ export default function ParentsPage() {
       email: "",
       phone: "",
       studentId: undefined,
+      authUserId: undefined,
     },
   });
 
@@ -140,6 +150,9 @@ export default function ParentsPage() {
       const studentsQueryInstance = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
       promises.push(getDocs(studentsQueryInstance));
 
+      const authOrangtuaQueryInstance = query(usersCollectionRef, where("role", "==", "orangtua"), orderBy("name", "asc"));
+      promises.push(getDocs(authOrangtuaQueryInstance));
+      
       if (role === 'admin') {
         const classesCollectionRef = collection(db, "classes");
         const classesQueryInstance = query(classesCollectionRef, orderBy("name", "asc"));
@@ -152,10 +165,10 @@ export default function ParentsPage() {
       const parentsQueryInstance = query(parentsCollectionRef, orderBy("name", "asc"));
       promises.push(getDocs(parentsQueryInstance));
 
-      const [studentsSnapshot, classesSnapshot, parentsSnapshot] = await Promise.all(promises);
+      const [studentsSnapshot, authOrangtuaSnapshot, classesSnapshot, parentsSnapshot] = await Promise.all(promises);
 
       const fetchedStudentsRaw = (studentsSnapshot as any).docs.map((docSnap: any) => ({
-        id: docSnap.data().uid, 
+        id: docSnap.data().uid, // Assuming student's doc id in 'users' is their auth UID
         name: docSnap.data().name,
         classId: docSnap.data().classId,
       }));
@@ -163,6 +176,12 @@ export default function ParentsPage() {
         (student: any) => student.id && typeof student.id === 'string'
       );
       setStudentsForDialog(validFetchedStudents);
+
+      setAuthOrangtuaUsers((authOrangtuaSnapshot as any).docs.map((docSnap: any) => ({
+        id: docSnap.data().uid, // Auth UID from users collection
+        name: docSnap.data().name,
+        email: docSnap.data().email,
+      })));
 
 
       if (role === 'admin' && classesSnapshot) {
@@ -176,6 +195,7 @@ export default function ParentsPage() {
         phone: docSnap.data().phone,
         studentId: docSnap.data().studentId,
         studentName: docSnap.data().studentName,
+        uid: docSnap.data().uid, // Fetch parent's auth UID if linked
         createdAt: docSnap.data().createdAt,
       }));
       setParents(fetchedParents);
@@ -204,6 +224,7 @@ export default function ParentsPage() {
         email: selectedParent.email || "",
         phone: selectedParent.phone || "",
         studentId: selectedParent.studentId,
+        authUserId: selectedParent.uid || undefined,
       });
     }
   }, [selectedParent, isEditDialogOpen, editParentForm]);
@@ -219,14 +240,18 @@ export default function ParentsPage() {
     try {
       const parentsCollectionRef = collection(db, "parents");
       await addDoc(parentsCollectionRef, {
-        ...data,
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        studentId: data.studentId,
         studentName: selectedStudent.name, 
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Save parent's auth UID
         createdAt: serverTimestamp(),
       });
       
       toast({ title: "Data Orang Tua Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
-      addParentForm.reset();
+      addParentForm.reset({ name: "", email: "", phone: "", studentId: undefined, authUserId: undefined });
       fetchPageData(); 
     } catch (error: any) {
       console.error("Error adding parent:", error);
@@ -250,10 +275,11 @@ export default function ParentsPage() {
       const parentDocRef = doc(db, "parents", data.id);
       await updateDoc(parentDocRef, {
         name: data.name,
-        email: data.email,
-        phone: data.phone,
+        email: data.email || null,
+        phone: data.phone || null,
         studentId: data.studentId,
         studentName: selectedStudent.name, 
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Update parent's auth UID
       });
       
       toast({ title: "Data Orang Tua Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -309,11 +335,110 @@ export default function ParentsPage() {
         parent.name.toLowerCase().includes(lowerSearchTerm) ||
         (parent.email && parent.email.toLowerCase().includes(lowerSearchTerm)) ||
         (parent.phone && parent.phone.includes(lowerSearchTerm)) ||
-        parent.studentName.toLowerCase().includes(lowerSearchTerm)
+        parent.studentName.toLowerCase().includes(lowerSearchTerm) ||
+        (parent.uid && parent.uid.toLowerCase().includes(lowerSearchTerm))
       );
     }
     return filtered;
   }, [parents, studentsForDialog, searchTerm, selectedClassFilter, role]);
+
+  const renderParentFormFields = (formInstance: typeof addParentForm | typeof editParentForm, formType: 'add' | 'edit') => (
+    <>
+      <div>
+        <Label htmlFor={`${formType}-parent-name`}>Nama Lengkap Orang Tua</Label>
+        <Input id={`${formType}-parent-name`} {...formInstance.register("name")} className="mt-1" />
+        {formInstance.formState.errors.name && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-parent-email`}>Email (Opsional)</Label>
+        <Input id={`${formType}-parent-email`} type="email" {...formInstance.register("email")} className="mt-1" />
+        {formInstance.formState.errors.email && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-parent-phone`}>Nomor Telepon (Opsional)</Label>
+        <Input id={`${formType}-parent-phone`} type="tel" {...formInstance.register("phone")} className="mt-1" />
+        {formInstance.formState.errors.phone && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.phone.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid)</Label>
+        <Controller
+          name="studentId"
+          control={formInstance.control}
+          render={({ field }) => (
+              <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value || undefined}
+                  disabled={isLoadingData}
+              >
+              <SelectTrigger id={`${formType}-parent-studentId`} className="mt-1">
+                <SelectValue placeholder={isLoadingData ? "Memuat murid..." : "Pilih murid"} />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingData ? (
+                    <SelectItem key={`loading-students-item-${formType}`} value="loading-students" disabled>Memuat murid...</SelectItem>
+                ) : studentsForDialog.length === 0 ? (
+                    <SelectItem key={`no-students-item-${formType}`} value="no-students" disabled>Tidak ada murid terdaftar</SelectItem>
+                ) : (
+                  studentsForDialog.map((student) => (
+                    <SelectItem key={student.id} value={student.id}>
+                      {student.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {formInstance.formState.errors.studentId && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.studentId.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-parent-authUserId`}>Akun Pengguna Orang Tua Tertaut (Opsional)</Label>
+        <Controller
+          name="authUserId"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(value) => field.onChange(value === NO_AUTH_USER_SELECTED ? undefined : value)}
+              value={field.value || NO_AUTH_USER_SELECTED}
+              disabled={isLoadingData}
+            >
+              <SelectTrigger id={`${formType}-parent-authUserId`} className="mt-1">
+                <SelectValue placeholder={isLoadingData ? "Memuat akun..." : "Pilih akun pengguna orang tua"} />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingData && <SelectItem key={`loading-auth-users-${formType}`} value="loading" disabled>Memuat...</SelectItem>}
+                <SelectItem key={`no-auth-user-option-${formType}`} value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Kosongkan</SelectItem>
+                {authOrangtuaUsers
+                  .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
+                  .map((authUser) => (
+                  <SelectItem key={authUser.id} value={authUser.id}>
+                    {authUser.name} ({authUser.email})
+                  </SelectItem>
+                ))}
+                {!isLoadingData && authOrangtuaUsers.length === 0 && (
+                  <SelectItem key={`no-auth-users-found-${formType}`} value="no-users" disabled>Tidak ada akun orang tua di User Admin.</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Tautkan profil ini ke akun pengguna orang tua yang sudah terdaftar di Administrasi Pengguna (jika ada).
+        </p>
+        {formInstance.formState.errors.authUserId && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.authUserId.message}</p>
+        )}
+      </div>
+    </>
+  );
 
 
   return (
@@ -332,7 +457,7 @@ export default function ParentsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) {
-                addParentForm.reset();
+                addParentForm.reset({ name: "", email: "", phone: "", studentId: undefined, authUserId: undefined });
                 addParentForm.clearErrors();
               }
             }}>
@@ -349,61 +474,7 @@ export default function ParentsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  <div>
-                    <Label htmlFor="add-parent-name">Nama Lengkap Orang Tua</Label>
-                    <Input id="add-parent-name" {...addParentForm.register("name")} className="mt-1" />
-                    {addParentForm.formState.errors.name && (
-                      <p className="text-sm text-destructive mt-1">{addParentForm.formState.errors.name.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-parent-email">Email (Opsional)</Label>
-                    <Input id="add-parent-email" type="email" {...addParentForm.register("email")} className="mt-1" />
-                    {addParentForm.formState.errors.email && (
-                      <p className="text-sm text-destructive mt-1">{addParentForm.formState.errors.email.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-parent-phone">Nomor Telepon (Opsional)</Label>
-                    <Input id="add-parent-phone" type="tel" {...addParentForm.register("phone")} className="mt-1" />
-                    {addParentForm.formState.errors.phone && (
-                      <p className="text-sm text-destructive mt-1">{addParentForm.formState.errors.phone.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-parent-studentId">Anak (Murid)</Label>
-                    <Controller
-                      name="studentId"
-                      control={addParentForm.control}
-                      render={({ field }) => (
-                          <Select 
-                              onValueChange={field.onChange} 
-                              value={field.value || undefined}
-                              disabled={isLoadingData}
-                          >
-                          <SelectTrigger id="add-parent-studentId" className="mt-1">
-                            <SelectValue placeholder={isLoadingData ? "Memuat murid..." : "Pilih murid"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {isLoadingData ? (
-                                <SelectItem key="loading-students-item-add" value="loading-students" disabled>Memuat murid...</SelectItem>
-                            ) : studentsForDialog.length === 0 ? (
-                                <SelectItem key="no-students-item-add" value="no-students" disabled>Tidak ada murid terdaftar</SelectItem>
-                            ) : (
-                              studentsForDialog.map((student) => (
-                                <SelectItem key={student.id} value={student.id}>
-                                  {student.name}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {addParentForm.formState.errors.studentId && (
-                      <p className="text-sm text-destructive mt-1">{addParentForm.formState.errors.studentId.message}</p>
-                    )}
-                  </div>
+                  {renderParentFormFields(addParentForm, 'add')}
                   <DialogFooter>
                     <DialogClose asChild>
                        <Button type="button" variant="outline">Batal</Button>
@@ -464,6 +535,7 @@ export default function ParentsPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Telepon</TableHead>
                     <TableHead>Nama Anak</TableHead>
+                    <TableHead>UID Akun Tertaut</TableHead>
                     {role === 'admin' && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -474,6 +546,16 @@ export default function ParentsPage() {
                       <TableCell>{parent.email || "-"}</TableCell>
                       <TableCell>{parent.phone || "-"}</TableCell>
                       <TableCell>{parent.studentName || "-"}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {parent.uid ? (
+                          <div className="flex items-center gap-1">
+                            <UidLinkIcon className="h-3 w-3 text-muted-foreground" /> 
+                            {parent.uid.substring(0,10)}...
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">Belum tertaut</span>
+                        )}
+                      </TableCell>
                       {role === 'admin' && (
                         <TableCell className="text-right space-x-2">
                           <Button variant="outline" size="icon" onClick={() => openEditDialog(parent)} aria-label={`Edit ${parent.name}`}>
@@ -538,61 +620,7 @@ export default function ParentsPage() {
             {selectedParent && (
               <form onSubmit={editParentForm.handleSubmit(handleEditParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <Input type="hidden" {...editParentForm.register("id")} />
-                <div>
-                  <Label htmlFor="edit-parent-name">Nama Lengkap Orang Tua</Label>
-                  <Input id="edit-parent-name" {...editParentForm.register("name")} className="mt-1" />
-                  {editParentForm.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">{editParentForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="edit-parent-email">Email (Opsional)</Label>
-                  <Input id="edit-parent-email" type="email" {...editParentForm.register("email")} className="mt-1" />
-                  {editParentForm.formState.errors.email && (
-                    <p className="text-sm text-destructive mt-1">{editParentForm.formState.errors.email.message}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="edit-parent-phone">Nomor Telepon (Opsional)</Label>
-                  <Input id="edit-parent-phone" type="tel" {...editParentForm.register("phone")} className="mt-1" />
-                  {editParentForm.formState.errors.phone && (
-                    <p className="text-sm text-destructive mt-1">{editParentForm.formState.errors.phone.message}</p>
-                  )}
-                </div>
-                 <div>
-                    <Label htmlFor="edit-parent-studentId">Anak (Murid)</Label>
-                     <Controller
-                        name="studentId"
-                        control={editParentForm.control}
-                        render={({ field }) => (
-                            <Select 
-                                onValueChange={field.onChange} 
-                                value={field.value || undefined}
-                                disabled={isLoadingData}
-                            >
-                            <SelectTrigger id="edit-parent-studentId" className="mt-1">
-                                <SelectValue placeholder={isLoadingData ? "Memuat murid..." : "Pilih murid"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {isLoadingData ? (
-                                    <SelectItem key="loading-students-item-edit" value="loading-students-edit" disabled>Memuat murid...</SelectItem>
-                                ) : studentsForDialog.length === 0 ? (
-                                    <SelectItem key="no-students-item-edit" value="no-students-edit" disabled>Tidak ada murid terdaftar</SelectItem>
-                                ) : (
-                                studentsForDialog.map((student) => (
-                                    <SelectItem key={student.id} value={student.id}>
-                                    {student.name}
-                                    </SelectItem>
-                                ))
-                                )}
-                            </SelectContent>
-                            </Select>
-                        )}
-                        />
-                    {editParentForm.formState.errors.studentId && (
-                      <p className="text-sm text-destructive mt-1">{editParentForm.formState.errors.studentId.message}</p>
-                    )}
-                  </div>
+                 {renderParentFormFields(editParentForm, 'edit')}
                 <DialogFooter>
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedParent(null); }}>Batal</Button>
@@ -609,3 +637,6 @@ export default function ParentsPage() {
     </div>
   );
 }
+
+
+    

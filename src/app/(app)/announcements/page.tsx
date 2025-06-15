@@ -52,7 +52,7 @@ import {
   orderBy,
   where,
   documentId,
-  writeBatch, // Added for batch writing notifications
+  writeBatch, 
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -137,12 +137,31 @@ export default function AnnouncementsPage() {
     setIsLoading(true);
     try {
       const announcementsCollectionRef = collection(db, "announcements");
-      const q = query(announcementsCollectionRef, orderBy("date", "desc"));
+      let q = query(announcementsCollectionRef, orderBy("date", "desc"));
       const querySnapshot = await getDocs(q);
-      const fetchedAnnouncements = querySnapshot.docs.map(docSnap => ({
+      let fetchedAnnouncements = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         ...docSnap.data(),
       })) as AnnouncementData[];
+
+      // Filter announcements based on user role and class
+      if (user && (role === 'siswa' || role === 'orangtua')) {
+        const userClassId = role === 'siswa' ? user.classId : user.linkedStudentClassId;
+        fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+          ann.targetAudience.includes(role!) ||
+          ann.targetAudience.includes("semua") || // "semua" might not be in ROLES type, adjust if needed
+          (ann.targetClassIds && userClassId && ann.targetClassIds.includes(userClassId))
+        );
+      } else if (user && role === 'guru') {
+         fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+            ann.targetAudience.includes('guru') || 
+            ann.targetAudience.includes("semua") ||
+            (ann.createdById === user.uid) || // Show announcements created by this teacher
+            (teacherClasses.length > 0 && ann.targetClassIds && ann.targetClassIds.some(tcId => teacherClasses.map(tc => tc.id).includes(tcId)) ) // Show if targets any of their classes
+        );
+      }
+      // Admin sees all by default
+
       setAnnouncements(fetchedAnnouncements);
     } catch (error) {
       console.error("Error fetching announcements: ", error);
@@ -154,14 +173,26 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     if (!authLoading) fetchAnnouncements();
-  }, [authLoading]);
+  }, [authLoading, user, role, teacherClasses]); // Added teacherClasses dependency
 
   useEffect(() => {
     if (role === 'guru' && user && (isAddDialogOpen || (isEditDialogOpen && selectedAnnouncement))) {
       const fetchTeacherClasses = async () => {
         setIsLoadingTeacherClasses(true);
         try {
-          const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", user.uid));
+           // First, get the teacher's profile ID from the 'teachers' collection using their auth UID
+          const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+          const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+          if (teacherProfileSnapshot.empty) {
+            toast({ title: "Profil Guru Tidak Ditemukan", description: "Tidak dapat memuat kelas untuk penargetan.", variant: "warning" });
+            setTeacherClasses([]);
+            setIsLoadingTeacherClasses(false);
+            return;
+          }
+          const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+
+          const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
           const lessonsSnapshot = await getDocs(lessonsQuery);
           const classIds = new Set<string>();
           lessonsSnapshot.docs.forEach(doc => classIds.add(doc.data().classId));
@@ -229,38 +260,29 @@ export default function AnnouncementsPage() {
       const newAnnouncementRef = await addDoc(collection(db, "announcements"), announcementData);
       toast({ title: "Pengumuman Ditambahkan", description: `"${data.title}" berhasil dipublikasikan.` });
       
-      // Create notifications
       const batch = writeBatch(db);
       const notificationBase = {
         title: `Pengumuman Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
         description: data.content.substring(0, 50) + (data.content.length > 50 ? "..." : ""),
-        href: `/announcements`, // Consider linking to specific announcement: `/announcements/${newAnnouncementRef.id}`
+        href: `/announcements`, 
         read: false,
         createdAt: serverTimestamp(),
         type: "new_announcement",
       };
 
-      // 1. Notify the creator
       const creatorNotificationRef = doc(collection(db, "notifications"));
       batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid });
 
-      // 2. If admin, notify target roles
       if (role === 'admin' && data.targetAudience && data.targetAudience.length > 0) {
         const usersRef = collection(db, "users");
         for (const targetRole of data.targetAudience) {
-          // Admins might target themselves, creator notification already covers this.
-          // Or admins might not want to be spammed by their own global announcements.
-          // For now, if targetRole is 'admin' and creator is admin, skip to avoid duplicate for creator.
-          if (targetRole === 'admin' && user.uid) { //  No need to notify self again if creator is admin
+          if (targetRole === 'admin' && user.uid) { 
              // Continue to next role if target is admin and creator is admin
-             // Or handle based on specific logic whether admin should get general role notification
           } else {
             const qUsers = query(usersRef, where("role", "==", targetRole));
             try {
               const querySnapshot = await getDocs(qUsers);
               querySnapshot.forEach((userDoc) => {
-                // Avoid double-notifying the creator if they happen to be in the targetRole list
-                // (though admin check above might handle some of this)
                 if (userDoc.id !== user.uid) { 
                   const userNotificationRef = doc(collection(db, "notifications"));
                   batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
@@ -271,13 +293,23 @@ export default function AnnouncementsPage() {
             }
           }
         }
+      } else if (role === 'guru' && data.targetAudience && data.targetClassIds && data.targetClassIds.length > 0) {
+        const usersRef = collection(db, "users");
+        for (const targetRole of data.targetAudience.filter(r => ROLES_FOR_TEACHER_TARGETING.includes(r))) {
+            const qStudents = query(usersRef, where("role", "==", targetRole), where("classId", "in", data.targetClassIds));
+             try {
+              const querySnapshot = await getDocs(qStudents);
+              querySnapshot.forEach((userDoc) => {
+                if (userDoc.id !== user.uid) { 
+                  const userNotificationRef = doc(collection(db, "notifications"));
+                  batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
+                }
+              });
+            } catch (e) {
+              console.error(`Error querying users for role ${targetRole} in classes for notification:`, e);
+            }
+        }
       }
-      // TODO: Implement notification logic for guru's class-specific announcements
-      // This would involve:
-      // 1. Getting student UIDs from `targetClassIds` (e.g., query `students` collection where `classId` is in `targetClassIds`)
-      // 2. If 'orangtua' is targeted, getting parent UIDs linked to those students.
-      // 3. Creating notifications for those UIDs.
-
       await batch.commit();
 
       setIsAddDialogOpen(false);
@@ -300,13 +332,10 @@ export default function AnnouncementsPage() {
     }
 
     let finalTargetClassIds = data.targetClassIds;
-    // Logic to preserve targetClassIds if non-guru (admin) is editing, or clear if admin changes target audience away from specific classes
     if (role !== 'guru') { 
-      // If admin clears all role targets or specifically targets roles that don't imply classes, clear classIds
       if (data.targetAudience.length === 0 || !data.targetAudience.some(r => ['siswa', 'orangtua'].includes(r))) {
         finalTargetClassIds = [];
       } else {
-        // Admin might be editing an announcement originally made by a teacher, keep existing classIds if appropriate
         finalTargetClassIds = selectedAnnouncement.targetClassIds || []; 
       }
     }
@@ -315,18 +344,12 @@ export default function AnnouncementsPage() {
     try {
       const announcementDocRef = doc(db, "announcements", data.id);
       await updateDoc(announcementDocRef, {
-        ...data, // title, content, targetAudience
+        ...data, 
         targetClassIds: finalTargetClassIds,
         updatedAt: serverTimestamp(),
-        // Potentially re-evaluate who made the edit if that's important
-        // lastEditedById: user.uid,
-        // lastEditedByName: user.displayName || user.email,
       });
       toast({ title: "Pengumuman Diperbarui", description: `"${data.title}" berhasil diperbarui.` });
       
-      // Optionally, create notifications for significant updates,
-      // or if target audience changes. For simplicity, skipping for edit now.
-
       setIsEditDialogOpen(false);
       setSelectedAnnouncement(null);
       fetchAnnouncements();
@@ -390,7 +413,7 @@ export default function AnnouncementsPage() {
             ) : teacherClasses.length === 0 ? (
               <p className="text-sm text-muted-foreground mt-1">Tidak ada kelas yang diajar atau data kelas belum termuat.</p>
             ) : (
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-32 overflow-y-auto">
                 {teacherClasses.map((cls) => (
                   <FormField
                     key={cls.id}
@@ -412,7 +435,7 @@ export default function AnnouncementsPage() {
                             }}
                           />
                         </FormControl>
-                        <FormLabel className="font-normal">
+                        <FormLabel className="font-normal text-sm">
                           {cls.name}
                         </FormLabel>
                       </FormItem>
@@ -531,7 +554,8 @@ export default function AnnouncementsPage() {
         )}
       </div>
 
-      <Card className="bg-card/70 backdrop-blur-sm border-border shadow-sm">
+      {/* Search and Filter UI - To be implemented if needed */}
+      {/* <Card className="bg-card/70 backdrop-blur-sm border-border shadow-sm">
         <CardContent className="p-4">
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="relative flex-1">
@@ -550,7 +574,7 @@ export default function AnnouncementsPage() {
             </Select>
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {isLoading ? (
         <div className="space-y-4">
@@ -568,18 +592,12 @@ export default function AnnouncementsPage() {
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
                     <span>Untuk: {announcement.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ")}</span>
-                    {announcement.targetClassIds && announcement.targetClassIds.length > 0 && teacherClasses.length > 0 && (
+                    {announcement.targetClassIds && announcement.targetClassIds.length > 0 && (
                         <>
                          <span>&bull;</span>
-                         <span>Kelas: {teacherClasses.filter(tc => announcement.targetClassIds?.includes(tc.id)).map(tc => tc.name).join(", ") || announcement.targetClassIds.join(", ")}</span>
+                         <span>Kelas: {announcement.targetClassIds.map(tcId => teacherClasses.find(tc => tc.id === tcId)?.name || tcId).join(", ")}</span>
                         </>
                     )}
-                     {announcement.targetClassIds && announcement.targetClassIds.length > 0 && teacherClasses.length === 0 && (
-                        <>
-                         <span>&bull;</span>
-                         <span>Kelas: {announcement.targetClassIds.join(", ")} (ID Kelas)</span>
-                        </>
-                     )}
                     {announcement.createdByName && <span>&bull; Oleh: {announcement.createdByName}</span>}
                   </div>
                 </div>
@@ -650,3 +668,6 @@ export default function AnnouncementsPage() {
     </div>
   );
 }
+
+
+    

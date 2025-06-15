@@ -4,16 +4,18 @@
 import type { User as FirebaseUser } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 import type { Role } from "@/config/roles";
-import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, Timestamp, query, collection, where, limit } from "firebase/firestore"; // Added query, collection, where, limit
 // Import React and other hooks/types explicitly
 import React, { useEffect, useContext, createContext, useState, type ReactNode, useCallback } from "react";
 
 interface UserProfile extends FirebaseUser {
   role?: Role;
   assignedClassIds?: string[]; // For teachers
-  // Add other profile fields as needed
   classId?: string; // For students
   className?: string; // For students
+  linkedStudentId?: string; // For parents: UID of their child
+  linkedStudentName?: string; // For parents: Name of their child
+  linkedStudentClassId?: string; // For parents: Class ID of their child
 }
 
 interface AuthContextType {
@@ -36,21 +38,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<Role | null>(null);
 
   useEffect(() => {
-    // Apply theme from localStorage on initial app load (client-side)
     if (typeof window !== "undefined") {
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme === "dark") {
         document.documentElement.classList.add("dark");
       } else {
         document.documentElement.classList.remove("dark");
-        // Optionally ensure "light" is set if nothing is there or it's an old value
-        // This ensures a default if localStorage is empty or has an invalid value.
         if (savedTheme !== "light") {
             localStorage.setItem("theme", "light");
         }
       }
     }
-  }, []); // Runs once when AuthProvider mounts
+  }, []);
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (!firebaseUser) {
@@ -77,7 +76,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           userProfileData.displayName = firebaseUser.displayName || null;
         }
-        // Update photoURL from Firebase Auth as it's the source of truth after updateProfile
         userProfileData.photoURL = firebaseUser.photoURL;
 
 
@@ -94,17 +92,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   userProfileData.className = classDocSnap.data()?.name;
               }
           }
+        } else if (userProfileData.role === 'orangtua') {
+          // Fetch linked student for parent
+          const parentProfileQuery = query(collection(db, "parents"), where("uid", "==", firebaseUser.uid), limit(1));
+          const parentProfileSnapshot = await getDocs(parentProfileQuery);
+          if (!parentProfileSnapshot.empty) {
+            const parentData = parentProfileSnapshot.docs[0].data();
+            userProfileData.linkedStudentId = parentData.studentId;
+            // Fetch student details if studentId is present
+            if (parentData.studentId) {
+              const studentUserDocRef = doc(db, "users", parentData.studentId); // Student's UID is their doc ID in 'users'
+              const studentUserDocSnap = await getDoc(studentUserDocRef);
+              if (studentUserDocSnap.exists()) {
+                const studentData = studentUserDocSnap.data();
+                userProfileData.linkedStudentName = studentData.name;
+                userProfileData.linkedStudentClassId = studentData.classId;
+                // Optionally fetch student's className if needed widely, or handle on specific pages
+                if(studentData.classId && !studentData.className) {
+                    const classDocRef = doc(db, "classes", studentData.classId);
+                    const classDocSnap = await getDoc(classDocRef);
+                    if (classDocSnap.exists()) {
+                        // Could add linkedStudentClassName to UserProfile if needed
+                    }
+                }
+              }
+            }
+          }
         }
       } else {
+        // User exists in Auth but not in Firestore 'users' collection
+        // This case should ideally be handled during registration, but as a fallback:
         userProfileData.displayName = firebaseUser.displayName || null;
         userProfileData.photoURL = firebaseUser.photoURL;
+        // Role would be unknown, could prompt for role selection or assign a default guest/pending role
       }
       setUser(userProfileData);
       setRole(userProfileData.role || null);
     } catch (error) {
       console.error("Error fetching user profile:", error);
-      setUser(null);
-      setRole(null);
+      // Fallback to basic FirebaseUser info if Firestore fetch fails
+      setUser({ ...firebaseUser } as UserProfile);
+      setRole(null); // Role is unknown if Firestore fetch fails
     } finally {
       setLoading(false);
     }
@@ -145,3 +173,5 @@ export const useAuth = () => {
   return context;
 };
 
+
+    

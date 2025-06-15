@@ -72,7 +72,7 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth(); // Changed from useAuth() to { user, role, loading: authLoading } for clarity
   const [stats, setStats] = useState<DashboardStats>({
     adminTotalStudents: 0,
     adminTotalTeachers: 0,
@@ -117,13 +117,13 @@ export default function DashboardPage() {
 
           const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserQuery), // Corrected this line
+            getDocs(teacherUserQuery),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
 
           newStats.adminTotalStudents = studentSnap.size;
-          newStats.adminTotalTeachers = teacherUserSnap.size;
+          newStats.adminTotalTeachers = teacherUserSnap.size; 
           newStats.adminTotalSubjects = subjectSnap.size;
           newStats.adminTotalClasses = classSnap.size;
 
@@ -150,7 +150,8 @@ export default function DashboardPage() {
                 newStats.teacherTotalClassesTaught = taughtClassIds.size;
                 newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
 
-                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId));
+                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId)); // Use teacherProfileId if assignments store teacher profile ID
+                // If assignments store teacher Auth UID, then use: where("teacherId", "==", user.uid)
                 const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
                 newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
 
@@ -198,23 +199,20 @@ export default function DashboardPage() {
         if (role === 'siswa' && user?.classId) {
            announcementsQueryInstance = query(
             announcementsRef,
-            where("targetAudience", "array-contains-any", [role, "semua"]),
-            orderBy("date", "desc"),
+            orderBy("date", "desc"), // Fetch more initially to filter client-side
             limit(10) 
           );
-        } else if (role === 'orangtua' && user?.linkedStudentClassId) {
+        } else if (role === 'orangtua' && user?.linkedStudentClassId) { // Use linkedStudentClassId for parents
            announcementsQueryInstance = query(
             announcementsRef,
-            where("targetAudience", "array-contains-any", [role, "semua"]),
             orderBy("date", "desc"),
             limit(10)
           );
         } else if (role === 'guru') { 
            announcementsQueryInstance = query(
             announcementsRef,
-             where("targetAudience", "array-contains-any", ["guru", "semua"]), 
             orderBy("date", "desc"),
-            limit(3)
+            limit(10) // Fetch a bit more for client-side filtering for teachers
           );
         }
         else { 
@@ -227,18 +225,28 @@ export default function DashboardPage() {
           ...doc.data()
         })) as Announcement[];
 
-        if (role === 'siswa' && user?.classId) {
-            fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
-                ann.targetAudience.includes(role) || 
-                ann.targetAudience.includes("semua") ||
-                (ann.targetClassIds && ann.targetClassIds.includes(user.classId!))
-            ).slice(0,3);
-        } else if (role === 'orangtua' && user?.linkedStudentClassId) {
-             fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
-                ann.targetAudience.includes(role) || 
-                ann.targetAudience.includes("semua") ||
-                (ann.targetClassIds && ann.targetClassIds.includes(user.linkedStudentClassId!))
-            ).slice(0,3);
+        // Client-side filtering based on role and classId/linkedStudentClassId
+        if (user) {
+            if (role === 'siswa' && user.classId) {
+                fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+                    ann.targetAudience.includes(role!) || 
+                    (ann.targetClassIds && ann.targetClassIds.includes(user.classId!))
+                ).slice(0,3);
+            } else if (role === 'orangtua' && user.linkedStudentClassId) {
+                 fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+                    ann.targetAudience.includes(role!) || 
+                    (ann.targetClassIds && ann.targetClassIds.includes(user.linkedStudentClassId!))
+                ).slice(0,3);
+            } else if (role === 'guru') {
+                // Logic for teachers: show if targeted to 'guru', 'semua', created by them, or targets one of their classes
+                // Assuming teacherClasses state exists or can be fetched/derived if needed for more complex class targeting
+                fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
+                    ann.targetAudience.includes('guru') ||
+                    ann.targetAudience.includes('semua') || // "semua" if used
+                    ann.createdById === user.uid // Announcements they created
+                    // Add more complex logic here if teachers should see announcements for specific classes they teach
+                ).slice(0, 3);
+            }
         }
         
         setRecentAnnouncements(fetchedAnnouncements);
@@ -251,12 +259,12 @@ export default function DashboardPage() {
     
     if (user && role) {
         fetchAllData();
-    } else if (!user && !loadingStats) { 
+    } else if (!user && !authLoading) { // Ensure loading is also false for non-user case
         setLoadingStats(false);
         setLoadingAnnouncements(false);
     }
 
-  }, [user, role]);
+  }, [user, role, authLoading]); // Added authLoading to dependency array
 
   const quickLinks = [
     { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
@@ -267,6 +275,9 @@ export default function DashboardPage() {
   if (role === 'siswa') {
     quickLinks.push({ title: "Tugas Saya", href: "/assignments", icon: ClipboardCheck, description: "Lihat dan kerjakan tugas." });
     quickLinks.push({ title: "Nilai Saya", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajarmu." });
+  } else if (role === 'orangtua') { // Added quick links for parents
+    quickLinks.push({ title: "Tugas Anak", href: "/assignments", icon: ClipboardCheck, description: "Lihat tugas anak Anda." });
+    quickLinks.push({ title: "Nilai Anak", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajar anak." });
   }
 
 
@@ -302,11 +313,48 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
+      
+      {role === 'siswa' && user && (
+        <section>
+          <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Siswa</h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold">{user.className || user.classId || "Belum ada kelas"}</div>
+                    <p className="text-xs text-muted-foreground pt-1">Informasi kelas Anda saat ini.</p>
+                     <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
+                </CardContent>
+            </Card>
+             <StatCard title="Jumlah Tugas" value={"N/A"} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
+             <StatCard title="Kehadiran Bulan Ini" value={"N/A"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+          </div>
+        </section>
+      )}
+
+      {role === 'orangtua' && user && (
+         <section>
+          <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Anak ({user.linkedStudentName || "Siswa"})</h2>
+           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold">{user.linkedStudentClassId ? "Lihat Kelas" : "Belum Tertaut"}</div>
+                    <p className="text-xs text-muted-foreground pt-1">Informasi kelas anak Anda.</p>
+                    {user.linkedStudentClassId &&  <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/lessons`}>Jadwal Pelajaran <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
+                </CardContent>
+            </Card>
+             <StatCard title="Tugas Anak" value={"N/A"} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif anak Anda." href="/assignments"/>
+             <StatCard title="Kehadiran Anak" value={"N/A"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+          </div>
+        </section>
+      )}
+
 
       <section>
         <h2 className="text-2xl font-semibold mb-4 font-headline">Akses Cepat</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quickLinks.slice(0, role === 'siswa' ? 5 : (role === 'guru' ? 3 : 3)).map((link) => ( 
+          {quickLinks.slice(0, (role === 'siswa' || role === 'orangtua') ? 5 : (role === 'guru' ? 3 : 3)).map((link) => ( 
             <Card key={link.title} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg font-medium">{link.title}</CardTitle>
@@ -344,7 +392,7 @@ export default function DashboardPage() {
                 <CardHeader>
                   <CardTitle className="text-lg">{announcement.title}</CardTitle>
                   <CardDescription>
-                     {format(announcement.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}
+                     {announcement.date ? format(announcement.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "Tanggal tidak tersedia"}
                      {announcement.targetAudience && announcement.targetAudience.length > 0 && (
                         <span className="text-xs text-muted-foreground ml-2">
                             (Untuk: {announcement.targetAudience.map(aud => aud.charAt(0).toUpperCase() + aud.slice(1)).join(", ")})
@@ -375,5 +423,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
 
     
