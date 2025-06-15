@@ -2,42 +2,41 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Settings as SettingsIcon, User, Lock, Bell, Moon, Sun } from "lucide-react"; // Renamed to avoid conflict, added new icons
+import { Settings as SettingsIcon, User, Lock, Bell, Moon, Sun } from "lucide-react"; 
 import type { Metadata } from 'next';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 
-// Metadata tidak bisa diekspor dari client component secara langsung.
-// Jika dibutuhkan secara statis, harus diatur di layout induk atau page.tsx induk jika ini adalah route group.
-// export const metadata: Metadata = {
-//   title: 'Pengaturan Akun - SDN',
-//   description: 'Kelola pengaturan akun Anda di SDN.',
-// };
-
 export default function SettingsPage() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  // Initialize state by reading from localStorage, defaulting to false (light mode)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("theme") === "dark";
+    }
+    return false; 
+  });
 
-  // Efek untuk memuat tema dari localStorage saat komponen dimuat
+  // Effect to update the class on documentElement when isDarkMode changes locally
+  // This is mostly for immediate visual feedback of the toggle switch itself.
+  // The global theme application is handled by AuthProvider.
   useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
+    if (isDarkMode) {
       document.documentElement.classList.add("dark");
-      setIsDarkMode(true);
     } else {
       document.documentElement.classList.remove("dark");
-      setIsDarkMode(false);
     }
-  }, []);
+  }, [isDarkMode]);
+
 
   const toggleDarkMode = () => {
     const newIsDarkMode = !isDarkMode;
-    setIsDarkMode(newIsDarkMode);
+    setIsDarkMode(newIsDarkMode); // Update local state for the switch
     if (newIsDarkMode) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add("dark"); // Directly apply for instant feedback
       localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove("dark"); // Directly apply for instant feedback
       localStorage.setItem("theme", "light");
     }
   };
@@ -120,3 +119,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

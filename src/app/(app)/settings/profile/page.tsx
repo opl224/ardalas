@@ -46,6 +46,10 @@ const localAvatars = [
     { src: '/avatars/p-polisi.png', hint: 'police female avatar', alt: 'Avatar Polisi Perempuan' },
     { src: '/avatars/messi.png', hint: 'football player avatar', alt: 'Avatar Messi' },
     { src: '/avatars/ronaldo.png', hint: 'soccer player avatar', alt: 'Avatar Ronaldo' },
+    { src: '/avatars/l-pemadam.png', hint: 'firefighter male avatar', alt: 'Avatar Pemadam Laki-laki' },
+    { src: '/avatars/p-pemadam.png', hint: 'firefighter female avatar', alt: 'Avatar Pemdam Perempuan' },
+    { src: '/avatars/l-sains.png', hint: 'Sains female avatar', alt: 'Avatar Sains Laki-laki' },
+    { src: '/avatars/p-sains.png', hint: 'Sains female avatar', alt: 'Avatar Sains Perempuan' },
 ];
 
 

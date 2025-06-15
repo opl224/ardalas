@@ -20,20 +20,37 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   role: Role | null;
-  refreshUser: () => Promise<void>; // Added refreshUser
+  refreshUser: () => Promise<void>; 
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   role: null,
-  refreshUser: async () => {}, // Default empty implementation
+  refreshUser: async () => {}, 
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    // Apply theme from localStorage on initial app load (client-side)
+    if (typeof window !== "undefined") {
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme === "dark") {
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.remove("dark");
+        // Optionally ensure "light" is set if nothing is there or it's an old value
+        // This ensures a default if localStorage is empty or has an invalid value.
+        if (savedTheme !== "light") {
+            localStorage.setItem("theme", "light");
+        }
+      }
+    }
+  }, []); // Runs once when AuthProvider mounts
 
   const fetchUserProfile = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (!firebaseUser) {
@@ -96,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
-      setLoading(true); // Set loading true when auth state changes
+      setLoading(true); 
       await fetchUserProfile(firebaseUser);
     });
     return () => unsubscribe();
@@ -106,9 +123,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const currentUser = auth.currentUser;
     if (currentUser) {
       setLoading(true);
-      // Re-fetch the user from Firebase Auth to get the latest profile (like photoURL)
       await currentUser.reload(); 
-      const refreshedFirebaseUser = auth.currentUser; // Get the reloaded user
+      const refreshedFirebaseUser = auth.currentUser; 
       await fetchUserProfile(refreshedFirebaseUser);
     }
   }, [fetchUserProfile]);
