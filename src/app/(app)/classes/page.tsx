@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2, Eye } from "lucide-react"; 
+import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle } from "lucide-react"; 
 import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,7 +60,8 @@ import {
   query,
   orderBy,
   where,
-  limit 
+  limit,
+  getDoc 
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
@@ -153,37 +154,38 @@ export default function ClassesPage() {
       let q;
 
       if (role === "admin") {
-        if (teachers.length === 0) { // Ensure teachers are loaded for admin dropdowns
+        if (teachers.length === 0) { 
           await fetchTeachersForDropdown();
         }
         q = query(classesCollectionRef, orderBy("name", "asc"));
+        const querySnapshot = await getDocs(q);
+        setClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
       } else if (role === "guru" && user?.uid) {
+        if (teachers.length === 0) { 
+          await fetchTeachersForDropdown();
+        }
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
         if (!teacherProfileSnapshot.empty) {
           const teacherDocId = teacherProfileSnapshot.docs[0].id;
           q = query(classesCollectionRef, where("teacherId", "==", teacherDocId), orderBy("name", "asc"));
+          const querySnapshot = await getDocs(q);
+          setClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
         } else {
           setClasses([]);
-          setIsLoading(false);
-          return;
+        }
+      } else if (role === "orangtua" && user?.linkedStudentClassId) {
+        const classDocRef = doc(db, "classes", user.linkedStudentClassId);
+        const classDocSnap = await getDoc(classDocRef);
+        if (classDocSnap.exists()) {
+          setClasses([{ id: classDocSnap.id, ...classDocSnap.data() } as ClassData]);
+        } else {
+          setClasses([]);
         }
       } else {
         setClasses([]);
-        setIsLoading(false);
-        return;
       }
-
-      const querySnapshot = await getDocs(q);
-      const fetchedClasses: ClassData[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        name: docSnap.data().name,
-        teacherId: docSnap.data().teacherId,
-        teacherName: docSnap.data().teacherName,
-        createdAt: docSnap.data().createdAt,
-      }));
-      setClasses(fetchedClasses);
     } catch (error) {
       console.error("Error fetching classes: ", error);
       toast({
@@ -300,7 +302,6 @@ export default function ClassesPage() {
     setIsLoadingStudentsInClass(true);
     setStudentsInClass([]); 
     try {
-      // Fetch students from 'users' collection with role 'siswa'
       const studentsQuery = query(
         collection(db, "users"), 
         where("role", "==", "siswa"),
@@ -309,7 +310,7 @@ export default function ClassesPage() {
       );
       const querySnapshot = await getDocs(studentsQuery);
       const fetchedStudents: StudentInClass[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id, // Document ID from 'users' collection (which is user's UID)
+        id: docSnap.id, 
         name: docSnap.data().name,
         nis: docSnap.data().nis || "N/A", 
       }));
@@ -333,18 +334,23 @@ export default function ClassesPage() {
     fetchStudentsForClass(classItem.id);
   };
 
+  const pageTitle = role === "orangtua" ? `Kelas Anak Saya (${user?.linkedStudentName || 'Siswa'})` : "Manajemen Kelas";
+  const pageDescription = role === "orangtua" 
+    ? "Informasi mengenai kelas anak Anda."
+    : "Kelola daftar kelas, wali kelas, dan siswa per kelas.";
+
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Manajemen Kelas</h1>
-        <p className="text-muted-foreground">Kelola daftar kelas, wali kelas, dan siswa per kelas.</p>
+        <h1 className="text-3xl font-bold font-headline">{pageTitle}</h1>
+        <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <School className="h-6 w-6 text-primary" />
-            <span>Daftar Kelas</span>
+            <span>{role === "orangtua" ? "Detail Kelas Anak" : "Daftar Kelas"}</span>
           </CardTitle>
           {role === "admin" && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
@@ -425,7 +431,7 @@ export default function ClassesPage() {
                     <TableHead>Nama Kelas</TableHead>
                     <TableHead>Wali Kelas</TableHead>
                     <TableHead className="text-right">
-                      {role === "admin" ? "Aksi" : "Lihat Siswa"}
+                      {role === "admin" || role === "guru" ? "Aksi" : "Lihat Siswa"}
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -476,10 +482,18 @@ export default function ClassesPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
-               role === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
-               'Tidak ada data kelas untuk ditampilkan.'
-              }
+                {role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
+                 role === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
+                 role === 'orangtua' && !user?.linkedStudentClassId ? (
+                   <div className="flex flex-col items-center">
+                     <AlertCircle className="w-10 h-10 mb-2 text-destructive" />
+                     <span className="font-semibold">Data Kelas Anak Tidak Ditemukan.</span>
+                     <span>Pastikan anak sudah terdaftar di kelas dan akun orang tua sudah ditautkan dengan benar.</span>
+                   </div>
+                 ) :
+                 role === 'orangtua' ? 'Data kelas anak Anda tidak ditemukan.' :
+                 'Tidak ada data kelas untuk ditampilkan.'
+                }
             </div>
           )}
         </CardContent>
