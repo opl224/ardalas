@@ -36,12 +36,16 @@ import { cn } from "@/lib/utils";
 // };
 
 const localAvatars = [
-    { src: '/avatars/male-01.png', hint: 'avatar male cartoon', alt: 'Avatar Pria 1'},
-    { src: '/avatars/female-01.png', hint: 'avatar female illustration', alt: 'Avatar Wanita 1' },
-    { src: '/avatars/abstract-01.png', hint: 'abstract geometric pattern', alt: 'Avatar Abstrak 1' },
-    { src: '/avatars/animal-01.png', hint: 'cute animal character', alt: 'Avatar Hewan 1' },
-    { src: '/avatars/male-02.png', hint: 'avatar cool boy', alt: 'Avatar Pria 2' },
-    { src: '/avatars/female-02.png', hint: 'avatar girl glasses', alt: 'Avatar Wanita 2' },
+    { src: '/avatars/laki-laki.png', hint: 'avatar male', alt: 'Avatar Laki-laki'},
+    { src: '/avatars/perempuan.png', hint: 'avatar female', alt: 'Avatar Perempuan' },
+    { src: '/avatars/l-guru.png', hint: 'teacher male avatar', alt: 'Avatar Guru Laki-laki' },
+    { src: '/avatars/p-guru.png', hint: 'teacher female avatar', alt: 'Avatar Guru Perempuan' },
+    { src: '/avatars/l-dokter.png', hint: 'doctor male avatar', alt: 'Avatar Dokter Laki-laki' },
+    { src: '/avatars/p-dokter.png', hint: 'doctor female avatar', alt: 'Avatar Dokter Perempuan' },
+    { src: '/avatars/l-polisi.png', hint: 'police male avatar', alt: 'Avatar Polisi Laki-laki' },
+    { src: '/avatars/p-polisi.png', hint: 'police female avatar', alt: 'Avatar Polisi Perempuan' },
+    { src: '/avatars/messi.png', hint: 'football player avatar', alt: 'Avatar Messi' },
+    { src: '/avatars/ronaldo.png', hint: 'soccer player avatar', alt: 'Avatar Ronaldo' },
 ];
 
 
@@ -55,11 +59,14 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user?.photoURL) {
       setSelectedAvatarUrlInDialog(user.photoURL);
+    } else if (localAvatars.length > 0) {
+      // If user has no photoURL, select the first local avatar as default in dialog
+      setSelectedAvatarUrlInDialog(localAvatars[0].src);
     } else {
-      // If user has no photoURL, select the first local avatar as default in dialog, or none
-      setSelectedAvatarUrlInDialog(localAvatars.length > 0 ? localAvatars[0].src : null);
+      setSelectedAvatarUrlInDialog(null);
     }
   }, [user?.photoURL]);
+
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -84,7 +91,7 @@ export default function ProfilePage() {
       await updateDoc(userDocRef, { photoURL: selectedAvatarUrlInDialog });
       
       if (refreshUser) {
-        await refreshUser();
+        await refreshUser(); // Call refreshUser to update context
       }
       
       toast({ title: "Sukses", description: "Avatar berhasil diperbarui." });
@@ -144,6 +151,7 @@ export default function ProfilePage() {
             </Avatar>
             <Dialog open={isAvatarDialogOpen} onOpenChange={(open) => {
               setIsAvatarDialogOpen(open);
+              // Reset selection to current user's avatar or first local if dialog closes
               if (!open) setSelectedAvatarUrlInDialog(user.photoURL || (localAvatars.length > 0 ? localAvatars[0].src : null)); 
             }}>
               <DialogTrigger asChild>
@@ -164,7 +172,7 @@ export default function ProfilePage() {
                     Klik pada salah satu avatar di bawah ini untuk memilihnya. Pastikan gambar tersedia di folder public/avatars.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-4 max-h-[60vh] overflow-y-auto">
                   {localAvatars.map((avatar) => (
                     <button
                       key={avatar.src}
