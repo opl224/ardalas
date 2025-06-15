@@ -4,7 +4,7 @@
 import type { User as FirebaseUser } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
 import type { Role } from "@/config/roles";
-import { doc, getDoc, Timestamp, query, collection, where, limit } from "firebase/firestore"; // Added query, collection, where, limit
+import { doc, getDoc, Timestamp, query, collection, where, limit, getDocs } from "firebase/firestore"; // Added getDocs here
 // Import React and other hooks/types explicitly
 import React, { useEffect, useContext, createContext, useState, type ReactNode, useCallback } from "react";
 
