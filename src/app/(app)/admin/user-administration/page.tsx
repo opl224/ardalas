@@ -671,8 +671,7 @@ export default function UserAdministrationPage() {
               </Table>
             </div>
             {totalPages > 1 && (
-                <div className="mt-6 flex justify-center">
-                    <Pagination>
+                <Pagination className="mt-6">
                     <PaginationContent>
                         <PaginationItem>
                         <PaginationPrevious 
@@ -690,8 +689,7 @@ export default function UserAdministrationPage() {
                         />
                         </PaginationItem>
                     </PaginationContent>
-                    </Pagination>
-                </div>
+                </Pagination>
             )}
             </>
           ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini (yang akan membuat entri di database dan di Firebase Authentication), atau jika pengguna sudah ada di Firebase Authentication, pastikan ada entri yang sesuai di database Firestore pada koleksi 'users' dengan field `uid` yang sesuai.</div> )}
