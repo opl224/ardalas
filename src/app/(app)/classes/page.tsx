@@ -41,8 +41,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical } from "lucide-react"; 
-import { useState, useEffect } from "react";
+import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical, Search } from "lucide-react"; 
+import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -109,12 +109,13 @@ const NO_TEACHER_VALUE = "_NONE_";
 
 export default function ClassesPage() {
   const { user, role, loading: authLoading } = useAuth(); 
-  const [classes, setClasses] = useState<ClassData[]>([]);
+  const [allRawClasses, setAllRawClasses] = useState<ClassData[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const [isViewStudentsDialogOpen, setIsViewStudentsDialogOpen] = useState(false);
   const [selectedClassForViewingStudents, setSelectedClassForViewingStudents] = useState<ClassData | null>(null);
@@ -168,10 +169,10 @@ export default function ClassesPage() {
         }
         q = query(classesCollectionRef, orderBy("name", "asc"));
         const querySnapshot = await getDocs(q);
-        setClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
+        setAllRawClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
       } else if (role === "guru" && user?.uid) {
-        if (teachers.length === 0) { 
-          await fetchTeachersForDropdown(); // Ensure teachers are fetched for admin too if needed for other contexts
+         if (teachers.length === 0) { 
+          await fetchTeachersForDropdown();
         }
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
@@ -180,20 +181,20 @@ export default function ClassesPage() {
           const teacherDocId = teacherProfileSnapshot.docs[0].id;
           q = query(classesCollectionRef, where("teacherId", "==", teacherDocId), orderBy("name", "asc"));
           const querySnapshot = await getDocs(q);
-          setClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
+          setAllRawClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
         } else {
-          setClasses([]);
+          setAllRawClasses([]);
         }
       } else if (role === "orangtua" && user?.linkedStudentClassId) {
         const classDocRef = doc(db, "classes", user.linkedStudentClassId);
         const classDocSnap = await getDoc(classDocRef);
         if (classDocSnap.exists()) {
-          setClasses([{ id: classDocSnap.id, ...classDocSnap.data() } as ClassData]);
+          setAllRawClasses([{ id: classDocSnap.id, ...classDocSnap.data() } as ClassData]);
         } else {
-          setClasses([]);
+          setAllRawClasses([]);
         }
       } else {
-        setClasses([]);
+        setAllRawClasses([]);
       }
     } catch (error) {
       console.error("Error fetching classes: ", error);
@@ -202,7 +203,7 @@ export default function ClassesPage() {
         description: "Terjadi kesalahan saat mengambil data kelas.",
         variant: "destructive",
       });
-      setClasses([]);
+      setAllRawClasses([]);
     } finally {
       setIsLoading(false);
     }
@@ -350,6 +351,15 @@ export default function ClassesPage() {
     : "Kelola daftar kelas, wali kelas, dan siswa per kelas.";
 
 
+  const filteredClasses = useMemo(() => {
+    if (!searchTerm) {
+      return allRawClasses;
+    }
+    return allRawClasses.filter(c => 
+      c.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [allRawClasses, searchTerm]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -427,13 +437,26 @@ export default function ClassesPage() {
           )}
         </CardHeader>
         <CardContent>
+          {(role === 'admin' || role === 'guru') && (
+             <div className="my-4">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari berdasarkan nama kelas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+            </div>
+          )}
           {isLoading || authLoading ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
              </div>
-          ) : classes.length > 0 ? (
+          ) : filteredClasses.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -445,7 +468,7 @@ export default function ClassesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {classes.map((classItem, index) => (
+                  {filteredClasses.map((classItem, index) => (
                     <TableRow key={classItem.id}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{classItem.name}</TableCell>
@@ -519,7 +542,8 @@ export default function ClassesPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
+                {searchTerm && role === 'admin' ? 'Tidak ada kelas yang cocok dengan pencarian Anda.' :
+                 role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
                  role === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
                  role === 'orangtua' && !user?.linkedStudentClassId ? (
                    <div className="flex flex-col items-center">
@@ -655,3 +679,4 @@ export default function ClassesPage() {
   );
 }
     
+
