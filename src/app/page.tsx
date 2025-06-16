@@ -30,15 +30,7 @@ export default function HomePage() {
         <h1 className="text-2xl font-semibold">Berusaha masuk...</h1>
 =======
         <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
->>>>>>> 81780d2 (hapus silahkan unggu sebentar dan hilangkan loader skeleton pada lottie-)
-=======
-        <LottieLoader width={150} height={150} onAnimationLoaded={() => setLottieLoaded(true)} /> 
-        {lottieLoaded ? (
-          <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
-        ) : (
-          <div style={{ height: "2rem" }} aria-hidden="true" /> // Placeholder for h1 height (text-2xl approx line-height)
-        )}
->>>>>>> 44bea24 (buat agar lottie animation keluar bersamaan dengan tulisan, soalnya lott)
+        <p className="text-muted-foreground">Silakan tunggu sebentar.</p>
       </div>
     </div>
   );

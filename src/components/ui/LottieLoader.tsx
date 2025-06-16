@@ -24,6 +24,7 @@ const LottieLoader: React.FC<LottieLoaderProps> = ({
   useEffect(() => {
     const loadAnimation = async () => {
       try {
+        // Ensure the path is correct and the file is in the public folder
         const response = await fetch("/lottie-animations/loader-animation.json");
         if (!response.ok) {
           throw new Error(`Failed to fetch Lottie: ${response.status} ${response.statusText}`);
@@ -34,22 +35,22 @@ const LottieLoader: React.FC<LottieLoaderProps> = ({
       } catch (err: any) {
         console.error("Error loading Lottie animation:", err);
         setErrorLottie(err.message || "Could not load animation");
-        onAnimationLoaded?.(); // Call callback even on error to unlock text
+      } finally {
+        setIsLoadingLottie(false);
       }
     };
 
     loadAnimation();
-  }, [onAnimationLoaded]);
+  }, []);
 
-  if (errorLottie) {
+  if (isLoadingLottie) {
+    return <div className={cn("animate-pulse rounded-md bg-muted", className)} style={{ width, height }} aria-label="Loading animation..."></div>;
+  }
+
+  if (errorLottie || !animationData) {
     return (
-      <div 
-        className={cn("flex items-center justify-center text-destructive text-xs p-1 text-center", className)} 
-        style={{ width, height }} 
-        role="img" 
-        aria-label="Animasi gagal dimuat"
-      >
-        ⚠️
+      <div className={cn("text-destructive text-xs text-center p-1 flex items-center justify-center", className)} style={{ width, height }}>
+        Animasi Gagal Dimuat
       </div>
     );
   }
