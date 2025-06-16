@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"; 
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon } from "lucide-react"; // Added Search and FilterIcon
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, CalendarIcon } from "lucide-react"; 
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,6 +64,11 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
+import { format, startOfDay } from "date-fns";
+import { id as indonesiaLocale } from "date-fns/locale";
 
 interface ClassMin {
   id: string;
@@ -76,14 +82,22 @@ interface Student {
   email?: string; 
   classId: string; 
   className?: string; 
+  dateOfBirth?: Timestamp;
+  gender?: "laki-laki" | "perempuan";
+  address?: string;
   createdAt?: Timestamp; 
 }
+
+const GENDERS = ["laki-laki", "perempuan"] as const;
 
 const studentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   classId: z.string({ required_error: "Pilih kelas." }), 
+  dateOfBirth: z.date().optional(),
+  gender: z.enum(GENDERS).optional(),
+  address: z.string().optional(),
 });
 type StudentFormValues = z.infer<typeof studentFormSchema>;
 
@@ -114,11 +128,23 @@ export default function StudentsPage() {
       nis: "",
       email: "",
       classId: undefined,
+      dateOfBirth: undefined,
+      gender: undefined,
+      address: "",
     },
   });
 
   const editStudentForm = useForm<EditStudentFormValues>({
     resolver: zodResolver(editStudentFormSchema),
+    defaultValues: { // Added defaultValues here for consistency
+      name: "",
+      nis: "",
+      email: "",
+      classId: undefined,
+      dateOfBirth: undefined,
+      gender: undefined,
+      address: "",
+    }
   });
 
   const fetchClassesForUserRole = async () => {
@@ -130,7 +156,6 @@ export default function StudentsPage() {
         const querySnapshot = await getDocs(q);
         setAllClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
       } else if (authRole === 'guru' && authUser?.uid) {
-        // For teachers, get classes they teach in by looking at lessons
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
@@ -183,11 +208,10 @@ export default function StudentsPage() {
     setIsLoadingStudents(true);
     try {
       const usersCollectionRef = collection(db, "users");
-      let studentsQuery;
       let finalFetchedStudents: Student[] = [];
 
       if (authRole === 'siswa' && authUser?.classId) {
-        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("name", "asc"));
+        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("name", "asc"));
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
@@ -196,6 +220,9 @@ export default function StudentsPage() {
           email: docSnap.data().email,
           classId: docSnap.data().classId,
           className: docSnap.data().className,
+          dateOfBirth: docSnap.data().dateOfBirth,
+          gender: docSnap.data().gender,
+          address: docSnap.data().address,
           createdAt: docSnap.data().createdAt,
         }));
       } else if (authRole === 'guru' && authUser?.uid) {
@@ -222,6 +249,9 @@ export default function StudentsPage() {
                 email: docSnap.data().email,
                 classId: docSnap.data().classId,
                 className: docSnap.data().className,
+                dateOfBirth: docSnap.data().dateOfBirth,
+                gender: docSnap.data().gender,
+                address: docSnap.data().address,
                 createdAt: docSnap.data().createdAt,
               });
             });
@@ -229,7 +259,7 @@ export default function StudentsPage() {
           finalFetchedStudents.sort((a,b) => a.name.localeCompare(b.name));
         }
       } else if (authRole === 'admin') {
-        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
@@ -238,6 +268,9 @@ export default function StudentsPage() {
           email: docSnap.data().email,
           classId: docSnap.data().classId,
           className: docSnap.data().className,
+          dateOfBirth: docSnap.data().dateOfBirth,
+          gender: docSnap.data().gender,
+          address: docSnap.data().address,
           createdAt: docSnap.data().createdAt,
         }));
       }
@@ -275,6 +308,9 @@ export default function StudentsPage() {
         nis: selectedStudent.nis || "",
         email: selectedStudent.email || "",
         classId: selectedStudent.classId,
+        dateOfBirth: selectedStudent.dateOfBirth ? selectedStudent.dateOfBirth.toDate() : undefined,
+        gender: selectedStudent.gender,
+        address: selectedStudent.address || "",
       });
     }
   }, [selectedStudent, isEditStudentDialogOpen, editStudentForm]);
@@ -297,8 +333,8 @@ export default function StudentsPage() {
 
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menambahkan murid.", variant: "destructive"});
+    if (authRole !== 'admin') { // Only admin can add these new fields
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan murid dengan detail ini.", variant: "destructive"});
         return;
     }
     addStudentForm.clearErrors();
@@ -309,19 +345,32 @@ export default function StudentsPage() {
         return;
     }
     try {
-      const studentDataForUsersCollection = {
+      const studentDataForUsersCollection: any = {
         name: data.name,
         nis: data.nis,
-        email: data.email,
+        email: data.email || null,
         classId: selectedClassObj.id, 
         className: selectedClassObj.name, 
         role: 'siswa', 
         createdAt: serverTimestamp(),
       };
+
+      if (authRole === 'admin') {
+        if (data.dateOfBirth) {
+          studentDataForUsersCollection.dateOfBirth = Timestamp.fromDate(startOfDay(data.dateOfBirth));
+        }
+        if (data.gender) {
+          studentDataForUsersCollection.gender = data.gender;
+        }
+        if (data.address) {
+          studentDataForUsersCollection.address = data.address;
+        }
+      }
+
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
-      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
+      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "" });
       fetchStudents(); 
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -339,8 +388,8 @@ export default function StudentsPage() {
 
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
-     if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat mengedit murid.", variant: "destructive"});
+     if (authRole !== 'admin') { // Only admin can edit these new fields
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit murid dengan detail ini.", variant: "destructive"});
         return;
     }
     editStudentForm.clearErrors();
@@ -351,13 +400,21 @@ export default function StudentsPage() {
     }
     try {
       const studentDocRef = doc(db, "users", selectedStudent.id); 
-      await updateDoc(studentDocRef, {
+      const updateData: any = {
         name: data.name,
         nis: data.nis,
-        email: data.email,
+        email: data.email || null,
         classId: data.classId,
         className: selectedClass.name, 
-      });
+      };
+
+      if (authRole === 'admin') {
+        updateData.dateOfBirth = data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null;
+        updateData.gender = data.gender || null;
+        updateData.address = data.address || null;
+      }
+      
+      await updateDoc(studentDocRef, updateData);
       
       toast({ title: "Data Murid Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditStudentDialogOpen(false);
@@ -470,6 +527,80 @@ export default function StudentsPage() {
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.classId.message}</p>
         )}
       </div>
+      {authRole === 'admin' && (
+        <>
+          <div>
+            <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
+            <Controller
+              name="dateOfBirth"
+              control={formInstance.control}
+              render={({ field }) => (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className="w-full justify-start text-left font-normal mt-1"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal lahir</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
+                      captionLayout="dropdown-buttons"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            />
+            {formInstance.formState.errors.dateOfBirth && (
+              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfBirth.message}</p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor={`${formType}-student-gender`}>Jenis Kelamin (Opsional)</Label>
+            <Controller
+              name="gender"
+              control={formInstance.control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={field.onChange}
+                  value={field.value || undefined}
+                >
+                  <SelectTrigger id={`${formType}-student-gender`} className="mt-1">
+                    <SelectValue placeholder="Pilih jenis kelamin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="laki-laki">Laki-laki</SelectItem>
+                    <SelectItem value="perempuan">Perempuan</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {formInstance.formState.errors.gender && (
+              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.gender.message}</p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor={`${formType}-student-address`}>Alamat (Opsional)</Label>
+            <Textarea
+              id={`${formType}-student-address`}
+              {...formInstance.register("address")}
+              className="mt-1"
+              placeholder="Masukkan alamat lengkap murid"
+            />
+            {formInstance.formState.errors.address && (
+              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 
@@ -501,7 +632,7 @@ export default function StudentsPage() {
               onOpenChange={(isOpen) => {
                 setIsAddStudentDialogOpen(isOpen);
                 if (!isOpen) {
-                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined });
+                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "" });
                   addStudentForm.clearErrors();
                 } else {
                    if (allClasses.length === 0 && !isLoadingClasses) fetchClassesForUserRole();
@@ -658,6 +789,7 @@ export default function StudentsPage() {
             </DialogHeader>
             {selectedStudent && (
               <form onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <Input type="hidden" {...editStudentForm.register("id")} />
                 {renderStudentFormFields(editStudentForm, 'edit')}
                 <DialogFooter>
                    <DialogClose asChild>
