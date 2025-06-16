@@ -60,7 +60,8 @@ import {
   query,
   orderBy,
   where,
-  documentId
+  documentId,
+  limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
@@ -136,7 +137,7 @@ export default function StudentsPage() {
 
   const editStudentForm = useForm<EditStudentFormValues>({
     resolver: zodResolver(editStudentFormSchema),
-    defaultValues: { // Added defaultValues here for consistency
+    defaultValues: { 
       name: "",
       nis: "",
       email: "",
@@ -333,7 +334,7 @@ export default function StudentsPage() {
 
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
-    if (authRole !== 'admin') { // Only admin can add these new fields
+    if (authRole !== 'admin') { 
         toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan murid dengan detail ini.", variant: "destructive"});
         return;
     }
@@ -388,7 +389,7 @@ export default function StudentsPage() {
 
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
-     if (authRole !== 'admin') { // Only admin can edit these new fields
+     if (authRole !== 'admin') { 
         toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit murid dengan detail ini.", variant: "destructive"});
         return;
     }
@@ -553,6 +554,7 @@ export default function StudentsPage() {
                       captionLayout="dropdown-buttons"
                       fromYear={1990}
                       toYear={new Date().getFullYear()}
+                      locale={indonesiaLocale}
                       initialFocus
                     />
                   </PopoverContent>
@@ -570,15 +572,18 @@ export default function StudentsPage() {
               control={formInstance.control}
               render={({ field }) => (
                 <Select
-                  onValueChange={field.onChange}
+                  onValueChange={(value) => field.onChange(value as typeof GENDERS[number] | undefined)}
                   value={field.value || undefined}
                 >
                   <SelectTrigger id={`${formType}-student-gender`} className="mt-1">
                     <SelectValue placeholder="Pilih jenis kelamin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="laki-laki">Laki-laki</SelectItem>
-                    <SelectItem value="perempuan">Perempuan</SelectItem>
+                    {GENDERS.map(genderValue => (
+                        <SelectItem key={genderValue} value={genderValue}>
+                            {genderValue.charAt(0).toUpperCase() + genderValue.slice(1)}
+                        </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               )}
@@ -807,4 +812,5 @@ export default function StudentsPage() {
     </div>
   );
 }
+
 
