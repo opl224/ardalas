@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"; 
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon } from "lucide-react"; 
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye } from "lucide-react"; 
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,10 +65,17 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
-import { CalendarDatePicker } from "@/components/calendar-date-picker"; // Changed import
+import { CalendarDatePicker } from "@/components/calendar-date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { format, startOfDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ClassMin {
   id: string;
@@ -100,7 +107,7 @@ const baseStudentFormSchema = z.object({
   address: z.string().optional(),
 });
 
-const studentFormSchema = baseStudentFormSchema; // No refine needed for basic schema
+const studentFormSchema = baseStudentFormSchema;
 type StudentFormValues = z.infer<typeof studentFormSchema>;
 
 const editStudentFormSchema = baseStudentFormSchema.extend({
@@ -116,7 +123,9 @@ export default function StudentsPage() {
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
+  const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudentForView, setSelectedStudentForView] = useState<Student | null>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
@@ -438,6 +447,11 @@ export default function StudentsPage() {
     }
   };
 
+  const openViewStudentDialog = (student: Student) => {
+    setSelectedStudentForView(student);
+    setIsViewStudentDialogOpen(true);
+  };
+
   const openEditDialog = (student: Student) => {
     if (authRole !== 'admin' && authRole !== 'guru') {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit murid.", variant: "destructive"});
@@ -527,12 +541,13 @@ export default function StudentsPage() {
               render={({ field }) => (
                 <CalendarDatePicker
                   id={`${formType}-student-dateOfBirth-picker`}
-                  date={{ from: field.value, to: field.value }}
-                  onDateSelect={({ from }) => field.onChange(from ? startOfDay(from) : undefined)}
-                  numberOfMonths={1}
-                  closeOnSelect={true}
+                  date={{ from: field.value, to: field.value }} // Pass date as DateRange
+                  onDateSelect={({ from }) => field.onChange(from ? startOfDay(from) : undefined)} // Handle single date selection
+                  numberOfMonths={1} // Use single month for single date picking
+                  closeOnSelect={true} // Close popover on date select
                   className="w-full justify-start text-left font-normal mt-1"
                   variant="outline"
+                  yearsRange={100} // Allow selection from 1990 up to current year
                 />
               )}
             />
@@ -700,38 +715,57 @@ export default function StudentsPage() {
                 <TableBody>
                   {displayedStudents.map((student) => (
                     <TableRow key={student.id}>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{student.nis || "-"}</TableCell>
-                      <TableCell>{student.email || "-"}</TableCell>
-                      <TableCell>{student.className || student.classId}</TableCell>
+                      <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
+                      <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
+                      <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
+                      <TableCell className="truncate" title={student.className}>{student.className || student.classId}</TableCell>
                       {(authRole === 'admin' || authRole === 'guru') && (
-                        <TableCell className="text-right space-x-2">
-                          <Button variant="outline" size="icon" onClick={() => openEditDialog(student)} aria-label={`Edit ${student.name}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(student)} aria-label={`Hapus ${student.name}`}>
-                                <Trash2 className="h-4 w-4" />
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}>
+                                <MoreVertical className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            {selectedStudent && selectedStudent.id === student.id && ( 
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
-                                    Ya, Hapus Data
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            )}
-                          </AlertDialog>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openViewStudentDialog(student)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Lihat Detail
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(student)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Hapus
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedStudent && selectedStudent.id === student.id && ( 
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
+                                        Ya, Hapus Data
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       )}
                     </TableRow>
@@ -751,6 +785,44 @@ export default function StudentsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isViewStudentDialogOpen} onOpenChange={(isOpen) => {
+          setIsViewStudentDialogOpen(isOpen);
+          if (!isOpen) { setSelectedStudentForView(null); }
+      }}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Detail Murid: {selectedStudentForView?.name}</DialogTitle>
+                <DialogDescription>Informasi lengkap mengenai murid.</DialogDescription>
+            </DialogHeader>
+            {selectedStudentForView && (
+                <div className="space-y-3 py-4 text-sm">
+                    <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
+                    <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{selectedStudentForView.nis || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedStudentForView.email || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedStudentForView.className || selectedStudentForView.classId}</p></div>
+                    <div>
+                        <Label className="text-muted-foreground">Tanggal Lahir:</Label>
+                        <p className="font-medium">
+                            {selectedStudentForView.dateOfBirth ? format(selectedStudentForView.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "-"}
+                        </p>
+                    </div>
+                    <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedStudentForView.gender || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedStudentForView.address || "-"}</p></div>
+                    {selectedStudentForView.createdAt && (
+                       <div>
+                          <Label className="text-muted-foreground">Tanggal Daftar Profil:</Label>
+                          <p className="font-medium">{format(selectedStudentForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                       </div>
+                    )}
+                </div>
+            )}
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       { (authRole === 'admin' || authRole === 'guru') && ( 
         <Dialog open={isEditStudentDialogOpen} onOpenChange={(isOpen) => {
