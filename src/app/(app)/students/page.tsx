@@ -83,6 +83,11 @@ interface ClassMin {
   name: string;
 }
 
+interface ParentMin {
+  id: string;
+  name: string;
+}
+
 interface Student {
   id: string; 
   name: string;
@@ -93,6 +98,9 @@ interface Student {
   dateOfBirth?: Timestamp;
   gender?: "laki-laki" | "perempuan";
   address?: string;
+  linkedParentId?: string;
+  parentName?: string; 
+  attendanceNumber?: number;
   createdAt?: Timestamp; 
 }
 
@@ -106,6 +114,8 @@ const baseStudentFormSchema = z.object({
   dateOfBirth: z.date().optional(),
   gender: z.enum(GENDERS).optional(),
   address: z.string().optional(),
+  linkedParentId: z.string().optional(),
+  attendanceNumber: z.coerce.number().positive("Nomor absen harus angka positif.").int("Nomor absen harus bilangan bulat.").optional().nullable(),
 });
 
 const studentFormSchema = baseStudentFormSchema;
@@ -120,8 +130,10 @@ export default function StudentsPage() {
   const { user: authUser, role: authRole, loading: authLoading } = useAuth(); 
   const [students, setStudents] = useState<Student[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
+  const [allParents, setAllParents] = useState<ParentMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [isLoadingParents, setIsLoadingParents] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
@@ -143,6 +155,8 @@ export default function StudentsPage() {
       dateOfBirth: undefined,
       gender: undefined,
       address: "",
+      linkedParentId: undefined,
+      attendanceNumber: undefined,
     },
   });
 
@@ -156,64 +170,78 @@ export default function StudentsPage() {
       dateOfBirth: undefined,
       gender: undefined,
       address: "",
+      linkedParentId: undefined,
+      attendanceNumber: undefined,
     }
   });
 
-  const fetchClassesForUserRole = async () => {
+  const fetchPageInitialData = async () => {
     setIsLoadingClasses(true);
+    setIsLoadingParents(true);
     try {
-      if (authRole === 'admin') {
+      const promises = [];
+      if (authRole === 'admin' || authRole === 'guru') {
         const classesCollectionRef = collection(db, "classes");
-        const q = query(classesCollectionRef, orderBy("name", "asc"));
-        const querySnapshot = await getDocs(q);
-        setAllClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
-      } else if (authRole === 'guru' && authUser?.uid) {
-        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
-        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+        const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
+        promises.push(getDocs(qClasses));
+      } else {
+        promises.push(Promise.resolve(null)); // Placeholder for classes if not admin/guru
+      }
 
-        if (teacherProfileSnapshot.empty) {
-            setAllClasses([]);
-            setIsLoadingClasses(false);
-            return;
-        }
-        const teacherProfileId = teacherProfileSnapshot.docs[0].id;
-        
-        const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
-        const lessonsSnapshot = await getDocs(lessonsQuery);
-        
-        const teacherClassIdsSet = new Set<string>();
-        lessonsSnapshot.docs.forEach(doc => {
-            const classId = doc.data().classId as string;
-            if (classId) teacherClassIdsSet.add(classId);
-        });
-        const teacherClassIds = Array.from(teacherClassIdsSet);
-        
-        if (teacherClassIds.length === 0) {
-          setAllClasses([]);
-        } else {
-            const CHUNK_SIZE_CLASSES = 30;
-            const fetchedClasses: ClassMin[] = [];
-            for (let i = 0; i < teacherClassIds.length; i += CHUNK_SIZE_CLASSES) {
-                const chunk = teacherClassIds.slice(i, i + CHUNK_SIZE_CLASSES);
-                if (chunk.length > 0) {
-                     const classesQuery = query(collection(db, "classes"), where(documentId(), "in", chunk));
-                     const classDetailsSnapshot = await getDocs(classesQuery);
-                     classDetailsSnapshot.forEach(doc => fetchedClasses.push({ id: doc.id, name: doc.data().name }));
-                }
+      if (authRole === 'admin') {
+        const parentsCollectionRef = collection(db, "parents");
+        const qParents = query(parentsCollectionRef, orderBy("name", "asc"));
+        promises.push(getDocs(qParents));
+      } else {
+        promises.push(Promise.resolve(null)); // Placeholder for parents if not admin
+      }
+      
+      const [classesSnapshot, parentsSnapshot] = await Promise.all(promises);
+
+      if (classesSnapshot) {
+         const fetchedClasses = (classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name }));
+        if (authRole === 'guru' && authUser?.uid) {
+            const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+            if (!teacherProfileSnapshot.empty) {
+                const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+                const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
+                const lessonsSnapshot = await getDocs(lessonsQuery);
+                const teacherClassIdsSet = new Set<string>();
+                lessonsSnapshot.docs.forEach(doc => {
+                    const classId = doc.data().classId as string;
+                    if (classId) teacherClassIdsSet.add(classId);
+                });
+                const teacherClassIds = Array.from(teacherClassIdsSet);
+                setAllClasses(fetchedClasses.filter((c: ClassMin) => teacherClassIds.includes(c.id)));
+            } else {
+                 setAllClasses([]);
             }
-            setAllClasses(fetchedClasses.sort((a,b) => a.name.localeCompare(b.name)));
+        } else {
+            setAllClasses(fetchedClasses);
         }
       } else {
         setAllClasses([]);
       }
-    } catch (error) {
-      console.error("Error fetching classes for user role: ", error);
-      toast({ title: "Gagal Memuat Daftar Kelas", variant: "destructive" });
-      setAllClasses([]);
-    } finally {
       setIsLoadingClasses(false);
+      
+      if (parentsSnapshot) {
+        setAllParents((parentsSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
+      } else {
+        setAllParents([]);
+      }
+      setIsLoadingParents(false);
+
+    } catch (error) {
+      console.error("Error fetching initial page data: ", error);
+      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
+      setAllClasses([]);
+      setAllParents([]);
+      setIsLoadingClasses(false);
+      setIsLoadingParents(false);
     }
   };
+
 
   const fetchStudents = async () => {
     if (authLoading) return;
@@ -227,16 +255,8 @@ export default function StudentsPage() {
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
-          name: docSnap.data().name,
-          nis: docSnap.data().nis,
-          email: docSnap.data().email,
-          classId: docSnap.data().classId,
-          className: docSnap.data().className,
-          dateOfBirth: docSnap.data().dateOfBirth,
-          gender: docSnap.data().gender,
-          address: docSnap.data().address,
-          createdAt: docSnap.data().createdAt,
-        }));
+          ...docSnap.data(),
+        } as Student));
       } else if (authRole === 'guru' && authUser?.uid) {
         if (allClasses.length > 0) {
           const classIdsForTeacher = allClasses.map(c => c.id);
@@ -256,16 +276,8 @@ export default function StudentsPage() {
             snapshot.docs.forEach(docSnap => {
               finalFetchedStudents.push({
                 id: docSnap.id,
-                name: docSnap.data().name,
-                nis: docSnap.data().nis,
-                email: docSnap.data().email,
-                classId: docSnap.data().classId,
-                className: docSnap.data().className,
-                dateOfBirth: docSnap.data().dateOfBirth,
-                gender: docSnap.data().gender,
-                address: docSnap.data().address,
-                createdAt: docSnap.data().createdAt,
-              });
+                 ...docSnap.data(),
+              } as Student);
             });
           });
           finalFetchedStudents.sort((a,b) => a.name.localeCompare(b.name));
@@ -275,16 +287,8 @@ export default function StudentsPage() {
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
-          name: docSnap.data().name,
-          nis: docSnap.data().nis,
-          email: docSnap.data().email,
-          classId: docSnap.data().classId,
-          className: docSnap.data().className,
-          dateOfBirth: docSnap.data().dateOfBirth,
-          gender: docSnap.data().gender,
-          address: docSnap.data().address,
-          createdAt: docSnap.data().createdAt,
-        }));
+          ...docSnap.data(),
+        } as Student));
       }
       setStudents(finalFetchedStudents);
     } catch (error) {
@@ -299,17 +303,17 @@ export default function StudentsPage() {
   useEffect(() => {
     const initializePageData = async () => {
       if (!authLoading) {
-        await fetchClassesForUserRole();
+        await fetchPageInitialData();
       }
     };
     initializePageData();
   }, [authRole, authUser, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && !isLoadingClasses) { 
+    if (!authLoading && !isLoadingClasses && !isLoadingParents) { 
         fetchStudents();
     }
-  }, [authLoading, isLoadingClasses, allClasses]);
+  }, [authLoading, isLoadingClasses, isLoadingParents, allClasses]);
 
 
   useEffect(() => {
@@ -323,6 +327,8 @@ export default function StudentsPage() {
         dateOfBirth: selectedStudent.dateOfBirth ? selectedStudent.dateOfBirth.toDate() : undefined,
         gender: selectedStudent.gender,
         address: selectedStudent.address || "",
+        linkedParentId: selectedStudent.linkedParentId || undefined,
+        attendanceNumber: selectedStudent.attendanceNumber ?? undefined,
       });
     }
   }, [selectedStudent, isEditStudentDialogOpen, editStudentForm]);
@@ -356,6 +362,8 @@ export default function StudentsPage() {
         toast({ title: "Kelas tidak valid", description: "Silakan pilih kelas yang valid untuk murid.", variant: "destructive" });
         return;
     }
+    const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
+
     try {
       const studentDataForUsersCollection: any = {
         name: data.name,
@@ -368,12 +376,15 @@ export default function StudentsPage() {
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
         address: data.address || null,
+        linkedParentId: data.linkedParentId || null,
+        parentName: selectedParent?.name || null,
+        attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
 
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
-      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "" });
+      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents(); 
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -401,6 +412,7 @@ export default function StudentsPage() {
         toast({ title: "Kelas tidak valid", variant: "destructive" });
         return;
     }
+    const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
     try {
       const studentDocRef = doc(db, "users", selectedStudent.id); 
       const updateData: any = {
@@ -412,6 +424,9 @@ export default function StudentsPage() {
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
         address: data.address || null,
+        linkedParentId: data.linkedParentId || null,
+        parentName: selectedParent?.name || null,
+        attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
       
       await updateDoc(studentDocRef, updateData);
@@ -458,8 +473,8 @@ export default function StudentsPage() {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit murid.", variant: "destructive"});
         return;
     }
-    if (allClasses.length === 0 && !isLoadingClasses && (authRole === 'admin' || authRole === 'guru')) {
-      fetchClassesForUserRole(); 
+    if ((allClasses.length === 0 && !isLoadingClasses) || (allParents.length === 0 && !isLoadingParents && authRole === 'admin')) {
+      fetchPageInitialData();
     }
     setSelectedStudent(student);
     setIsEditStudentDialogOpen(true);
@@ -595,6 +610,52 @@ export default function StudentsPage() {
               <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
             )}
           </div>
+          <div>
+            <Label htmlFor={`${formType}-student-linkedParentId`}>Orang Tua Terhubung (Opsional)</Label>
+            <Controller
+              name="linkedParentId"
+              control={formInstance.control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
+                  value={field.value || "_NONE_"}
+                  disabled={isLoadingParents}
+                >
+                  <SelectTrigger id={`${formType}-student-linkedParentId`} className="mt-1">
+                    <SelectValue placeholder={isLoadingParents ? "Memuat orang tua..." : "Pilih orang tua"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingParents ? (
+                      <SelectItem value="loading_parents" disabled>Memuat orang tua...</SelectItem>
+                    ) : (
+                      <>
+                        <SelectItem value="_NONE_">Tidak Ada / Kosongkan</SelectItem>
+                        {allParents.map((parent) => (
+                          <SelectItem key={parent.id} value={parent.id}>
+                            {parent.name}
+                          </SelectItem>
+                        ))}
+                        {allParents.length === 0 && <SelectItem value="no_parents" disabled>Belum ada data orang tua.</SelectItem>}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+          <div>
+            <Label htmlFor={`${formType}-student-attendanceNumber`}>Nomor Absen (Opsional)</Label>
+            <Input
+              id={`${formType}-student-attendanceNumber`}
+              type="number"
+              {...formInstance.register("attendanceNumber", { setValueAs: (v) => (v === "" ? null : Number(v)) })}
+              className="mt-1"
+              placeholder="Contoh: 15"
+            />
+            {formInstance.formState.errors.attendanceNumber && (
+              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.attendanceNumber.message}</p>
+            )}
+          </div>
         </>
       )}
     </>
@@ -609,6 +670,7 @@ export default function StudentsPage() {
     : (authRole === 'guru' ? "Daftar siswa dari kelas-kelas yang mata pelajarannya Anda ampu." : "Kelola data murid, absensi, nilai, dan informasi terkait.");
 
   const showClassFilter = (authRole === 'admin' && allClasses.length > 0) || (authRole === 'guru' && allClasses.length > 1);
+  const isLoadingCombined = isLoadingStudents || authLoading || ((authRole === 'admin' || authRole === 'guru') && (isLoadingClasses || (authRole === 'admin' && isLoadingParents)));
 
   return (
     <div className="space-y-6">
@@ -628,15 +690,15 @@ export default function StudentsPage() {
               onOpenChange={(isOpen) => {
                 setIsAddStudentDialogOpen(isOpen);
                 if (!isOpen) {
-                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "" });
+                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
                   addStudentForm.clearErrors();
                 } else {
-                   if (allClasses.length === 0 && !isLoadingClasses) fetchClassesForUserRole();
+                   if ((allClasses.length === 0 && !isLoadingClasses) || (authRole === 'admin' && allParents.length === 0 && !isLoadingParents)) fetchPageInitialData();
                 }
               }}
             >
               <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" disabled={authRole === 'guru' && !allClasses.length && !isLoadingClasses}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Tambah Murid
                 </Button>
               </DialogTrigger>
@@ -653,8 +715,8 @@ export default function StudentsPage() {
                     <DialogClose asChild>
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses}>
-                      {(addStudentForm.formState.isSubmitting || isLoadingClasses) ? "Menyimpan..." : "Simpan Murid"}
+                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)}>
+                      {(addStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)) ? "Menyimpan..." : "Simpan Murid"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -695,7 +757,7 @@ export default function StudentsPage() {
             </div>
           )}
 
-          {isLoadingStudents || authLoading || ( (authRole === 'admin' || authRole === 'guru') && isLoadingClasses) ? (
+          {isLoadingCombined ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -820,6 +882,18 @@ export default function StudentsPage() {
                     </div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedStudentForView.gender || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedStudentForView.address || "-"}</p></div>
+                    {selectedStudentForView?.attendanceNumber != null && (
+                        <div><Label className="text-muted-foreground">Nomor Absen:</Label><p className="font-medium">{selectedStudentForView.attendanceNumber}</p></div>
+                    )}
+                    {selectedStudentForView?.parentName && (
+                        <div><Label className="text-muted-foreground">Orang Tua Terhubung:</Label><p className="font-medium">{selectedStudentForView.parentName}</p></div>
+                    )}
+                    {selectedStudentForView?.linkedParentId && !selectedStudentForView.parentName && (
+                        <div><Label className="text-muted-foreground">ID Orang Tua Terhubung:</Label><p className="font-medium">{selectedStudentForView.linkedParentId} (Nama tidak tersedia)</p></div>
+                    )}
+                    {!selectedStudentForView?.linkedParentId && (
+                        <div><Label className="text-muted-foreground">Orang Tua Terhubung:</Label><p className="font-medium">-</p></div>
+                    )}
                     {selectedStudentForView.createdAt && (
                        <div>
                           <Label className="text-muted-foreground">Tanggal Daftar Profil:</Label>
@@ -858,8 +932,8 @@ export default function StudentsPage() {
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button>
                    </DialogClose>
-                  <Button type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses}>
-                    {(editStudentForm.formState.isSubmitting || isLoadingClasses) ? "Menyimpan..." : "Simpan Perubahan"}
+                  <Button type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)}>
+                    {(editStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>
               </form>
