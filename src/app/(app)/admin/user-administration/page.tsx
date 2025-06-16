@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter as FilterIcon } from "lucide-react";
+import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter as FilterIcon, ChevronDown } from "lucide-react";
 import { useState, useEffect, type ReactNode, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -76,6 +76,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Badge } from "@/components/ui/badge";
+
 
 interface ClassMin {
   id: string;
@@ -157,7 +161,8 @@ export default function UserAdministrationPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<Role[]>([]);
+  const [isRoleFilterPopoverOpen, setIsRoleFilterPopoverOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -405,10 +410,12 @@ export default function UserAdministrationPage() {
     return assignedIds.map(id => allClasses.find(c => c.id === id)?.name || id).join(", ");
   }
 
-  const renderClassAssignmentField = (formInstance: typeof addUserForm | typeof editUserForm, currentRole: Role | undefined) => {
+  const renderClassAssignmentField = (formInstance: ReturnType<typeof useForm<AddUserFormValues | EditUserFormValues>>, currentRole: Role | undefined) => {
     const noClassesAvailable = !isLoadingClasses && allClasses.length === 0;
     
     if (currentRole === 'guru') {
+      const selectedClasses = formInstance.watch("assignedClassIds") || [];
+      const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
       return (
         <div>
           <Label>Kelas yang Ditugaskan</Label>
@@ -420,33 +427,65 @@ export default function UserAdministrationPage() {
               <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
             </div>
           ) : (
-            <div className="mt-2 grid grid-cols-2 gap-2 border p-3 rounded-md max-h-40 overflow-y-auto">
-              {allClasses.map((cls) => (
-                <FormField
-                  key={cls.id}
-                  control={formInstance.control}
-                  name="assignedClassIds"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value?.includes(cls.id)}
-                          onCheckedChange={(checked) => {
-                            const currentValue = field.value || [];
-                            return checked
-                              ? field.onChange([...currentValue, cls.id])
-                              : field.onChange(currentValue.filter((value) => value !== cls.id));
-                          }}
-                        />
-                      </FormControl>
-                      <FormLabel className="font-normal text-sm">
-                        {cls.name}
-                      </FormLabel>
-                    </FormItem>
-                  )}
-                />
-              ))}
-            </div>
+            <FormField
+              control={formInstance.control}
+              name="assignedClassIds"
+              render={({ field }) => (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between mt-1"
+                    >
+                      <span className="truncate">
+                        {selectedClassNames.length > 0
+                          ? selectedClassNames.join(", ")
+                          : "Pilih kelas..."}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Cari kelas..." />
+                      <CommandList>
+                        <CommandEmpty>Tidak ada kelas ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {allClasses.map((cls) => (
+                            <CommandItem
+                              key={cls.id}
+                              value={cls.id}
+                              onSelect={() => {
+                                const currentValue = field.value || [];
+                                const isSelected = currentValue.includes(cls.id);
+                                if (isSelected) {
+                                  field.onChange(currentValue.filter((id) => id !== cls.id));
+                                } else {
+                                  field.onChange([...currentValue, cls.id]);
+                                }
+                              }}
+                            >
+                              <Checkbox
+                                className="mr-2"
+                                checked={field.value?.includes(cls.id)}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  return checked
+                                    ? field.onChange([...currentValue, cls.id])
+                                    : field.onChange(currentValue.filter((value) => value !== cls.id));
+                                }}
+                              />
+                              {cls.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
+            />
           )}
           {(formInstance.formState.errors as any).assignedClassIds && (
             <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).assignedClassIds.message}</p>
@@ -497,7 +536,7 @@ export default function UserAdministrationPage() {
       const matchesSearchTerm = searchTerm === "" ||
                                 user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                 user.email.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesRoleFilter = roleFilter === "all" || user.role === roleFilter;
+      const matchesRoleFilter = roleFilter.length === 0 || roleFilter.includes(user.role);
       return matchesSearchTerm && matchesRoleFilter;
     });
   }, [users, searchTerm, roleFilter]);
@@ -653,23 +692,56 @@ export default function UserAdministrationPage() {
               />
             </div>
             <div className="flex items-center">
-              <Select
-                value={roleFilter}
-                onValueChange={(value) => setRoleFilter(value as Role | "all")}
-              >
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Filter Peran" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Peran</SelectItem>
-                  {ROLES.map((roleItem) => (
-                    <SelectItem key={roleItem} value={roleItem} className="capitalize">
-                      {roleDisplayNames[roleItem]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Popover open={isRoleFilterPopoverOpen} onOpenChange={setIsRoleFilterPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full sm:w-[200px] justify-start">
+                    <FilterIcon className="mr-2 h-4 w-4" />
+                    {roleFilter.length > 0
+                        ? roleFilter.map(r => roleDisplayNames[r]).join(', ')
+                        : "Filter Peran"}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0" align="start">
+                    <Command>
+                    <CommandInput placeholder="Filter peran..." />
+                    <CommandList>
+                        <CommandEmpty>Tidak ada peran ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                        {ROLES.map((roleItem) => (
+                            <CommandItem
+                            key={roleItem}
+                            onSelect={() => {
+                                setRoleFilter(prev => 
+                                prev.includes(roleItem) 
+                                    ? prev.filter(r => r !== roleItem)
+                                    : [...prev, roleItem]
+                                );
+                            }}
+                            >
+                            <Checkbox
+                                className="mr-2"
+                                checked={roleFilter.includes(roleItem)}
+                            />
+                            <span>{roleDisplayNames[roleItem]}</span>
+                            </CommandItem>
+                        ))}
+                        </CommandGroup>
+                        {roleFilter.length > 0 && (
+                        <>
+                            <CommandGroup>
+                                <CommandItem
+                                    onSelect={() => setRoleFilter([])}
+                                    className="justify-center text-center text-sm text-muted-foreground hover:text-foreground cursor-pointer"
+                                >
+                                    Hapus Filter
+                                </CommandItem>
+                            </CommandGroup>
+                        </>
+                        )}
+                    </CommandList>
+                    </Command>
+                </PopoverContent>
+                </Popover>
             </div>
           </div>
 
@@ -682,10 +754,10 @@ export default function UserAdministrationPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className="w-1/4">Nama</TableHead>
-                    <TableHead className="w-1/4">Email</TableHead>
+                    <TableHead className="w-1/4 max-w-xs">Nama</TableHead>
+                    <TableHead className="w-1/4 max-w-xs">Email</TableHead>
                     <TableHead className="w-1/6">Peran</TableHead>
-                    <TableHead className="w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>
+                    <TableHead className="w-1/4 max-w-sm">Kelas Ditugaskan/Dimiliki</TableHead>
                     <TableHead className="text-right w-[120px]">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -693,10 +765,10 @@ export default function UserAdministrationPage() {
                   {currentTableData.map((user, index) => (
                     <TableRow key={user.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium truncate max-w-xs" title={user.name}>{user.name}</TableCell>
-                      <TableCell className="truncate max-w-xs" title={user.email}>{user.email}</TableCell>
+                      <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
+                      <TableCell className="truncate" title={user.email}>{user.email}</TableCell>
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
-                      <TableCell className="truncate max-w-xs" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
+                      <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
                         {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
                          user.role === 'siswa' ? (user.className || user.classId || '-') :
                          "-"}
@@ -725,7 +797,7 @@ export default function UserAdministrationPage() {
                         <PaginationPrevious 
                             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
                             aria-disabled={currentPage === 1}
-                            className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
                         />
                         </PaginationItem>
                         {renderPageNumbers()}
@@ -733,7 +805,7 @@ export default function UserAdministrationPage() {
                         <PaginationNext 
                             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
                             aria-disabled={currentPage === totalPages}
-                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
                         />
                         </PaginationItem>
                     </PaginationContent>
@@ -741,7 +813,7 @@ export default function UserAdministrationPage() {
             )}
             </>
           ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {searchTerm || roleFilter !== "all" 
+              {searchTerm || roleFilter.length > 0
                 ? "Tidak ada pengguna yang cocok dengan filter atau pencarian Anda."
                 : "Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur \"Tambah Pengguna\"."
               }
