@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle } from "lucide-react"; 
+import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical } from "lucide-react"; 
 import { useState, useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,6 +65,14 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 interface TeacherMin { 
   id: string;
@@ -430,52 +438,68 @@ export default function ClassesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama Kelas</TableHead>
                     <TableHead>Wali Kelas</TableHead>
-                    <TableHead className="text-right">
-                      {role === "admin" || role === "guru" ? "Aksi" : "Lihat Siswa"}
-                    </TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {classes.map((classItem) => (
+                  {classes.map((classItem, index) => (
                     <TableRow key={classItem.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{classItem.name}</TableCell>
                       <TableCell>{classItem.teacherName || "-"}</TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => openViewStudentsDialog(classItem)} aria-label={`Lihat siswa di ${classItem.name}`}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {role === "admin" && (
-                          <>
-                            <Button variant="outline" size="icon" onClick={() => openEditDialog(classItem)} aria-label={`Edit ${classItem.name}`}>
-                              <Edit className="h-4 w-4" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${classItem.name}`}>
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(classItem)} aria-label={`Hapus ${classItem.name}`}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              {selectedClass && selectedClass.id === classItem.id && ( 
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setSelectedClass(null)}>Batal</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteClass(selectedClass.id, selectedClass.name)}>
-                                      Ya, Hapus Kelas
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              )}
-                            </AlertDialog>
-                          </>
-                        )}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openViewStudentsDialog(classItem)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Lihat Siswa
+                            </DropdownMenuItem>
+                            {role === "admin" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openEditDialog(classItem)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem
+                                      onSelect={(e) => { e.preventDefault(); openDeleteDialog(classItem); }}
+                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Hapus
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  {selectedClass && selectedClass.id === classItem.id && ( 
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setSelectedClass(null)}>Batal</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteClass(selectedClass.id, selectedClass.name)}>
+                                          Ya, Hapus Kelas
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  )}
+                                </AlertDialog>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -620,3 +644,4 @@ export default function ClassesPage() {
   );
 }
     
+
