@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,6 +71,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 interface AuthUserMin {
   id: string; // Firebase Auth UID
@@ -99,6 +110,7 @@ const editSubjectFormSchema = subjectFormSchema.extend({
 type EditSubjectFormValues = z.infer<typeof editSubjectFormSchema>;
 
 const NO_RESPONSIBLE_TEACHER = "_NONE_";
+const ITEMS_PER_PAGE = 10;
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -110,6 +122,7 @@ export default function SubjectsPage() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const { user, role, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -360,7 +373,7 @@ export default function SubjectsPage() {
 
   const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingAuthUsers);
 
-  const filteredSubjects = useMemo(() => {
+  const displayedSubjects = useMemo(() => {
     if (role !== 'admin') return subjects; 
   
     return subjects.filter(subject => {
@@ -371,6 +384,63 @@ export default function SubjectsPage() {
     });
   }, [subjects, searchTerm, role]);
 
+  const totalPages = Math.ceil(displayedSubjects.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return displayedSubjects.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, displayedSubjects]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -437,11 +507,10 @@ export default function SubjectsPage() {
           )}
           {showSkeleton ? (
              <div className="space-y-2 mt-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
              </div>
-          ) : filteredSubjects.length > 0 ? (
+          ) : currentTableData.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -454,9 +523,9 @@ export default function SubjectsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSubjects.map((subject, index) => (
+                  {currentTableData.map((subject, index) => (
                     <TableRow key={subject.id}>
-                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium">{subject.name}</TableCell>
                       <TableCell>{subject.description || "-"}</TableCell>
                       {(role === "admin" || role === "guru") && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
@@ -509,6 +578,28 @@ export default function SubjectsPage() {
                 </TableBody>
               </Table>
             </div>
+             {totalPages > 1 && (
+                <Pagination className="mt-6">
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                            aria-disabled={currentPage === 1}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                            aria-disabled={currentPage === totalPages}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            )}
+            </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {role === "admin" ? (searchTerm ? 'Tidak ada subjek yang cocok dengan pencarian Anda.' : 'Tidak ada data subjek. Klik "Tambah Subjek" untuk membuat data baru.') : 'Tidak ada subjek yang ditugaskan kepada Anda.'}
@@ -552,3 +643,4 @@ export default function SubjectsPage() {
     </div>
   );
 }
+
