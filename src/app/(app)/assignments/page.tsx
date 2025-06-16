@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine } from "lucide-react";
+import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine, MoreVertical, Search, Filter as FilterIcon } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,8 +71,24 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import NextLink from "next/link"; 
+import NextLink from "next/link";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 
 interface SubjectMin { id: string; name: string; }
@@ -81,7 +97,7 @@ interface TeacherMin { id: string; name: string; }
 
 
 interface AssignmentResultInfo {
-  id?: string; 
+  id?: string;
   score?: number;
   maxScore?: number;
   grade?: string;
@@ -107,14 +123,14 @@ interface AssignmentData {
   submissionStatus?: "Belum Dikerjakan" | "Sudah Dikerjakan" | "Terlambat";
   studentSubmissionLink?: string;
   submissionTimestamp?: Timestamp;
-  result?: AssignmentResultInfo; 
-  
+  result?: AssignmentResultInfo;
+
   submissionCount?: number;
-  totalStudentsInClass?: number; 
+  totalStudentsInClass?: number;
 }
 
 interface AssignmentSubmission {
-  id?: string; 
+  id?: string;
   assignmentId: string;
   studentId: string;
   studentName: string;
@@ -135,7 +151,7 @@ interface FetchedResultData {
   className: string;
   subjectId: string;
   subjectName: string;
-  assessmentType: string; 
+  assessmentType: string;
   assessmentTitle: string;
   score: number;
   maxScore?: number;
@@ -174,10 +190,11 @@ const studentSubmissionFormSchema = z.object({
 });
 type StudentSubmissionFormValues = z.infer<typeof studentSubmissionFormSchema>;
 
+const ITEMS_PER_PAGE = 10;
 
 export default function AssignmentsPage() {
   const { user, role, loading: authLoading } = useAuth();
-  const [assignments, setAssignments] = useState<AssignmentData[]>([]);
+  const [allAssignments, setAllAssignments] = useState<AssignmentData[]>([]); // Renamed from 'assignments'
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]);
@@ -200,6 +217,11 @@ export default function AssignmentsPage() {
 
   const [isViewResultDialogOpen, setIsViewResultDialogOpen] = useState(false);
   const [selectedAssignmentForViewingResult, setSelectedAssignmentForViewingResult] = useState<AssignmentData | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
 
   const { toast } = useToast();
@@ -250,7 +272,7 @@ export default function AssignmentsPage() {
     try {
       if (!user || !role) {
           setIsLoading(false);
-          setAssignments([]);
+          setAllAssignments([]);
           return;
       }
 
@@ -266,17 +288,17 @@ export default function AssignmentsPage() {
         if (user.classId && user.classId.trim() !== "") {
           assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
         } else {
-          setAssignments([]); setIsLoading(false); return;
+          setAllAssignments([]); setIsLoading(false); return;
         }
       } else if (isParentRole && user.linkedStudentId) {
         studentToQueryId = user.linkedStudentId;
          if (user.linkedStudentClassId && user.linkedStudentClassId.trim() !== "") {
           assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.linkedStudentClassId), orderBy("dueDate", "desc"));
         } else {
-          setAssignments([]); setIsLoading(false); return;
+          setAllAssignments([]); setIsLoading(false); return;
         }
-      } else if (!isTeacherOrAdminRole && !isStudentRole && !isParentRole) { 
-         setAssignments([]); setIsLoading(false); return;
+      } else if (!isTeacherOrAdminRole && !isStudentRole && !isParentRole) {
+         setAllAssignments([]); setIsLoading(false); return;
       }
 
 
@@ -382,7 +404,7 @@ export default function AssignmentsPage() {
         fetchedAssignments = assignmentsWithCounts;
       }
 
-      setAssignments(fetchedAssignments);
+      setAllAssignments(fetchedAssignments);
     } catch (error) {
       console.error("Error fetching assignments: ", error);
       toast({ title: "Gagal Memuat Data Tugas", variant: "destructive" });
@@ -397,12 +419,12 @@ export default function AssignmentsPage() {
       return;
     }
 
-    if (!user || !user.uid) { 
+    if (!user || !user.uid) {
       setIsLoading(false);
-      setAssignments([]);
+      setAllAssignments([]);
       return;
     }
-    
+
     fetchAssignments();
 
   }, [authLoading, user, role]);
@@ -515,7 +537,7 @@ export default function AssignmentsPage() {
           teacherName
       };
       if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
-        updateData.meetingNumber = null; 
+        updateData.meetingNumber = null;
       }
 
       await updateDoc(assignmentDocRef, updateData);
@@ -618,6 +640,78 @@ export default function AssignmentsPage() {
     setIsViewResultDialogOpen(true);
   };
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedClassFilter, selectedSubjectFilter]);
+
+  const filteredAssignments = useMemo(() => {
+    return allAssignments.filter(assignment => {
+      const matchesClass = selectedClassFilter === "all" || assignment.classId === selectedClassFilter;
+      const matchesSubject = selectedSubjectFilter === "all" || assignment.subjectId === selectedSubjectFilter;
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = searchTerm === "" ||
+        assignment.title.toLowerCase().includes(searchLower) ||
+        (assignment.subjectName && assignment.subjectName.toLowerCase().includes(searchLower)) ||
+        (assignment.className && assignment.className.toLowerCase().includes(searchLower)) ||
+        (assignment.teacherName && assignment.teacherName.toLowerCase().includes(searchLower));
+      return matchesClass && matchesSubject && matchesSearch;
+    });
+  }, [allAssignments, searchTerm, selectedClassFilter, selectedSubjectFilter]);
+
+  const totalPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return filteredAssignments.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, filteredAssignments]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
 
   if (authLoading || (!user && !authLoading)) {
     return <div className="space-y-6"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -667,13 +761,56 @@ export default function AssignmentsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {isTeacherOrAdminRole && (
+            <div className="my-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="relative sm:col-span-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari tugas..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+              <Select
+                value={selectedClassFilter}
+                onValueChange={setSelectedClassFilter}
+                disabled={isLoading || classes.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <FilterIcon className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filter Kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kelas</SelectItem>
+                  {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select
+                value={selectedSubjectFilter}
+                onValueChange={setSelectedSubjectFilter}
+                disabled={isLoading || subjects.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <FilterIcon className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filter Mata Pelajaran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
+                  {subjects.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {isLoading ? (
-            <div className="space-y-2 mt-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : assignments.length > 0 ? (
+            <div className="space-y-2 mt-4">{[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : currentTableData.length > 0 ? (
+            <>
             <div className="overflow-x-auto mt-4">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {isTeacherOrAdminRole && <TableHead className="w-[50px]">No.</TableHead>}
                     <TableHead>Judul Tugas</TableHead>
                     <TableHead>Mata Pelajaran</TableHead>
                     {(isStudentRole || isParentRole) && <TableHead>Guru</TableHead>}
@@ -688,8 +825,9 @@ export default function AssignmentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {assignments.map((assignment) => (
+                  {currentTableData.map((assignment, index) => (
                     <TableRow key={assignment.id}>
+                      {isTeacherOrAdminRole && <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>}
                       <TableCell className="font-medium">{assignment.title}</TableCell>
                       <TableCell>{assignment.subjectName || assignment.subjectId}</TableCell>
                       {(isStudentRole || isParentRole) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
@@ -736,16 +874,38 @@ export default function AssignmentsPage() {
 
                       <TableCell className="text-right space-x-2">
                         {isTeacherOrAdminRole && (
-                          <>
-                            <Button variant="outline" size="icon" onClick={() => handleOpenViewSubmissions(assignment)} aria-label={`Lihat pengumpulan ${assignment.title}`}>
-                                <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="icon" onClick={() => openEditDialog(assignment)} aria-label={`Edit tugas ${assignment.title}`}><Edit className="h-4 w-4" /></Button>
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(assignment)} aria-label={`Hapus tugas ${assignment.title}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                              {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
-                            </AlertDialog>
-                          </>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas ${assignment.title}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
+                                <Eye className="mr-2 h-4 w-4" /> Lihat Pengumpulan
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedAssignment && selectedAssignment.id === assignment.id && (
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader>
+                                    <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                         {isStudentRole && (
                           <div className="flex justify-end space-x-2">
@@ -776,7 +936,34 @@ export default function AssignmentsPage() {
                 </TableBody>
               </Table>
             </div>
-          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Belum ada tugas.</div> )}
+            {totalPages > 1 && (
+              <Pagination className="mt-6">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      aria-disabled={currentPage === 1}
+                      className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                    />
+                  </PaginationItem>
+                  {renderPageNumbers()}
+                  <PaginationItem>
+                    <PaginationNext
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      aria-disabled={currentPage === totalPages}
+                      className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+            </>
+          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
+                {(searchTerm || selectedClassFilter !== "all" || selectedSubjectFilter !== "all")
+                  ? "Tidak ada tugas yang cocok dengan filter atau pencarian Anda."
+                  : "Belum ada tugas."
+                }
+              </div> )}
         </CardContent>
       </Card>
 
