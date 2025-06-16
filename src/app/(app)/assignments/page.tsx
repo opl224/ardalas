@@ -1041,6 +1041,7 @@ export default function AssignmentsPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-[50px]">No.</TableHead>
                                     <TableHead>Nama Siswa</TableHead>
                                     <TableHead>Link Pengumpulan</TableHead>
                                     <TableHead>Waktu Kirim</TableHead>
@@ -1048,8 +1049,9 @@ export default function AssignmentsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {submissionsForCurrentAssignment.map(sub => (
+                                {submissionsForCurrentAssignment.map((sub, index) => (
                                     <TableRow key={sub.id}>
+                                        <TableCell>{index + 1}</TableCell>
                                         <TableCell>{sub.studentName}</TableCell>
                                         <TableCell>
                                             <Button variant="link" asChild className="p-0 h-auto text-sm">
