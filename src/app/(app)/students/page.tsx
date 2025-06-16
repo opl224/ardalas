@@ -87,9 +87,9 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
-// import { Calendar } from "@/components/ui/calendar"; // Replaced by CalendarDatePicker for specific use case
-import { CalendarDatePicker } from "@/components/calendar-date-picker"; // Using the custom date picker
+import { CalendarDatePicker } from "@/components/calendar-date-picker"; 
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 
 interface ClassMin {
@@ -197,46 +197,24 @@ export default function StudentsPage() {
     setIsLoadingParents(true);
     try {
       const promises = [];
+      // Admins and Teachers now fetch all classes and all parents
       if (authRole === 'admin' || authRole === 'guru') {
         const classesCollectionRef = collection(db, "classes");
         const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qClasses));
-      } else {
-        promises.push(Promise.resolve(null)); 
-      }
 
-      if (authRole === 'admin') {
         const parentsCollectionRef = collection(db, "parents");
         const qParents = query(parentsCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qParents));
       } else {
+        promises.push(Promise.resolve(null)); 
         promises.push(Promise.resolve(null)); 
       }
       
       const [classesSnapshot, parentsSnapshot] = await Promise.all(promises);
 
       if (classesSnapshot) {
-         const fetchedClasses = (classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name }));
-        if (authRole === 'guru' && authUser?.uid) {
-            const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
-            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
-            if (!teacherProfileSnapshot.empty) {
-                const teacherProfileId = teacherProfileSnapshot.docs[0].id;
-                const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
-                const lessonsSnapshot = await getDocs(lessonsQuery);
-                const teacherClassIdsSet = new Set<string>();
-                lessonsSnapshot.docs.forEach(doc => {
-                    const classId = doc.data().classId as string;
-                    if (classId) teacherClassIdsSet.add(classId);
-                });
-                const teacherClassIds = Array.from(teacherClassIdsSet);
-                setAllClasses(fetchedClasses.filter((c: ClassMin) => teacherClassIds.includes(c.id)));
-            } else {
-                 setAllClasses([]);
-            }
-        } else {
-            setAllClasses(fetchedClasses);
-        }
+        setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
       } else {
         setAllClasses([]);
       }
@@ -274,32 +252,7 @@ export default function StudentsPage() {
           id: docSnap.id,
           ...docSnap.data(),
         } as Student));
-      } else if (authRole === 'guru' && authUser?.uid) {
-        if (allClasses.length > 0) {
-          const classIdsForTeacher = allClasses.map(c => c.id);
-          const CHUNK_SIZE = 30;
-          const studentPromises = [];
-
-          for (let i = 0; i < classIdsForTeacher.length; i += CHUNK_SIZE) {
-            const chunk = classIdsForTeacher.slice(i, i + CHUNK_SIZE);
-            if (chunk.length > 0) {
-              studentPromises.push(
-                getDocs(query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", chunk), orderBy("name", "asc")))
-              );
-            }
-          }
-          const snapshots = await Promise.all(studentPromises);
-          snapshots.forEach(snapshot => {
-            snapshot.docs.forEach(docSnap => {
-              finalFetchedStudents.push({
-                id: docSnap.id,
-                 ...docSnap.data(),
-              } as Student);
-            });
-          });
-          finalFetchedStudents.sort((a,b) => a.name.localeCompare(b.name));
-        }
-      } else if (authRole === 'admin') {
+      } else if (authRole === 'admin' || authRole === 'guru') { // Teachers now fetch all students like admins
         const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
@@ -330,7 +283,7 @@ export default function StudentsPage() {
     if (!authLoading && !isLoadingClasses && !isLoadingParents) { 
         fetchStudents();
     }
-  }, [authLoading, isLoadingClasses, isLoadingParents, allClasses]);
+  }, [authLoading, isLoadingClasses, isLoadingParents, allClasses]); // Rerun if allClasses changes (e.g., after initial load for teacher)
 
 
   useEffect(() => {
@@ -426,8 +379,8 @@ export default function StudentsPage() {
 
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
-    if (authRole !== 'admin') { 
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan murid dengan detail ini.", variant: "destructive"});
+    if (authRole !== 'admin' && authRole !== 'guru') { 
+        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menambahkan murid.", variant: "destructive"});
         return;
     }
     addStudentForm.clearErrors();
@@ -456,6 +409,8 @@ export default function StudentsPage() {
         attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
 
+      // For now, we assume if a student is added, their user auth account is handled elsewhere (e.g., User Admin page)
+      // This form only adds/updates the profile in the 'users' collection with role 'siswa'.
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
@@ -477,8 +432,8 @@ export default function StudentsPage() {
 
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
-     if (authRole !== 'admin') { 
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit murid dengan detail ini.", variant: "destructive"});
+     if (authRole !== 'admin' && authRole !== 'guru') { 
+        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat mengedit murid.", variant: "destructive"});
         return;
     }
     editStudentForm.clearErrors();
@@ -548,7 +503,7 @@ export default function StudentsPage() {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit murid.", variant: "destructive"});
         return;
     }
-    if ((allClasses.length === 0 && !isLoadingClasses) || (allParents.length === 0 && !isLoadingParents && authRole === 'admin')) {
+    if ((allClasses.length === 0 && !isLoadingClasses) || (allParents.length === 0 && !isLoadingParents)) {
       fetchPageInitialData();
     }
     setSelectedStudent(student);
@@ -604,9 +559,7 @@ export default function StudentsPage() {
                 {isLoadingClasses ? (
                   <SelectItem value="loading" disabled>Memuat kelas...</SelectItem>
                 ) : allClasses.length === 0 ? (
-                  <SelectItem value="no-classes" disabled>
-                    {authRole === 'guru' ? "Tidak ada kelas yang Anda ajar" : "Tidak ada kelas tersedia"}
-                  </SelectItem>
+                  <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia</SelectItem>
                 ) : (
                   allClasses.map((classItem) => (
                     <SelectItem key={classItem.id} value={classItem.id}>
@@ -622,7 +575,7 @@ export default function StudentsPage() {
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.classId.message}</p>
         )}
       </div>
-      {authRole === 'admin' && (
+      {(authRole === 'admin' || authRole === 'guru') && (
         <>
           <div>
             <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
@@ -630,18 +583,33 @@ export default function StudentsPage() {
               name="dateOfBirth"
               control={formInstance.control}
               render={({ field }) => (
-                <CalendarDatePicker
-                  id={`${formType}-student-dateOfBirth-picker`}
-                  date={field.value ? { from: field.value, to: field.value } : { from: undefined, to: undefined }}
-                  onDateSelect={(range) => {
-                    field.onChange(range.from ? startOfDay(range.from) : undefined);
-                  }}
-                  numberOfMonths={1}
-                  closeOnSelect={true}
-                  yearsRange={70} // Covers approx. 35 years past and 35 future
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal mt-1"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-1",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP", {locale: indonesiaLocale}) : <span>Pilih tanggal</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
+                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      locale={indonesiaLocale}
+                    />
+                  </PopoverContent>
+                </Popover>
               )}
             />
             {formInstance.formState.errors.dateOfBirth && (
@@ -740,14 +708,19 @@ export default function StudentsPage() {
 
   const pageTitle = authRole === 'siswa' && authUser?.className 
     ? `Daftar Siswa Kelas ${authUser.className}` 
-    : (authRole === 'guru' ? "Daftar Siswa (Kelas yang Diajar)" : "Manajemen Murid");
+    : "Manajemen Murid"; 
   
   const pageDescription = authRole === 'siswa' && authUser?.className
     ? `Daftar teman sekelas Anda.`
-    : (authRole === 'guru' ? "Daftar siswa dari kelas-kelas yang mata pelajarannya Anda ampu." : "Kelola data murid, absensi, nilai, dan informasi terkait.");
+    : "Kelola data murid, absensi, nilai, dan informasi terkait.";
 
-  const showClassFilter = (authRole === 'admin' && allClasses.length > 0) || (authRole === 'guru' && allClasses.length > 1);
-  const isLoadingCombined = isLoadingStudents || authLoading || ((authRole === 'admin' || authRole === 'guru') && (isLoadingClasses || (authRole === 'admin' && isLoadingParents)));
+  const showClassFilter = ((authRole === 'admin' || authRole === 'guru') && allClasses.length > 0);
+  const isLoadingCombined = isLoadingStudents || authLoading || ((authRole === 'admin' || authRole === 'guru') && (isLoadingClasses || isLoadingParents));
+
+  const getNoStudentsMessage = () => {
+    if (authRole === 'siswa') return "Tidak ada siswa lain di kelas Anda.";
+    return "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.";
+  };
 
   return (
     <div className="space-y-6">
@@ -770,12 +743,12 @@ export default function StudentsPage() {
                   addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
                   addStudentForm.clearErrors();
                 } else {
-                   if ((allClasses.length === 0 && !isLoadingClasses) || (authRole === 'admin' && allParents.length === 0 && !isLoadingParents)) fetchPageInitialData();
+                   if ((allClasses.length === 0 && !isLoadingClasses) || (allParents.length === 0 && !isLoadingParents)) fetchPageInitialData();
                 }
               }}
             >
               <DialogTrigger asChild>
-                <Button size="sm" disabled={authRole === 'guru' && !allClasses.length && !isLoadingClasses}>
+                <Button size="sm" disabled={authRole === 'guru' && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Tambah Murid
                 </Button>
               </DialogTrigger>
@@ -792,8 +765,9 @@ export default function StudentsPage() {
                     <DialogClose asChild>
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)}>
-                      {(addStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)) ? "Menyimpan..." : "Simpan Murid"}
+                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
+                      {(addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) && <LottieLoader width={16} height={16} className="mr-2" />}
+                      {(addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) ? "Menyimpan..." : "Simpan Murid"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -946,9 +920,7 @@ export default function StudentsPage() {
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || selectedClassFilter !== "all"
                 ? "Tidak ada murid yang cocok dengan filter atau pencarian Anda."
-                : (authRole === 'siswa' ? "Tidak ada siswa lain di kelas Anda." : 
-                   authRole === 'guru' ? "Tidak ada data siswa di kelas yang mata pelajarannya Anda ajar atau filter yang dipilih tidak memiliki data." : 
-                   "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.")
+                : getNoStudentsMessage()
               }
             </div>
           )}
@@ -1031,8 +1003,9 @@ export default function StudentsPage() {
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button>
                    </DialogClose>
-                  <Button type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)}>
-                    {(editStudentForm.formState.isSubmitting || isLoadingClasses || (authRole === 'admin' && isLoadingParents)) ? "Menyimpan..." : "Simpan Perubahan"}
+                  <Button type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
+                    {(editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) && <LottieLoader width={16} height={16} className="mr-2" />}
+                    {(editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>
               </form>
