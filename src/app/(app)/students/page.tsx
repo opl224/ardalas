@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"; 
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, CalendarIcon } from "lucide-react"; 
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon } from "lucide-react"; 
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,8 +65,7 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { CalendarDatePicker } from "@/components/calendar-date-picker"; // Changed import
 import { Textarea } from "@/components/ui/textarea";
 import { format, startOfDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -101,7 +100,7 @@ const baseStudentFormSchema = z.object({
   address: z.string().optional(),
 });
 
-const studentFormSchema = baseStudentFormSchema;
+const studentFormSchema = baseStudentFormSchema; // No refine needed for basic schema
 type StudentFormValues = z.infer<typeof studentFormSchema>;
 
 const editStudentFormSchema = baseStudentFormSchema.extend({
@@ -526,30 +525,15 @@ export default function StudentsPage() {
               name="dateOfBirth"
               control={formInstance.control}
               render={({ field }) => (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className="w-full justify-start text-left font-normal mt-1"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(field.value, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal lahir</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
-                      captionLayout="dropdown-buttons"
-                      fromYear={1990}
-                      toYear={new Date().getFullYear()}
-                      locale={indonesiaLocale}
-                      initialFocus
-                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <CalendarDatePicker
+                  id={`${formType}-student-dateOfBirth-picker`}
+                  date={{ from: field.value, to: field.value }}
+                  onDateSelect={({ from }) => field.onChange(from ? startOfDay(from) : undefined)}
+                  numberOfMonths={1}
+                  closeOnSelect={true}
+                  className="w-full justify-start text-left font-normal mt-1"
+                  variant="outline"
+                />
               )}
             />
             {formInstance.formState.errors.dateOfBirth && (
