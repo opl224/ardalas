@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle } from "lucide-react";
+import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter } from "lucide-react";
 import { useState, useEffect, type ReactNode, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,6 +75,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 interface ClassMin {
   id: string;
@@ -155,6 +156,8 @@ export default function UserAdministrationPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState<Role | "all">("all");
 
   const { toast } = useToast();
 
@@ -211,7 +214,6 @@ export default function UserAdministrationPage() {
         createdAt: docSnap.data().createdAt,
       }));
       setUsers(fetchedUsers);
-      setCurrentPage(1); 
     } catch (error) {
       console.error("Error fetching users: ", error);
       toast({ title: "Gagal Memuat Pengguna", variant: "destructive" });
@@ -224,6 +226,10 @@ export default function UserAdministrationPage() {
     fetchAllClasses();
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, roleFilter]);
 
   const watchAddUserRole = addUserForm.watch("role");
   const watchEditUserRole = editUserForm.watch("role");
@@ -486,12 +492,22 @@ export default function UserAdministrationPage() {
     return null;
   };
 
-  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const matchesSearchTerm = searchTerm === "" ||
+                                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRoleFilter = roleFilter === "all" || user.role === roleFilter;
+      return matchesSearchTerm && matchesRoleFilter;
+    });
+  }, [users, searchTerm, roleFilter]);
+
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
     const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
-    return users.slice(firstPageIndex, lastPageIndex);
-  }, [currentPage, users]);
+    return filteredUsers.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, filteredUsers]);
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -539,7 +555,6 @@ export default function UserAdministrationPage() {
     }
     return pageNumbers;
   };
-
 
   return (
     <div className="space-y-6">
@@ -627,9 +642,41 @@ export default function UserAdministrationPage() {
           </Dialog>
         </CardHeader>
         <CardContent>
+          <div className="my-4 flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-grow">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari berdasarkan nama atau email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-full"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+               <Button 
+                variant={roleFilter === "all" ? "default" : "outline"} 
+                size="sm" 
+                onClick={() => setRoleFilter("all")}
+              >
+                Semua Peran
+              </Button>
+              {ROLES.map((role) => (
+                <Button
+                  key={role}
+                  variant={roleFilter === role ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setRoleFilter(role)}
+                  className="capitalize"
+                >
+                  {roleDisplayNames[role]}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           {isLoadingUsers || isLoadingClasses ? (
              <div className="space-y-2 mt-4"> {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)} </div>
-          ) : users.length > 0 ? (
+          ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
               <Table className="table-fixed w-full">
@@ -694,7 +741,13 @@ export default function UserAdministrationPage() {
                 </Pagination>
             )}
             </>
-          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini (yang akan membuat entri di database dan di Firebase Authentication), atau jika pengguna sudah ada di Firebase Authentication, pastikan ada entri yang sesuai di database Firestore pada koleksi 'users' dengan field `uid` yang sesuai.</div> )}
+          ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
+              {searchTerm || roleFilter !== "all" 
+                ? "Tidak ada pengguna yang cocok dengan filter atau pencarian Anda."
+                : "Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur \"Tambah Pengguna\"."
+              }
+            </div> 
+          )}
         </CardContent>
       </Card>
 
