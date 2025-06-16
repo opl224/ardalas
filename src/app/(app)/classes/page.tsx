@@ -83,6 +83,7 @@ interface StudentInClass {
   id: string;
   name: string;
   nis: string;
+  attendanceNumber?: number;
 }
 
 const classFormSchema = z.object({
@@ -313,6 +314,7 @@ export default function ClassesPage() {
         id: docSnap.id, 
         name: docSnap.data().name,
         nis: docSnap.data().nis || "N/A", 
+        attendanceNumber: docSnap.data().attendanceNumber,
       }));
       setStudentsInClass(fetchedStudents);
     } catch (error) {
@@ -585,15 +587,19 @@ export default function ClassesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">No.</TableHead>
                     <TableHead>Nama Siswa</TableHead>
                     <TableHead>NIS</TableHead>
+                    <TableHead>No. Absen</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {studentsInClass.map(student => (
+                  {studentsInClass.map((student, index) => (
                     <TableRow key={student.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell>{student.nis}</TableCell>
+                      <TableCell>{student.attendanceNumber ?? "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
