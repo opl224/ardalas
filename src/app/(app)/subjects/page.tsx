@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,8 +41,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, PlusCircle, Edit, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { BookOpen, PlusCircle, Edit, Trash2, Search, MoreVertical } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -64,6 +63,13 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AuthUserMin {
   id: string; // Firebase Auth UID
@@ -98,11 +104,12 @@ export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [authGuruUsers, setAuthGuruUsers] = useState<AuthUserMin[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true); // Separate loading state for auth users
+  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true); 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const { user, role, loading: authLoading } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { toast } = useToast();
 
@@ -186,11 +193,13 @@ export default function SubjectsPage() {
   useEffect(() => {
     if (role === "admin" && !authLoading) {
       fetchAuthGuruUsers();
+    } else {
+        setIsLoadingAuthUsers(false); 
     }
   }, [role, authLoading]);
 
   useEffect(() => {
-    if (!authLoading && role) { // Fetch subjects once role is determined and auth is not loading
+    if (!authLoading && role) {
         fetchSubjects();
     }
   }, [role, user, authLoading]);
@@ -198,8 +207,7 @@ export default function SubjectsPage() {
 
   useEffect(() => {
     if (selectedSubject && isEditDialogOpen && role === "admin") {
-      // Ensure authGuruUsers are loaded before resetting form if not already
-      if (authGuruUsers.length === 0 && !isLoadingAuthUsers) {
+      if (authGuruUsers.length === 0 && !isLoadingAuthUsers && role === "admin") {
         fetchAuthGuruUsers();
       }
       editSubjectForm.reset({
@@ -284,8 +292,7 @@ export default function SubjectsPage() {
 
   const openEditDialog = (subject: Subject) => {
     if (role !== "admin") return;
-    // Ensure authGuruUsers are fetched if not already, for the form dropdown
-    if (authGuruUsers.length === 0 && !isLoadingAuthUsers) {
+    if (authGuruUsers.length === 0 && !isLoadingAuthUsers && role === "admin") {
         fetchAuthGuruUsers();
     }
     setSelectedSubject(subject);
@@ -351,7 +358,19 @@ export default function SubjectsPage() {
     ? "Daftar subjek atau mata pelajaran yang menjadi tanggung jawab Anda."
     : "Kelola daftar subjek atau mata pelajaran yang diajarkan.";
 
-  const showSkeleton = isLoadingSubjects || authLoading;
+  const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingAuthUsers);
+
+  const filteredSubjects = useMemo(() => {
+    if (role !== 'admin') return subjects; 
+  
+    return subjects.filter(subject => {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      const nameMatch = subject.name.toLowerCase().includes(lowerSearchTerm);
+      const teacherMatch = subject.teacherName ? subject.teacherName.toLowerCase().includes(lowerSearchTerm) : false;
+      return nameMatch || teacherMatch;
+    });
+  }, [subjects, searchTerm, role]);
+
 
   return (
     <div className="space-y-6">
@@ -403,17 +422,31 @@ export default function SubjectsPage() {
           )}
         </CardHeader>
         <CardContent>
+          {role === 'admin' && (
+            <div className="my-4">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari berdasarkan nama subjek atau guru..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+            </div>
+          )}
           {showSkeleton ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
              </div>
-          ) : subjects.length > 0 ? (
+          ) : filteredSubjects.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama Subjek</TableHead>
                     <TableHead>Deskripsi</TableHead>
                     {(role === "admin" || role === "guru") && <TableHead>Guru Penanggung Jawab</TableHead>}
@@ -421,39 +454,54 @@ export default function SubjectsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {subjects.map((subject) => (
+                  {filteredSubjects.map((subject, index) => (
                     <TableRow key={subject.id}>
+                      <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{subject.name}</TableCell>
                       <TableCell>{subject.description || "-"}</TableCell>
                       {(role === "admin" || role === "guru") && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
                       {role === "admin" && (
-                        <TableCell className="text-right space-x-2">
-                          <Button variant="outline" size="icon" onClick={() => openEditDialog(subject)} aria-label={`Edit ${subject.name}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(subject)} aria-label={`Hapus ${subject.name}`}>
-                                <Trash2 className="h-4 w-4" />
+                        <TableCell className="text-right">
+                           <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${subject.name}`}>
+                                <MoreVertical className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            {selectedSubject && selectedSubject.id === subject.id && ( 
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tindakan ini akan menghapus subjek <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setSelectedSubject(null)}>Batal</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteSubject(selectedSubject.id, selectedSubject.name)}>
-                                    Ya, Hapus Subjek
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            )}
-                          </AlertDialog>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditDialog(subject)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(subject); }}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Hapus
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedSubject && selectedSubject.id === subject.id && ( 
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tindakan ini akan menghapus subjek <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => setSelectedSubject(null)}>Batal</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteSubject(selectedSubject.id, selectedSubject.name)}>
+                                        Ya, Hapus Subjek
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       )}
                     </TableRow>
@@ -463,7 +511,7 @@ export default function SubjectsPage() {
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {role === "admin" ? 'Tidak ada data subjek untuk ditampilkan. Klik "Tambah Subjek" untuk membuat data baru.' : 'Tidak ada subjek yang ditugaskan kepada Anda.'}
+              {role === "admin" ? (searchTerm ? 'Tidak ada subjek yang cocok dengan pencarian Anda.' : 'Tidak ada data subjek. Klik "Tambah Subjek" untuk membuat data baru.') : 'Tidak ada subjek yang ditugaskan kepada Anda.'}
             </div>
           )}
         </CardContent>
