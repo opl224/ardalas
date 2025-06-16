@@ -44,7 +44,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle } from "lucide-react";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -66,6 +66,15 @@ import {
   deleteField,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface ClassMin {
   id: string;
@@ -74,13 +83,13 @@ interface ClassMin {
 
 interface User {
   id: string; 
-  uid: string; // Ensure UID is part of the User interface if it's expected from Firestore
+  uid: string; 
   name: string;
   email: string;
   role: Role;
-  assignedClassIds?: string[]; // For teachers
-  classId?: string; // For students
-  className?: string; // For students, denormalized
+  assignedClassIds?: string[]; 
+  classId?: string; 
+  className?: string; 
   createdAt?: Timestamp; 
 }
 
@@ -114,7 +123,7 @@ const addUserFormSchema = baseUserSchema.extend({
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 const editUserFormSchema = baseUserSchema.extend({
-  id: z.string(), // This 'id' will be the Firestore document ID, which should be the user's UID
+  id: z.string(), 
 }).refine(data => {
     if (data.role === 'guru') {
       return data.assignedClassIds && data.assignedClassIds.length > 0;
@@ -134,6 +143,8 @@ const editUserFormSchema = baseUserSchema.extend({
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
+const ITEMS_PER_PAGE = 10;
+
 export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
@@ -143,6 +154,7 @@ export default function UserAdministrationPage() {
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -188,8 +200,8 @@ export default function UserAdministrationPage() {
       const q = query(usersCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: User[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id, // This is the Firestore document ID, should be user's UID
-        uid: docSnap.data().uid, // Make sure 'uid' field exists and is fetched
+        id: docSnap.id, 
+        uid: docSnap.data().uid, 
         name: docSnap.data().name,
         email: docSnap.data().email,
         role: docSnap.data().role,
@@ -199,6 +211,7 @@ export default function UserAdministrationPage() {
         createdAt: docSnap.data().createdAt,
       }));
       setUsers(fetchedUsers);
+      setCurrentPage(1); // Reset to first page after fetching
     } catch (error) {
       console.error("Error fetching users: ", error);
       toast({ title: "Gagal Memuat Pengguna", variant: "destructive" });
@@ -238,7 +251,7 @@ export default function UserAdministrationPage() {
   useEffect(() => {
     if (selectedUser && isEditUserDialogOpen) {
       editUserForm.reset({
-        id: selectedUser.id, // This is the user's UID / Firestore doc ID
+        id: selectedUser.id, 
         name: selectedUser.name,
         email: selectedUser.email,
         role: selectedUser.role,
@@ -264,7 +277,7 @@ export default function UserAdministrationPage() {
         classId?: string;
         className?: string;
       } = {
-        uid: newAuthUser.uid, // Store the Auth UID in Firestore
+        uid: newAuthUser.uid, 
         name: data.name,
         email: data.email,
         role: data.role,
@@ -274,7 +287,6 @@ export default function UserAdministrationPage() {
       if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
         userData.assignedClassIds = data.assignedClassIds;
       } else {
-        // Ensure assignedClassIds is not set if role is not guru
         delete userData.assignedClassIds; 
       }
 
@@ -283,12 +295,10 @@ export default function UserAdministrationPage() {
         userData.classId = data.classId;
         userData.className = selectedClass?.name || "";
       } else {
-         // Ensure classId and className are not set if role is not siswa
         delete userData.classId;
         delete userData.className;
       }
       
-      // Use the user's UID as the document ID in Firestore for direct mapping
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
       
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -326,7 +336,7 @@ export default function UserAdministrationPage() {
     if (!selectedUser) return;
     editUserForm.clearErrors();
     try {
-      const userDocRef = doc(db, "users", data.id); // data.id is the user's UID
+      const userDocRef = doc(db, "users", data.id); 
       const updateData: any = {
         name: data.name,
         email: data.email, 
@@ -364,7 +374,6 @@ export default function UserAdministrationPage() {
   };
 
   const handleDeleteUser = async (userId: string, userName?: string) => {
-    // Note: This only deletes from Firestore. Deleting from Firebase Auth needs separate handling.
     try {
       await deleteDoc(doc(db, "users", userId));
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
@@ -477,6 +486,60 @@ export default function UserAdministrationPage() {
     return null;
   };
 
+  const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return users.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, users]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5; 
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
 
   return (
     <div className="space-y-6">
@@ -565,8 +628,9 @@ export default function UserAdministrationPage() {
         </CardHeader>
         <CardContent>
           {isLoadingUsers || isLoadingClasses ? (
-             <div className="space-y-2 mt-4"> {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)} </div>
+             <div className="space-y-2 mt-4"> {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)} </div>
           ) : users.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -579,7 +643,7 @@ export default function UserAdministrationPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {currentTableData.map((user) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>
@@ -606,6 +670,30 @@ export default function UserAdministrationPage() {
                 </TableBody>
               </Table>
             </div>
+            {totalPages > 1 && (
+                <div className="mt-6 flex justify-center">
+                    <Pagination>
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                            aria-disabled={currentPage === 1}
+                            className={currentPage === 1 ? "pointer-events-none opacity-50" : undefined}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                            aria-disabled={currentPage === totalPages}
+                            className={currentPage === totalPages ? "pointer-events-none opacity-50" : undefined}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                    </Pagination>
+                </div>
+            )}
+            </>
           ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur "Tambah Pengguna" di aplikasi ini (yang akan membuat entri di database dan di Firebase Authentication), atau jika pengguna sudah ada di Firebase Authentication, pastikan ada entri yang sesuai di database Firestore pada koleksi 'users' dengan field `uid` yang sesuai.</div> )}
         </CardContent>
       </Card>
