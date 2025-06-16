@@ -79,6 +79,8 @@ import { cn } from "@/lib/utils";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
+import { format } from 'date-fns';
+import { id as indonesiaLocale } from 'date-fns/locale';
 
 
 interface ClassMin {
@@ -157,6 +159,7 @@ export default function UserAdministrationPage() {
   const [isLoadingClasses, setIsLoadingClasses] = useState(true);
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [isViewUserDialogOpen, setIsViewUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -400,6 +403,11 @@ export default function UserAdministrationPage() {
     setSelectedUser(user);
     setIsEditUserDialogOpen(true);
   };
+
+  const openViewDialog = (user: User) => {
+    setSelectedUser(user);
+    setIsViewUserDialogOpen(true);
+  };
   
   const openDeleteDialog = (user: User) => {
     setSelectedUser(user);
@@ -455,7 +463,7 @@ export default function UserAdministrationPage() {
                           {allClasses.map((cls) => (
                             <CommandItem
                               key={cls.id}
-                              value={cls.id}
+                              value={cls.name} // Use name for search, actual value is id
                               onSelect={() => {
                                 const currentValue = field.value || [];
                                 const isSelected = currentValue.includes(cls.id);
@@ -758,7 +766,7 @@ export default function UserAdministrationPage() {
                     <TableHead className="w-1/4 max-w-xs">Email</TableHead>
                     <TableHead className="w-1/6">Peran</TableHead>
                     <TableHead className="w-1/4 max-w-sm">Kelas Ditugaskan/Dimiliki</TableHead>
-                    <TableHead className="text-right w-[120px]">Aksi</TableHead>
+                    <TableHead className="text-right w-[160px]">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -774,6 +782,7 @@ export default function UserAdministrationPage() {
                          "-"}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
+                        <Button variant="outline" size="icon" onClick={() => openViewDialog(user)} aria-label={`Lihat detail ${user.name}`}><Eye className="h-4 w-4" /></Button>
                         <Button variant="outline" size="icon" onClick={() => openEditDialog(user)} aria-label={`Edit ${user.name}`}><Edit className="h-4 w-4" /></Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(user)} aria-label={`Hapus ${user.name}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
@@ -821,6 +830,47 @@ export default function UserAdministrationPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isViewUserDialogOpen} onOpenChange={(isOpen) => {
+          setIsViewUserDialogOpen(isOpen);
+          if (!isOpen) { setSelectedUser(null); }
+      }}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Detail Pengguna: {selectedUser?.name}</DialogTitle>
+                <DialogDescription>Informasi lengkap mengenai pengguna.</DialogDescription>
+            </DialogHeader>
+            {selectedUser && (
+                <div className="space-y-3 py-4">
+                    <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedUser.name}</p></div>
+                    <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedUser.email}</p></div>
+                    <div><Label className="text-muted-foreground">UID:</Label><p className="font-mono text-xs">{selectedUser.uid}</p></div>
+                    <div><Label className="text-muted-foreground">Peran:</Label><p className="font-medium">{roleDisplayNames[selectedUser.role]}</p></div>
+                    {selectedUser.role === 'guru' && (
+                        <div>
+                            <Label className="text-muted-foreground">Kelas Ditugaskan:</Label>
+                            <p className="font-medium">{renderAssignedClassesForTeacher(selectedUser.assignedClassIds) || "Tidak ada kelas ditugaskan"}</p>
+                        </div>
+                    )}
+                    {selectedUser.role === 'siswa' && (
+                        <div>
+                            <Label className="text-muted-foreground">Kelas Siswa:</Label>
+                            <p className="font-medium">{selectedUser.className || selectedUser.classId || "Belum ada kelas"}</p>
+                        </div>
+                    )}
+                    {selectedUser.createdAt && (
+                       <div>
+                          <Label className="text-muted-foreground">Tanggal Dibuat:</Label>
+                          <p className="font-medium">{format(selectedUser.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                       </div>
+                    )}
+                </div>
+            )}
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditUserDialogOpen} onOpenChange={(isOpen) => {
           setIsEditUserDialogOpen(isOpen);
