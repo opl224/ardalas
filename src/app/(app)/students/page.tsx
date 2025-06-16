@@ -87,7 +87,8 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
-import { Calendar } from "@/components/ui/calendar";
+// import { Calendar } from "@/components/ui/calendar"; // Replaced by CalendarDatePicker for specific use case
+import { CalendarDatePicker } from "@/components/calendar-date-picker"; // Using the custom date picker
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 
@@ -629,33 +630,18 @@ export default function StudentsPage() {
               name="dateOfBirth"
               control={formInstance.control}
               render={({ field }) => (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal mt-1",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(field.value, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
-                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                      initialFocus
-                      captionLayout="dropdown-buttons"
-                      fromYear={1990}
-                      toYear={new Date().getFullYear()}
-                      locale={indonesiaLocale}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <CalendarDatePicker
+                  id={`${formType}-student-dateOfBirth-picker`}
+                  date={field.value ? { from: field.value, to: field.value } : { from: undefined, to: undefined }}
+                  onDateSelect={(range) => {
+                    field.onChange(range.from ? startOfDay(range.from) : undefined);
+                  }}
+                  numberOfMonths={1}
+                  closeOnSelect={true}
+                  yearsRange={70} // Covers approx. 35 years past and 35 future
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal mt-1"
+                />
               )}
             />
             {formInstance.formState.errors.dateOfBirth && (

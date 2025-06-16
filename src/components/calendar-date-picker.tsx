@@ -681,3 +681,5 @@ export const CalendarDatePicker = React.forwardRef<
 );
 
 CalendarDatePicker.displayName = "CalendarDatePicker";
+
+export { Calendar };
