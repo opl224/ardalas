@@ -42,8 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+import { CalendarDatePicker } from "@/components/calendar-date-picker"; // Import CalendarDatePicker
 import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
@@ -95,8 +94,8 @@ interface ResultData {
   assessmentType: AssessmentType;
   assessmentTitle: string;
   score: number;
-  maxScore?: number;
-  grade?: string;
+  // maxScore?: number; // Removed
+  // grade?: string; // Removed
   dateOfAssessment: Timestamp;
   feedback?: string;
   assignmentId?: string;
@@ -115,27 +114,18 @@ const baseResultFormSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
-  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."),
-  maxScore: z.coerce.number().min(1, "Nilai maks. minimal 1.").optional(),
-  grade: z.string().max(5, "Grade maksimal 5 karakter.").optional(),
+  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), // Assuming score can still be high, but maxScore concept is removed from form
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
   feedback: z.string().optional(),
   assignmentId: z.string().optional(),
   meetingNumber: z.coerce.number().positive("Pertemuan harus angka positif.").optional(),
 });
 
-const resultValidationRefinement = (data: { score: number; maxScore?: number | undefined }) => !data.maxScore || data.score <= data.maxScore;
-
-const resultFormSchema = baseResultFormSchema.refine(resultValidationRefinement, {
-  message: "Nilai tidak boleh melebihi nilai maksimal.",
-  path: ["score"],
-});
+// Refinement based on maxScore is removed as maxScore field is removed
+const resultFormSchema = baseResultFormSchema;
 type ResultFormValues = z.infer<typeof resultFormSchema>;
 
-const editResultFormSchema = baseResultFormSchema.extend({ id: z.string() }).refine(resultValidationRefinement, {
-  message: "Nilai tidak boleh melebihi nilai maksimal.",
-  path: ["score"],
-});
+const editResultFormSchema = baseResultFormSchema.extend({ id: z.string() });
 type EditResultFormValues = z.infer<typeof editResultFormSchema>;
 
 
@@ -168,8 +158,8 @@ export default function ResultsPage() {
       assessmentType: undefined,
       assessmentTitle: "",
       score: 0,
-      maxScore: 100,
-      grade: "",
+      // maxScore: 100, // Removed
+      // grade: "", // Removed
       dateOfAssessment: new Date(),
       feedback: "",
       assignmentId: undefined,
@@ -280,7 +270,7 @@ export default function ResultsPage() {
             submissionsSnapshots.forEach(snapshot => {
                 snapshot.forEach(doc => {
                     const subData = doc.data();
-                    if (subData.assignmentId) { // Ensure assignmentId exists before setting
+                    if (subData.assignmentId) { 
                       submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
                     }
                 });
@@ -468,8 +458,8 @@ export default function ResultsPage() {
         assessmentType: selectedResult.assessmentType,
         assessmentTitle: selectedResult.assessmentTitle,
         score: selectedResult.score,
-        maxScore: selectedResult.maxScore || 100,
-        grade: selectedResult.grade || "",
+        // maxScore: selectedResult.maxScore || 100, // Removed
+        // grade: selectedResult.grade || "", // Removed
         dateOfAssessment: selectedResult.dateOfAssessment.toDate(),
         feedback: selectedResult.feedback || "",
         assignmentId: selectedResult.assignmentId || undefined,
@@ -510,7 +500,7 @@ export default function ResultsPage() {
         className,
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
-        maxScore: data.maxScore || 100,
+        // maxScore: data.maxScore || 100, // Removed
         recordedById: user.uid,
         recordedByName: user.displayName || user.email,
         createdAt: serverTimestamp(),
@@ -528,7 +518,7 @@ export default function ResultsPage() {
       await addDoc(collection(db, "results"), resultData);
       toast({ title: "Hasil Belajar Ditambahkan", description: "Data berhasil disimpan." });
       setIsAddDialogOpen(false);
-      addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "", meetingNumber: undefined, assignmentId: undefined });
+      addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, assessmentTitle: "", feedback: "", meetingNumber: undefined, assignmentId: undefined });
       fetchResults();
     } catch (error: any) {
       console.error("Error adding result:", error);
@@ -557,7 +547,7 @@ export default function ResultsPage() {
         className,
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
-        maxScore: data.maxScore || 100,
+        // maxScore: data.maxScore || 100, // Removed
         updatedAt: serverTimestamp(),
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
@@ -766,35 +756,31 @@ export default function ResultsPage() {
                 {formInstance.formState.errors.assessmentType && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.assessmentType.message}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor={`${dialogType}-result-score`}>Nilai</Label>
-                    <Input id={`${dialogType}-result-score`} type="number" {...formInstance.register("score")} className="mt-1" />
-                    {formInstance.formState.errors.score && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.score.message}</p>}
-                </div>
-                <div>
-                    <Label htmlFor={`${dialogType}-result-maxScore`}>Nilai Maks. (Default: 100)</Label>
-                    <Input id={`${dialogType}-result-maxScore`} type="number" {...formInstance.register("maxScore")} className="mt-1" placeholder="100"/>
-                    {formInstance.formState.errors.maxScore && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.maxScore.message}</p>}
-                </div>
+             <div>
+                <Label htmlFor={`${dialogType}-result-score`}>Nilai</Label>
+                <Input id={`${dialogType}-result-score`} type="number" {...formInstance.register("score")} className="mt-1" />
+                {formInstance.formState.errors.score && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.score.message}</p>}
             </div>
+            
             <div>
-                <Label htmlFor={`${dialogType}-result-grade`}>Grade (Opsional)</Label>
-                <Input id={`${dialogType}-result-grade`} {...formInstance.register("grade")} className="mt-1" placeholder="A, B+, C, dll." />
-                {formInstance.formState.errors.grade && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.grade.message}</p>}
-            </div>
-            <div>
-                <Label htmlFor={`${dialogType}-result-dateOfAssessment`}>Tanggal Asesmen</Label>
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1">
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formInstance.watch("dateOfAssessment") ? format(formInstance.watch("dateOfAssessment"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={formInstance.watch("dateOfAssessment")} onSelect={(date) => formInstance.setValue("dateOfAssessment", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent>
-                </Popover>
-                {formInstance.formState.errors.dateOfAssessment && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfAssessment.message}</p>}
+              <Label htmlFor={`${dialogType}-result-dateOfAssessment`}>Tanggal Asesmen</Label>
+              <Controller
+                control={formInstance.control}
+                name="dateOfAssessment"
+                render={({ field }) => (
+                  <CalendarDatePicker
+                    id={`${dialogType}-result-dateOfAssessment-picker`}
+                    date={{ from: field.value, to: field.value }}
+                    onDateSelect={(range) => field.onChange(range.from)}
+                    numberOfMonths={1}
+                    closeOnSelect={true}
+                    yearsRange={5} // Or another suitable range for assessment dates
+                    className="mt-1 w-full"
+                    variant="outline" 
+                  />
+                )}
+              />
+              {formInstance.formState.errors.dateOfAssessment && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfAssessment.message}</p>}
             </div>
             <div>
                 <Label htmlFor={`${dialogType}-result-feedback`}>Umpan Balik (Opsional)</Label>
@@ -838,7 +824,7 @@ export default function ResultsPage() {
             {canManageResults && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
                   setIsAddDialogOpen(isOpen);
-                  if (!isOpen) { addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, maxScore: 100, assessmentTitle: "", feedback: "", grade: "", meetingNumber: undefined, assignmentId: undefined }); addResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
+                  if (!isOpen) { addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, assessmentTitle: "", feedback: "", meetingNumber: undefined, assignmentId: undefined }); addResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
               }}>
                 <DialogTrigger asChild>
                   <Button size="sm" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
@@ -923,7 +909,7 @@ export default function ResultsPage() {
                             ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">Tidak ada pengumpulan</span> : "-")}
                           </TableCell>
                           <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
-                           <TableCell>{result.score}{result.maxScore && result.maxScore !== 100 ? `/${result.maxScore}` : '/100'} {result.grade && `(${result.grade})`}</TableCell>
+                           <TableCell>{result.score}</TableCell>
                         </>
                       ) : (
                         <>
@@ -931,7 +917,7 @@ export default function ResultsPage() {
                             {result.assessmentTitle} ({result.assessmentType})
                             {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
                           </TableCell>
-                          <TableCell>{result.score}{result.maxScore && result.maxScore !== 100 ? `/${result.maxScore}` : ''} {result.grade && `(${result.grade})`}</TableCell>
+                          <TableCell>{result.score}</TableCell>
                           <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
                           <TableCell>
                             {format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
@@ -1018,5 +1004,3 @@ export default function ResultsPage() {
   );
 }
 
-
-    
