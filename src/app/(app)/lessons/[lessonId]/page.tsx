@@ -350,13 +350,6 @@ export default function LessonDetailPage() {
             </div>
           )}
           
-          <div className="mt-6 pt-4 border-t border-border">
-            <h3 className="text-lg font-semibold mb-2">Sumber Daya Terkait</h3>
-            <p className="text-sm text-muted-foreground">
-              (Area ini dapat digunakan untuk menampilkan tugas, kuis, atau tautan sumber daya yang relevan dengan pelajaran ini.)
-            </p>
-          </div>
-
            <div className="mt-8 text-center">
                 <Button asChild variant="outline">
                     <Link href="/lessons">
@@ -369,5 +362,3 @@ export default function LessonDetailPage() {
     </div>
   );
 }
-
-
