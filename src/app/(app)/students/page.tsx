@@ -87,7 +87,7 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
-import { CalendarDatePicker } from "@/components/calendar-date-picker"; 
+import { CalendarDatePicker } from "@/components/calendar-date-picker";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
@@ -252,7 +252,7 @@ export default function StudentsPage() {
           id: docSnap.id,
           ...docSnap.data(),
         } as Student));
-      } else if (authRole === 'admin' || authRole === 'guru') { // Teachers now fetch all students like admins
+      } else if (authRole === 'admin' || authRole === 'guru') { 
         const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
@@ -283,7 +283,7 @@ export default function StudentsPage() {
     if (!authLoading && !isLoadingClasses && !isLoadingParents) { 
         fetchStudents();
     }
-  }, [authLoading, isLoadingClasses, isLoadingParents, allClasses]); // Rerun if allClasses changes (e.g., after initial load for teacher)
+  }, [authLoading, isLoadingClasses, isLoadingParents, allClasses]);
 
 
   useEffect(() => {
@@ -409,8 +409,6 @@ export default function StudentsPage() {
         attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
 
-      // For now, we assume if a student is added, their user auth account is handled elsewhere (e.g., User Admin page)
-      // This form only adds/updates the profile in the 'users' collection with role 'siswa'.
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
@@ -579,39 +577,22 @@ export default function StudentsPage() {
         <>
           <div>
             <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
-            <Controller
-              name="dateOfBirth"
-              control={formInstance.control}
-              render={({ field }) => (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal mt-1",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(field.value, "PPP", {locale: indonesiaLocale}) : <span>Pilih tanggal</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
-                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                      initialFocus
-                      captionLayout="dropdown-buttons"
-                      fromYear={1990}
-                      toYear={new Date().getFullYear()}
-                      locale={indonesiaLocale}
-                    />
-                  </PopoverContent>
-                </Popover>
-              )}
-            />
+             <Controller
+                name="dateOfBirth"
+                control={formInstance.control}
+                render={({ field }) => (
+                  <CalendarDatePicker
+                    id={`${formType}-student-dateOfBirth-picker`}
+                    date={{ from: field.value, to: field.value }}
+                    onDateSelect={({ from }) => field.onChange(startOfDay(from))}
+                    numberOfMonths={1}
+                    closeOnSelect={true}
+                    yearsRange={70}
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal mt-1"
+                  />
+                )}
+              />
             {formInstance.formState.errors.dateOfBirth && (
               <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfBirth.message}</p>
             )}
@@ -706,13 +687,17 @@ export default function StudentsPage() {
     </>
   );
 
-  const pageTitle = authRole === 'siswa' && authUser?.className 
-    ? `Daftar Siswa Kelas ${authUser.className}` 
-    : "Manajemen Murid"; 
+  const pageTitle = (authRole === 'admin' || authRole === 'guru')
+    ? "Manajemen Murid"
+    : (authRole === 'siswa' && authUser?.className 
+      ? `Daftar Siswa Kelas ${authUser.className}` 
+      : "Daftar Murid"); 
   
-  const pageDescription = authRole === 'siswa' && authUser?.className
-    ? `Daftar teman sekelas Anda.`
-    : "Kelola data murid, absensi, nilai, dan informasi terkait.";
+  const pageDescription = (authRole === 'admin' || authRole === 'guru')
+    ? "Kelola data murid, absensi, nilai, dan informasi terkait."
+    : (authRole === 'siswa' && authUser?.className
+      ? `Daftar teman sekelas Anda.`
+      : "Informasi murid.");
 
   const showClassFilter = ((authRole === 'admin' || authRole === 'guru') && allClasses.length > 0);
   const isLoadingCombined = isLoadingStudents || authLoading || ((authRole === 'admin' || authRole === 'guru') && (isLoadingClasses || isLoadingParents));
@@ -748,7 +733,7 @@ export default function StudentsPage() {
               }}
             >
               <DialogTrigger asChild>
-                <Button size="sm" disabled={authRole === 'guru' && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
+                <Button size="sm" disabled={(authRole === 'admin' || authRole === 'guru') && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Tambah Murid
                 </Button>
               </DialogTrigger>
@@ -817,6 +802,7 @@ export default function StudentsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama</TableHead>
                     <TableHead>NIS</TableHead>
                     <TableHead>Email</TableHead>
@@ -826,8 +812,9 @@ export default function StudentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentTableData.map((student) => (
+                  {currentTableData.map((student, index) => (
                     <TableRow key={student.id}>
+                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
                       <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
                       <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
