@@ -83,6 +83,7 @@ import {
 import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
+import LottieLoader from "@/components/ui/LottieLoader";
 
 
 interface AuthUserMin {
@@ -590,9 +591,9 @@ export default function TeachersPage() {
                   {currentTableData.map((teacher, index) => (
                     <TableRow key={teacher.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium">{teacher.name}</TableCell>
-                      <TableCell>{teacher.email}</TableCell>
-                      <TableCell>{teacher.subject}</TableCell>
+                      <TableCell className="font-medium truncate" title={teacher.name}>{teacher.name}</TableCell>
+                      <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>
+                      <TableCell className="truncate" title={teacher.subject}>{teacher.subject}</TableCell>
                        <TableCell>
                         {teacher.gender === "laki-laki" ? 
                           <Image src="https://placehold.co/24x24.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
@@ -772,6 +773,4 @@ export default function TeachersPage() {
     </div>
   );
 }
-
     
-
