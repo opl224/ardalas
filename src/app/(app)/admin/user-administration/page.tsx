@@ -143,7 +143,7 @@ const editUserFormSchema = baseUserSchema.extend({
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
-const ITEMS_PER_PAGE = 3;
+const ITEMS_PER_PAGE = 10;
 
 export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -635,6 +635,7 @@ export default function UserAdministrationPage() {
               <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead className="w-1/4">Nama</TableHead>
                     <TableHead className="w-1/4">Email</TableHead>
                     <TableHead className="w-1/6">Peran</TableHead>
@@ -643,12 +644,13 @@ export default function UserAdministrationPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentTableData.map((user) => (
+                  {currentTableData.map((user, index) => (
                     <TableRow key={user.id}>
+                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate max-w-xs" title={user.name}>{user.name}</TableCell>
-                      <TableCell className="truncate max-w-sm" title={user.email}>{user.email}</TableCell>
+                      <TableCell className="truncate max-w-xs" title={user.email}>{user.email}</TableCell>
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
-                      <TableCell className="truncate max-w-sm" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
+                      <TableCell className="truncate max-w-xs" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
                         {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
                          user.role === 'siswa' ? (user.className || user.classId || '-') :
                          "-"}
