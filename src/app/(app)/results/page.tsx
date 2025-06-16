@@ -42,8 +42,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDatePicker } from "@/components/calendar-date-picker"; // Import CalendarDatePicker
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon } from "lucide-react";
+import { CalendarDatePicker } from "@/components/calendar-date-picker"; 
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -73,6 +73,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { Form } from "@/components/ui/form";
 import Link from "next/link";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 
 interface ClassMin { id: string; name: string; }
@@ -94,8 +104,6 @@ interface ResultData {
   assessmentType: AssessmentType;
   assessmentTitle: string;
   score: number;
-  // maxScore?: number; // Removed
-  // grade?: string; // Removed
   dateOfAssessment: Timestamp;
   feedback?: string;
   assignmentId?: string;
@@ -114,20 +122,20 @@ const baseResultFormSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
-  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), // Assuming score can still be high, but maxScore concept is removed from form
+  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), 
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
   feedback: z.string().optional(),
   assignmentId: z.string().optional(),
   meetingNumber: z.coerce.number().positive("Pertemuan harus angka positif.").optional(),
 });
 
-// Refinement based on maxScore is removed as maxScore field is removed
 const resultFormSchema = baseResultFormSchema;
 type ResultFormValues = z.infer<typeof resultFormSchema>;
 
 const editResultFormSchema = baseResultFormSchema.extend({ id: z.string() });
 type EditResultFormValues = z.infer<typeof editResultFormSchema>;
 
+const ITEMS_PER_PAGE = 10;
 
 export default function ResultsPage() {
   const { user, role, loading: authLoading } = useAuth();
@@ -144,8 +152,10 @@ export default function ResultsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<ResultData | null>(null);
+  
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedAssessmentTypeFilter, setSelectedAssessmentTypeFilter] = useState<AssessmentType | "all">("all");
-
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -158,8 +168,6 @@ export default function ResultsPage() {
       assessmentType: undefined,
       assessmentTitle: "",
       score: 0,
-      // maxScore: 100, // Removed
-      // grade: "", // Removed
       dateOfAssessment: new Date(),
       feedback: "",
       assignmentId: undefined,
@@ -170,7 +178,6 @@ export default function ResultsPage() {
   const editResultForm = useForm<EditResultFormValues>({
     resolver: zodResolver(editResultFormSchema),
   });
-
 
   const fetchDropdownData = async () => {
     if (role !== "admin" && role !== "guru") {
@@ -213,7 +220,6 @@ export default function ResultsPage() {
       setIsLoadingData(false);
     }
   };
-
 
   const fetchResults = async () => {
     if (!user || !role) {
@@ -276,7 +282,6 @@ export default function ResultsPage() {
                 });
             });
 
-
             fetchedResults = fetchedResults.map(result => {
                 if (result.assignmentId && submissionsMap.has(result.assignmentId)) {
                     const submission = submissionsMap.get(result.assignmentId)!;
@@ -333,7 +338,6 @@ export default function ResultsPage() {
 
   }, [authLoading, user, role]); 
 
-
   const watchClassId = addResultForm.watch("classId");
   const watchSubjectIdForAdd = addResultForm.watch("subjectId");
   const watchAssignmentId = addResultForm.watch("assignmentId");
@@ -341,7 +345,6 @@ export default function ResultsPage() {
   const editWatchClassId = editResultForm.watch("classId");
   const editWatchSubjectId = editResultForm.watch("subjectId");
   const editWatchAssignmentId = editResultForm.watch("assignmentId");
-
 
   useEffect(() => {
     const currentFormStudentId = addResultForm.getValues("studentId");
@@ -355,7 +358,6 @@ export default function ResultsPage() {
       addResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, students, addResultForm]);
-
 
   useEffect(() => {
     const currentFormStudentId = editResultForm.getValues("studentId");
@@ -371,8 +373,7 @@ export default function ResultsPage() {
     if (currentFormStudentId && !newFilteredStudentsList.find(s => s.id === currentFormStudentId) || !editWatchClassId && (role === "admin" || role === "guru")) {
         editResultForm.setValue("studentId", undefined, { shouldValidate: true });
     }
-}, [editWatchClassId, students, editResultForm, role]);
-
+  }, [editWatchClassId, students, editResultForm, role]);
 
   useEffect(() => {
     const currentClassIdValue = addResultForm.getValues("classId");
@@ -386,8 +387,7 @@ export default function ResultsPage() {
     }
   }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
 
-
-  useEffect(() => {
+   useEffect(() => {
      const selectedAssignment = assignments.find(a => a.id === watchAssignmentId);
      if (selectedAssignment) {
          addResultForm.setValue("assessmentTitle", selectedAssignment.title, {shouldValidate: true});
@@ -410,7 +410,6 @@ export default function ResultsPage() {
      }
   }, [watchAssignmentId, assignments, addResultForm]);
 
-
   useEffect(() => {
     const currentClassIdValue = editResultForm.getValues("classId");
     if (currentClassIdValue && editWatchSubjectId) {
@@ -423,7 +422,6 @@ export default function ResultsPage() {
     }
   }, [editWatchClassId, editWatchSubjectId, assignments, editResultForm]);
 
-
    useEffect(() => {
      const selectedAssignment = assignments.find(a => a.id === editWatchAssignmentId);
      if (selectedAssignment) {
@@ -435,7 +433,6 @@ export default function ResultsPage() {
          }
      }
   }, [editWatchAssignmentId, assignments, editResultForm]);
-
 
   useEffect(() => {
     if (selectedResult && isEditDialogOpen) {
@@ -458,8 +455,6 @@ export default function ResultsPage() {
         assessmentType: selectedResult.assessmentType,
         assessmentTitle: selectedResult.assessmentTitle,
         score: selectedResult.score,
-        // maxScore: selectedResult.maxScore || 100, // Removed
-        // grade: selectedResult.grade || "", // Removed
         dateOfAssessment: selectedResult.dateOfAssessment.toDate(),
         feedback: selectedResult.feedback || "",
         assignmentId: selectedResult.assignmentId || undefined,
@@ -500,7 +495,6 @@ export default function ResultsPage() {
         className,
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
-        // maxScore: data.maxScore || 100, // Removed
         recordedById: user.uid,
         recordedByName: user.displayName || user.email,
         createdAt: serverTimestamp(),
@@ -512,7 +506,6 @@ export default function ResultsPage() {
     if (!data.assignmentId) {
         delete resultData.assignmentId;
     }
-
 
     try {
       await addDoc(collection(db, "results"), resultData);
@@ -547,7 +540,6 @@ export default function ResultsPage() {
         className,
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
-        // maxScore: data.maxScore || 100, // Removed
         updatedAt: serverTimestamp(),
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
@@ -556,7 +548,6 @@ export default function ResultsPage() {
     if (!data.assignmentId) {
         resultData.assignmentId = null;
     }
-
 
     try {
       const resultDocRef = doc(db, "results", data.id);
@@ -594,13 +585,82 @@ export default function ResultsPage() {
 
   const canManageResults = role === "admin" || role === "guru";
 
-  const filteredResults = useMemo(() => {
-    if (selectedAssessmentTypeFilter === "all") {
-      return results;
+  const filteredAndSearchedResults = useMemo(() => {
+    let tempResults = results;
+    if (selectedAssessmentTypeFilter !== "all") {
+      tempResults = tempResults.filter(result => result.assessmentType === selectedAssessmentTypeFilter);
     }
-    return results.filter(result => result.assessmentType === selectedAssessmentTypeFilter);
-  }, [results, selectedAssessmentTypeFilter]);
 
+    if (canManageResults && searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      tempResults = tempResults.filter(result => 
+        result.studentName?.toLowerCase().includes(lowerSearch) ||
+        result.className?.toLowerCase().includes(lowerSearch) ||
+        result.subjectName?.toLowerCase().includes(lowerSearch) ||
+        result.assessmentTitle?.toLowerCase().includes(lowerSearch) ||
+        result.assessmentType?.toLowerCase().includes(lowerSearch)
+      );
+    }
+    return tempResults;
+  }, [results, selectedAssessmentTypeFilter, searchTerm, canManageResults]);
+
+  const totalPages = Math.ceil(filteredAndSearchedResults.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return filteredAndSearchedResults.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, filteredAndSearchedResults]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedAssessmentTypeFilter]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5; 
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
 
   if (authLoading || (isLoadingData && (role === "admin" || role === "guru"))) {
     return (
@@ -648,17 +708,14 @@ export default function ResultsPage() {
       }
   }
 
-
   const renderResultFormFields = (formInstance: typeof addResultForm | typeof editResultForm, dialogType: 'add' | 'edit') => {
     const currentClassId = formInstance.watch("classId");
     const currentSubjectId = formInstance.watch("subjectId");
     const currentAssignmentId = formInstance.watch("assignmentId");
 
-
     const studentsForDropdown = dialogType === 'add'
         ? filteredStudents
         : (editWatchClassId ? students.filter(s => s.classId === editWatchClassId) : (role === 'admin' || role === 'guru' ? students : []));
-
 
     const assignmentsForDropdown = (currentClassId && currentSubjectId)
         ? assignments.filter(a => a.classId === currentClassId && a.subjectId === currentSubjectId)
@@ -744,7 +801,6 @@ export default function ResultsPage() {
                 {formInstance.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.meetingNumber.message}</p>}
             </div>
 
-
             <div>
                 <Label htmlFor={`${dialogType}-result-assessmentType`}>Tipe Asesmen</Label>
                 <Select onValueChange={(value) => formInstance.setValue("assessmentType", value as AssessmentType, { shouldValidate: true })} value={formInstance.watch("assessmentType")}>
@@ -774,7 +830,7 @@ export default function ResultsPage() {
                     onDateSelect={(range) => field.onChange(range.from)}
                     numberOfMonths={1}
                     closeOnSelect={true}
-                    yearsRange={5} // Or another suitable range for assessment dates
+                    yearsRange={5} 
                     className="mt-1 w-full"
                     variant="outline" 
                   />
@@ -790,7 +846,6 @@ export default function ResultsPage() {
     );
   };
 
-
   return (
     <div className="space-y-6">
       <div>
@@ -803,23 +858,35 @@ export default function ResultsPage() {
             <BarChart3 className="h-6 w-6 text-primary" />
             <span>Daftar Hasil Belajar</span>
           </CardTitle>
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
             { (role === "admin" || role === "guru") && (
+              <>
+                <div className="relative w-full sm:w-auto flex-grow">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari siswa, kelas, mapel, asesmen..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-full"
+                  />
+                </div>
                 <Select
-                value={selectedAssessmentTypeFilter}
-                onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+                  value={selectedAssessmentTypeFilter}
+                  onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+                  
                 >
-                <SelectTrigger className="w-full md:w-[200px]">
-                    <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Filter Tipe Asesmen" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">Semua Tipe</SelectItem>
-                    {ASSESSMENT_TYPES.map(type => (
-                    <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                </SelectContent>
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                      <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Filter Tipe Asesmen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Semua Tipe</SelectItem>
+                      {ASSESSMENT_TYPES.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                  </SelectContent>
                 </Select>
+              </>
             )}
             {canManageResults && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
@@ -827,7 +894,7 @@ export default function ResultsPage() {
                   if (!isOpen) { addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, assessmentTitle: "", feedback: "", meetingNumber: undefined, assignmentId: undefined }); addResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
               }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
+                  <Button size="sm" className="w-full sm:w-auto" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
                   </Button>
                 </DialogTrigger>
@@ -858,18 +925,21 @@ export default function ResultsPage() {
         </CardHeader>
         <CardContent>
           {isLoadingResults ? (
-            <div className="space-y-2 mt-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : filteredResults.length > 0 ? (
+            <div className="space-y-2 mt-4">{[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : currentTableData.length > 0 ? (
+            <>
             <div className="overflow-x-auto mt-4">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {canManageResults && <TableHead className="w-[50px]">No.</TableHead>}
                     {canManageResults && <TableHead>Siswa</TableHead>}
                     {canManageResults && <TableHead>Kelas</TableHead>}
                     {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
                     
                     {(role === 'siswa' || role === 'orangtua') ? (
                       <>
+                        <TableHead className="w-[50px]">No.</TableHead>
                         <TableHead>Judul</TableHead>
                         <TableHead>Link Tugas</TableHead>
                         <TableHead>Feedback Guru</TableHead>
@@ -887,15 +957,17 @@ export default function ResultsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredResults.map((result) => (
+                  {currentTableData.map((result, index) => (
                     <TableRow key={result.id}>
-                      {canManageResults && <TableCell className="font-medium">{result.studentName}</TableCell>}
-                      {canManageResults && <TableCell>{result.className}</TableCell>}
-                      {(role === 'admin' || role === 'guru') && <TableCell>{result.subjectName}</TableCell>}
+                      {canManageResults && <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>}
+                      {canManageResults && <TableCell className="font-medium truncate" title={result.studentName}>{result.studentName}</TableCell>}
+                      {canManageResults && <TableCell className="truncate" title={result.className}>{result.className}</TableCell>}
+                      {(role === 'admin' || role === 'guru') && <TableCell className="truncate" title={result.subjectName}>{result.subjectName}</TableCell>}
                       
                       {(role === 'siswa' || role === 'orangtua') ? (
                         <>
-                          <TableCell>
+                          <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                          <TableCell className="truncate" title={result.assessmentTitle}>
                             {result.assessmentTitle}
                             {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
                           </TableCell>
@@ -913,7 +985,7 @@ export default function ResultsPage() {
                         </>
                       ) : (
                         <>
-                          <TableCell>
+                          <TableCell className="truncate" title={result.assessmentTitle}>
                             {result.assessmentTitle} ({result.assessmentType})
                             {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
                           </TableCell>
@@ -957,17 +1029,38 @@ export default function ResultsPage() {
                 </TableBody>
               </Table>
             </div>
+            {totalPages > 1 && (
+                <Pagination className="mt-6">
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                            aria-disabled={currentPage === 1}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                            aria-disabled={currentPage === totalPages}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            )}
+            </>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
                  (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." : 
-                 selectedAssessmentTypeFilter !== "all" ? `Tidak ada hasil belajar untuk tipe asesmen "${selectedAssessmentTypeFilter}". Coba filter lain.` :
+                 searchTerm || selectedAssessmentTypeFilter !== "all" ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian Anda." :
                  "Belum ada data hasil belajar yang sesuai."}
             </div>
           )}
         </CardContent>
       </Card>
-
 
       {canManageResults && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
