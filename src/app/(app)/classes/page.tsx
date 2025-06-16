@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical, Search } from "lucide-react"; 
+import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical, Search, Filter as FilterIcon } from "lucide-react"; 
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -72,6 +72,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 
 interface TeacherMin { 
@@ -106,6 +116,7 @@ const editClassFormSchema = classFormSchema.extend({
 type EditClassFormValues = z.infer<typeof editClassFormSchema>;
 
 const NO_TEACHER_VALUE = "_NONE_";
+const ITEMS_PER_PAGE = 10;
 
 export default function ClassesPage() {
   const { user, role, loading: authLoading } = useAuth(); 
@@ -116,6 +127,8 @@ export default function ClassesPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClassNameFilter, setSelectedClassNameFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [isViewStudentsDialogOpen, setIsViewStudentsDialogOpen] = useState(false);
   const [selectedClassForViewingStudents, setSelectedClassForViewingStudents] = useState<ClassData | null>(null);
@@ -352,13 +365,80 @@ export default function ClassesPage() {
 
 
   const filteredClasses = useMemo(() => {
-    if (!searchTerm) {
-      return allRawClasses;
+    let tempClasses = allRawClasses;
+
+    if (selectedClassNameFilter !== "all") {
+      tempClasses = tempClasses.filter(c => c.name === selectedClassNameFilter);
     }
-    return allRawClasses.filter(c => 
-      c.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [allRawClasses, searchTerm]);
+
+    if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      tempClasses = tempClasses.filter(c => 
+        c.name.toLowerCase().includes(lowerSearchTerm) ||
+        (c.teacherName && c.teacherName.toLowerCase().includes(lowerSearchTerm))
+      );
+    }
+    return tempClasses;
+  }, [allRawClasses, searchTerm, selectedClassNameFilter]);
+
+  const totalPages = Math.ceil(filteredClasses.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return filteredClasses.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, filteredClasses]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedClassNameFilter]);
+
 
   return (
     <div className="space-y-6">
@@ -438,25 +518,42 @@ export default function ClassesPage() {
         </CardHeader>
         <CardContent>
           {(role === 'admin' || role === 'guru') && (
-             <div className="my-4">
-              <div className="relative">
+             <div className="my-4 flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari berdasarkan nama kelas..."
+                  placeholder="Cari nama kelas atau wali kelas..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 w-full"
                 />
               </div>
+               <Select
+                  value={selectedClassNameFilter}
+                  onValueChange={setSelectedClassNameFilter}
+                  disabled={isLoading || allRawClasses.length === 0}
+                >
+                  <SelectTrigger className="w-full sm:w-[220px]">
+                    <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Filter Nama Kelas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Nama Kelas</SelectItem>
+                    {isLoading && <SelectItem value="loading-classes" disabled>Memuat kelas...</SelectItem>}
+                    {!isLoading && allRawClasses.length === 0 && <SelectItem value="no-classes" disabled>Tidak ada kelas</SelectItem>}
+                    {Array.from(new Set(allRawClasses.map(c => c.name))).sort().map((className) => (
+                      <SelectItem key={className} value={className}>{className}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
             </div>
           )}
           {isLoading || authLoading ? (
              <div className="space-y-2 mt-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
              </div>
-          ) : filteredClasses.length > 0 ? (
+          ) : currentTableData.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -468,15 +565,15 @@ export default function ClassesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredClasses.map((classItem, index) => (
+                  {currentTableData.map((classItem, index) => (
                     <TableRow key={classItem.id}>
-                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium">{classItem.name}</TableCell>
                       <TableCell>{classItem.teacherName || "-"}</TableCell>
                       <TableCell className="text-right">
                         {role === "guru" ? (
                            <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
                             onClick={() => openViewStudentsDialog(classItem)}
                             aria-label={`Lihat Siswa di Kelas ${classItem.name}`}
@@ -540,9 +637,31 @@ export default function ClassesPage() {
                 </TableBody>
               </Table>
             </div>
+             {totalPages > 1 && (
+                <Pagination className="mt-6">
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                            aria-disabled={currentPage === 1}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                            aria-disabled={currentPage === totalPages}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            )}
+            </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {searchTerm && role === 'admin' ? 'Tidak ada kelas yang cocok dengan pencarian Anda.' :
+                {searchTerm || selectedClassNameFilter !== "all" ? 'Tidak ada kelas yang cocok dengan filter atau pencarian Anda.' :
                  role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
                  role === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
                  role === 'orangtua' && !user?.linkedStudentClassId ? (
@@ -679,4 +798,3 @@ export default function ClassesPage() {
   );
 }
     
-
