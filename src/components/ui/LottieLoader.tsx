@@ -24,6 +24,7 @@ const LottieLoader: React.FC<LottieLoaderProps> = ({
   useEffect(() => {
     const loadAnimation = async () => {
       try {
+        // Ensure the path is correct and the file is in the public folder
         const response = await fetch("/lottie-animations/loader-animation.json");
         if (!response.ok) {
           throw new Error(`Failed to fetch Lottie: ${response.status} ${response.statusText}`);
