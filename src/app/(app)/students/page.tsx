@@ -87,7 +87,7 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
-import { CalendarDatePicker } from "@/components/calendar-date-picker";
+// import { CalendarDatePicker } from "@/components/calendar-date-picker";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
@@ -197,7 +197,7 @@ export default function StudentsPage() {
     setIsLoadingParents(true);
     try {
       const promises = [];
-      // Admins and Teachers now fetch all classes and all parents
+      
       if (authRole === 'admin' || authRole === 'guru') {
         const classesCollectionRef = collection(db, "classes");
         const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
@@ -305,10 +305,10 @@ export default function StudentsPage() {
   
   const displayedStudents = useMemo(() => {
     let filtered = students;
-    if (selectedClassFilter !== "all") {
+    if ((authRole === 'admin' || authRole === 'guru') && selectedClassFilter !== "all") {
       filtered = filtered.filter(student => student.classId === selectedClassFilter);
     }
-    if (searchTerm) {
+    if ((authRole === 'admin' || authRole === 'guru') && searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(student =>
         student.name.toLowerCase().includes(lowerSearchTerm) ||
@@ -317,7 +317,7 @@ export default function StudentsPage() {
       );
     }
     return filtered;
-  }, [students, searchTerm, selectedClassFilter]);
+  }, [students, searchTerm, selectedClassFilter, authRole]);
 
   const totalPages = Math.ceil(displayedStudents.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -577,22 +577,41 @@ export default function StudentsPage() {
         <>
           <div>
             <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
-             <Controller
-                name="dateOfBirth"
-                control={formInstance.control}
-                render={({ field }) => (
-                  <CalendarDatePicker
-                    id={`${formType}-student-dateOfBirth-picker`}
-                    date={{ from: field.value, to: field.value }}
-                    onDateSelect={({ from }) => field.onChange(startOfDay(from))}
-                    numberOfMonths={1}
-                    closeOnSelect={true}
-                    yearsRange={70}
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal mt-1"
-                  />
-                )}
-              />
+            <Controller
+              name="dateOfBirth"
+              control={formInstance.control}
+              render={({ field }) => (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-1",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={field.onChange}
+                      disabled={(date) =>
+                        date > new Date() || date < new Date("1900-01-01")
+                      }
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      locale={indonesiaLocale}
+                    />
+                  </PopoverContent>
+                </Popover>
+              )}
+            />
             {formInstance.formState.errors.dateOfBirth && (
               <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfBirth.message}</p>
             )}
@@ -797,7 +816,7 @@ export default function StudentsPage() {
              <div className="space-y-2 mt-4">
                 {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
              </div>
-          ) : displayedStudents.length > 0 ? (
+          ) : currentTableData.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
