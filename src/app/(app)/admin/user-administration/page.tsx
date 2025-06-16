@@ -143,7 +143,7 @@ const editUserFormSchema = baseUserSchema.extend({
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 3;
 
 export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
