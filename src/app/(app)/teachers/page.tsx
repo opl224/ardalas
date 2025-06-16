@@ -42,9 +42,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, PlusCircle, Edit, Trash2, LinkIcon } from "lucide-react";
+import { Users, PlusCircle, Edit, Trash2, LinkIcon as UidLinkIcon, MoreVertical, Eye, Search, Filter as FilterIcon } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -64,9 +64,29 @@ import {
   where
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
+import { format } from 'date-fns';
+import { id as indonesiaLocale } from 'date-fns/locale';
+
 
 interface AuthUserMin {
-  id: string; // This will be the Firebase Auth UID
+  id: string; 
   name: string;
   email: string;
 }
@@ -74,12 +94,12 @@ interface AuthUserMin {
 interface Teacher {
   id: string; 
   name: string;
-  email: string; // Profile email, can be different from Auth email
+  email: string; 
   subject: string; 
   address?: string;
   phone?: string;
   gender?: "laki-laki" | "perempuan";
-  uid?: string; // Firebase Auth UID linked to this teacher profile
+  uid?: string; 
   createdAt?: Timestamp; 
 }
 
@@ -87,12 +107,12 @@ const GENDERS = ["laki-laki", "perempuan"] as const;
 
 const teacherFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  email: z.string().email({ message: "Format email tidak valid." }), // Profile email
+  email: z.string().email({ message: "Format email tidak valid." }), 
   subject: z.string().min(2, { message: "Mata pelajaran minimal 2 karakter." }),
   address: z.string().trim().optional(),
   phone: z.string().trim().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal('')),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
-  authUserId: z.string().optional(), // To store the selected Firebase Auth UID from dropdown
+  authUserId: z.string().optional(), 
 });
 type TeacherFormValues = z.infer<typeof teacherFormSchema>;
 
@@ -102,6 +122,7 @@ const editTeacherFormSchema = teacherFormSchema.extend({
 type EditTeacherFormValues = z.infer<typeof editTeacherFormSchema>;
 
 const NO_AUTH_USER_SELECTED = "_NO_AUTH_USER_";
+const ITEMS_PER_PAGE = 10;
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -110,7 +131,13 @@ export default function TeachersPage() {
   const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true);
   const [isAddTeacherDialogOpen, setIsAddTeacherDialogOpen] = useState(false);
   const [isEditTeacherDialogOpen, setIsEditTeacherDialogOpen] = useState(false);
+  const [isViewTeacherDialogOpen, setIsViewTeacherDialogOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [selectedTeacherForView, setSelectedTeacherForView] = useState<Teacher | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -138,7 +165,7 @@ export default function TeachersPage() {
       const q = query(usersCollectionRef, where("role", "==", "guru"), orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: AuthUserMin[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.data().uid, // uid from users collection is the Auth UID
+        id: docSnap.data().uid, 
         name: docSnap.data().name,
         email: docSnap.data().email,
       }));
@@ -147,7 +174,6 @@ export default function TeachersPage() {
       console.error("Error fetching auth guru users: ", error);
       toast({
         title: "Gagal Memuat Akun Guru",
-        description: "Terjadi kesalahan saat mengambil daftar akun pengguna guru.",
         variant: "destructive",
       });
     } finally {
@@ -158,7 +184,7 @@ export default function TeachersPage() {
   const fetchTeachers = async () => {
     setIsLoadingTeachers(true);
     try {
-      await fetchAuthGuruUsers(); // Fetch auth users for linking
+      await fetchAuthGuruUsers(); 
       const teachersCollectionRef = collection(db, "teachers");
       const q = query(teachersCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
@@ -170,7 +196,7 @@ export default function TeachersPage() {
         address: docSnap.data().address,
         phone: docSnap.data().phone,
         gender: docSnap.data().gender,
-        uid: docSnap.data().uid, // Fetch the UID
+        uid: docSnap.data().uid, 
         createdAt: docSnap.data().createdAt,
       }));
       setTeachers(fetchedTeachers);
@@ -199,7 +225,7 @@ export default function TeachersPage() {
         address: selectedTeacher.address || "",
         phone: selectedTeacher.phone || "",
         gender: selectedTeacher.gender,
-        authUserId: selectedTeacher.uid || undefined, // Pre-fill with existing linked UID
+        authUserId: selectedTeacher.uid || undefined, 
       });
     }
   }, [selectedTeacher, isEditTeacherDialogOpen, editTeacherForm]);
@@ -215,7 +241,7 @@ export default function TeachersPage() {
         address: data.address || null,
         phone: data.phone || null,
         gender: data.gender,
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Save selected Auth UID
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, 
         createdAt: serverTimestamp(),
       });
       
@@ -244,7 +270,7 @@ export default function TeachersPage() {
         address: data.address || null,
         phone: data.phone || null,
         gender: data.gender,
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Update linked Auth UID
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, 
       });
       
       toast({ title: "Data Profil Guru Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -275,6 +301,11 @@ export default function TeachersPage() {
     }
   };
 
+  const openViewDialog = (teacher: Teacher) => {
+    setSelectedTeacherForView(teacher);
+    setIsViewTeacherDialogOpen(true);
+  };
+
   const openEditDialog = (teacher: Teacher) => {
     setSelectedTeacher(teacher);
     setIsEditTeacherDialogOpen(true);
@@ -283,6 +314,83 @@ export default function TeachersPage() {
   const openDeleteDialog = (teacher: Teacher) => {
     setSelectedTeacher(teacher); 
   };
+
+  const uniqueSubjects = useMemo(() => {
+    const subjectsSet = new Set<string>();
+    teachers.forEach(teacher => subjectsSet.add(teacher.subject));
+    return Array.from(subjectsSet).sort();
+  }, [teachers]);
+
+  const filteredAndSearchedTeachers = useMemo(() => {
+    return teachers
+      .filter(teacher => {
+        const matchesSubject = subjectFilter === "all" || teacher.subject === subjectFilter;
+        const matchesSearchTerm = searchTerm === "" ||
+          teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          teacher.subject.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesSubject && matchesSearchTerm;
+      });
+  }, [teachers, searchTerm, subjectFilter]);
+
+  const totalPages = Math.ceil(filteredAndSearchedTeachers.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return filteredAndSearchedTeachers.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, filteredAndSearchedTeachers]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, subjectFilter]);
+
 
   const renderTeacherFormFields = (formInstance: typeof addTeacherForm | typeof editTeacherForm, formType: 'add' | 'edit') => (
     <>
@@ -383,7 +491,6 @@ export default function TeachersPage() {
     </>
   );
 
-
   return (
     <div className="space-y-6">
       <div>
@@ -432,28 +539,57 @@ export default function TeachersPage() {
           </Dialog>
         </CardHeader>
         <CardContent>
+          <div className="my-4 flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-grow">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari nama, email, atau mapel..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-full"
+              />
+            </div>
+            <Select
+              value={subjectFilter}
+              onValueChange={setSubjectFilter}
+              disabled={isLoadingTeachers || uniqueSubjects.length === 0}
+            >
+              <SelectTrigger className="w-full sm:w-[200px]">
+                 <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder="Filter per Mapel" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
+                {uniqueSubjects.map((subject) => (
+                  <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {isLoadingTeachers || isLoadingAuthUsers ? (
              <div className="space-y-2 mt-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
              </div>
-          ) : teachers.length > 0 ? (
+          ) : currentTableData.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama Profil</TableHead>
                     <TableHead>Email Profil</TableHead>
                     <TableHead>Mapel</TableHead>
                     <TableHead>Gender</TableHead>
                     <TableHead>UID Akun Tertaut</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className="text-center w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teachers.map((teacher) => (
+                  {currentTableData.map((teacher, index) => (
                     <TableRow key={teacher.id}>
+                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium">{teacher.name}</TableCell>
                       <TableCell>{teacher.email}</TableCell>
                       <TableCell>{teacher.subject}</TableCell>
@@ -467,53 +603,141 @@ export default function TeachersPage() {
                       <TableCell className="font-mono text-xs">
                         {teacher.uid ? (
                           <div className="flex items-center gap-1">
-                            <LinkIcon className="h-3 w-3 text-muted-foreground" /> 
+                            <UidLinkIcon className="h-3 w-3 text-muted-foreground" /> 
                             {teacher.uid.substring(0,10)}...
                           </div>
                         ) : (
                           <span className="text-muted-foreground italic">Belum tertaut</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => openEditDialog(teacher)} aria-label={`Edit ${teacher.name}`}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(teacher)} aria-label={`Hapus ${teacher.name}`}>
-                              <Trash2 className="h-4 w-4" />
+                      <TableCell className="text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${teacher.name}`}>
+                              <MoreVertical className="h-4 w-4" />
                             </Button>
-                          </AlertDialogTrigger>
-                          {selectedTeacher && selectedTeacher.id === teacher.id && ( 
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tindakan ini akan menghapus profil guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel onClick={() => setSelectedTeacher(null)}>Batal</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteTeacher(selectedTeacher.id, selectedTeacher.name)}>
-                                  Ya, Hapus Profil
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          )}
-                        </AlertDialog>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openViewDialog(teacher)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Lihat Detail
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditDialog(teacher)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault(); 
+                                    openDeleteDialog(teacher);
+                                  }}
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Hapus
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              {selectedTeacher && selectedTeacher.id === teacher.id && ( 
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tindakan ini akan menghapus profil guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel onClick={() => setSelectedTeacher(null)}>Batal</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDeleteTeacher(selectedTeacher.id, selectedTeacher.name)}>
+                                      Ya, Hapus Profil
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              )}
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
+            {totalPages > 1 && (
+                <Pagination className="mt-6">
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious 
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                            aria-disabled={currentPage === 1}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext 
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                            aria-disabled={currentPage === totalPages}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            )}
+            </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              Tidak ada data profil guru. Klik "Tambah Profil Guru" untuk membuat data baru.
+              {searchTerm || subjectFilter !== "all" 
+                ? "Tidak ada profil guru yang cocok dengan filter atau pencarian Anda."
+                : "Tidak ada data profil guru. Klik \"Tambah Profil Guru\" untuk membuat data baru."
+              }
             </div>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isViewTeacherDialogOpen} onOpenChange={(isOpen) => {
+          setIsViewTeacherDialogOpen(isOpen);
+          if (!isOpen) { setSelectedTeacherForView(null); }
+      }}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Detail Profil Guru: {selectedTeacherForView?.name}</DialogTitle>
+                <DialogDescription>Informasi lengkap mengenai profil guru.</DialogDescription>
+            </DialogHeader>
+            {selectedTeacherForView && (
+                <div className="space-y-3 py-4 text-sm">
+                    <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedTeacherForView.name}</p></div>
+                    <div><Label className="text-muted-foreground">Email Profil:</Label><p className="font-medium">{selectedTeacherForView.email}</p></div>
+                    <div><Label className="text-muted-foreground">Mata Pelajaran Utama:</Label><p className="font-medium">{selectedTeacherForView.subject}</p></div>
+                    <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedTeacherForView.gender || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{selectedTeacherForView.phone || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedTeacherForView.address || "-"}</p></div>
+                    <div>
+                        <Label className="text-muted-foreground">UID Akun Tertaut:</Label>
+                        {selectedTeacherForView.uid ? (
+                            <p className="font-mono text-xs flex items-center gap-1">
+                                <UidLinkIcon className="h-3.5 w-3.5 text-muted-foreground" /> {selectedTeacherForView.uid}
+                            </p>
+                        ) : (
+                            <p className="italic text-muted-foreground">Belum ditautkan ke akun pengguna.</p>
+                        )}
+                    </div>
+                     {selectedTeacherForView.createdAt && (
+                       <div>
+                          <Label className="text-muted-foreground">Tanggal Dibuat (Profil):</Label>
+                          <p className="font-medium">{format(selectedTeacherForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                       </div>
+                    )}
+                </div>
+            )}
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditTeacherDialogOpen} onOpenChange={(isOpen) => {
           setIsEditTeacherDialogOpen(isOpen);
@@ -550,3 +774,4 @@ export default function TeachersPage() {
 }
 
     
+
