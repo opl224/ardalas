@@ -68,7 +68,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { format, startOfDay, getMonth, getYear } from "date-fns";
+import { format, startOfDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 
 interface ClassMin {
@@ -101,7 +101,7 @@ const baseStudentFormSchema = z.object({
   address: z.string().optional(),
 });
 
-const studentFormSchema = baseStudentFormSchema; // No specific refine needed for dateOfBirth as a single field
+const studentFormSchema = baseStudentFormSchema;
 type StudentFormValues = z.infer<typeof studentFormSchema>;
 
 const editStudentFormSchema = baseStudentFormSchema.extend({
@@ -802,3 +802,5 @@ export default function StudentsPage() {
     </div>
   );
 }
+
+    
