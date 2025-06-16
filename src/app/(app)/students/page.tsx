@@ -546,6 +546,7 @@ export default function StudentsPage() {
                       toYear={new Date().getFullYear()}
                       locale={indonesiaLocale}
                       initialFocus
+                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
                     />
                   </PopoverContent>
                 </Popover>
@@ -802,5 +803,6 @@ export default function StudentsPage() {
     </div>
   );
 }
+    
 
     
