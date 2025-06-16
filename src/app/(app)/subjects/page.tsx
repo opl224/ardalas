@@ -98,7 +98,7 @@ export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [authGuruUsers, setAuthGuruUsers] = useState<AuthUserMin[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true);
+  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true); // Separate loading state for auth users
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -146,14 +146,10 @@ export default function SubjectsPage() {
     }
   };
 
-
   const fetchSubjects = async () => {
     if (authLoading) return;
     setIsLoadingSubjects(true);
     try {
-      if (role === "admin" && authGuruUsers.length === 0 && !isLoadingAuthUsers) {
-        await fetchAuthGuruUsers();
-      }
       const subjectsCollectionRef = collection(db, "subjects");
       let q;
       if (role === "guru" && user?.uid) {
@@ -161,8 +157,6 @@ export default function SubjectsPage() {
       } else if (role === "admin") {
         q = query(subjectsCollectionRef, orderBy("name", "asc"));
       } else {
-        // For other roles (siswa, orangtua), no subjects are fetched for this management view.
-        // They would see subjects through lesson schedules, etc.
         setSubjects([]);
         setIsLoadingSubjects(false);
         return;
@@ -190,11 +184,24 @@ export default function SubjectsPage() {
   };
 
   useEffect(() => {
-    fetchSubjects();
-  }, [role, user, authLoading, isLoadingAuthUsers]); // Re-fetch if role, user, or authLoading changes
+    if (role === "admin" && !authLoading) {
+      fetchAuthGuruUsers();
+    }
+  }, [role, authLoading]);
+
+  useEffect(() => {
+    if (!authLoading && role) { // Fetch subjects once role is determined and auth is not loading
+        fetchSubjects();
+    }
+  }, [role, user, authLoading]);
+
 
   useEffect(() => {
     if (selectedSubject && isEditDialogOpen && role === "admin") {
+      // Ensure authGuruUsers are loaded before resetting form if not already
+      if (authGuruUsers.length === 0 && !isLoadingAuthUsers) {
+        fetchAuthGuruUsers();
+      }
       editSubjectForm.reset({
         id: selectedSubject.id,
         name: selectedSubject.name,
@@ -202,7 +209,7 @@ export default function SubjectsPage() {
         teacherUid: selectedSubject.teacherUid || undefined,
       });
     }
-  }, [selectedSubject, isEditDialogOpen, editSubjectForm, role]);
+  }, [selectedSubject, isEditDialogOpen, editSubjectForm, role, authGuruUsers, isLoadingAuthUsers]);
 
   const handleAddSubjectSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
     if (role !== "admin") return;
@@ -277,6 +284,10 @@ export default function SubjectsPage() {
 
   const openEditDialog = (subject: Subject) => {
     if (role !== "admin") return;
+    // Ensure authGuruUsers are fetched if not already, for the form dropdown
+    if (authGuruUsers.length === 0 && !isLoadingAuthUsers) {
+        fetchAuthGuruUsers();
+    }
     setSelectedSubject(subject);
     setIsEditDialogOpen(true);
   };
@@ -340,6 +351,8 @@ export default function SubjectsPage() {
     ? "Daftar subjek atau mata pelajaran yang menjadi tanggung jawab Anda."
     : "Kelola daftar subjek atau mata pelajaran yang diajarkan.";
 
+  const showSkeleton = isLoadingSubjects || authLoading;
+
   return (
     <div className="space-y-6">
       <div>
@@ -390,7 +403,7 @@ export default function SubjectsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {isLoadingSubjects || (role === "admin" && isLoadingAuthUsers) || authLoading ? (
+          {showSkeleton ? (
              <div className="space-y-2 mt-4">
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
@@ -491,4 +504,3 @@ export default function SubjectsPage() {
     </div>
   );
 }
-
