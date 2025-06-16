@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -41,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon } from "lucide-react";
+import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon, MoreVertical, Eye } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -65,15 +66,35 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { format } from 'date-fns';
+import { id as indonesiaLocale } from 'date-fns/locale';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
+
 
 interface StudentForDialog {
-  id: string; 
+  id: string;
   name: string;
   classId?: string;
 }
 
-interface AuthUserMin { // For Auth users with role 'orangtua'
-  id: string; // Firebase Auth UID
+interface AuthUserMin {
+  id: string;
   name: string;
   email: string;
 }
@@ -84,22 +105,24 @@ interface ClassMin {
 }
 
 interface Parent {
-  id: string; 
+  id: string;
   name: string;
-  email?: string; 
+  email?: string;
   phone?: string;
-  studentId: string; 
-  studentName: string; 
-  uid?: string; // Firebase Auth UID of the parent, if linked
-  createdAt?: Timestamp; 
+  address?: string;
+  studentId: string;
+  studentName: string;
+  uid?: string;
+  createdAt?: Timestamp;
 }
 
 const parentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
+  address: z.string().trim().optional(),
   studentId: z.string({ required_error: "Pilih murid terkait (UID)." }),
-  authUserId: z.string().optional(), // UID of the parent's auth account
+  authUserId: z.string().optional(),
 });
 type ParentFormValues = z.infer<typeof parentFormSchema>;
 
@@ -109,20 +132,25 @@ const editParentFormSchema = parentFormSchema.extend({
 type EditParentFormValues = z.infer<typeof editParentFormSchema>;
 
 const NO_AUTH_USER_SELECTED = "_NO_AUTH_USER_";
+const ITEMS_PER_PAGE = 10;
 
 export default function ParentsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const [parents, setParents] = useState<Parent[]>([]);
-  const [studentsForDialog, setStudentsForDialog] = useState<StudentForDialog[]>([]); 
+  const [studentsForDialog, setStudentsForDialog] = useState<StudentForDialog[]>([]);
   const [authOrangtuaUsers, setAuthOrangtuaUsers] = useState<AuthUserMin[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true); 
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isViewParentDialogOpen, setIsViewParentDialogOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
+  const [selectedParentForView, setSelectedParentForView] = useState<Parent | null>(null);
+
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -132,6 +160,7 @@ export default function ParentsPage() {
       name: "",
       email: "",
       phone: "",
+      address: "",
       studentId: undefined,
       authUserId: undefined,
     },
@@ -142,7 +171,7 @@ export default function ParentsPage() {
   });
 
   const fetchPageData = async () => {
-    if (authLoading && role !== 'admin') return; 
+    if (authLoading && role !== 'admin') return;
     setIsLoadingData(true);
     try {
       const promises = [];
@@ -153,15 +182,15 @@ export default function ParentsPage() {
 
       const authOrangtuaQueryInstance = query(usersCollectionRef, where("role", "==", "orangtua"), orderBy("name", "asc"));
       promises.push(getDocs(authOrangtuaQueryInstance));
-      
+
       if (role === 'admin') {
         const classesCollectionRef = collection(db, "classes");
         const classesQueryInstance = query(classesCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(classesQueryInstance));
       } else {
-        promises.push(Promise.resolve(null)); 
+        promises.push(Promise.resolve(null));
       }
-      
+
       const parentsCollectionRef = collection(db, "parents");
       const parentsQueryInstance = query(parentsCollectionRef, orderBy("name", "asc"));
       promises.push(getDocs(parentsQueryInstance));
@@ -169,7 +198,7 @@ export default function ParentsPage() {
       const [studentsSnapshot, authOrangtuaSnapshot, classesSnapshot, parentsSnapshot] = await Promise.all(promises);
 
       const fetchedStudentsRaw = (studentsSnapshot as any).docs.map((docSnap: any) => ({
-        id: docSnap.data().uid, // Assuming student's doc id in 'users' is their auth UID
+        id: docSnap.data().uid,
         name: docSnap.data().name,
         classId: docSnap.data().classId,
       }));
@@ -179,7 +208,7 @@ export default function ParentsPage() {
       setStudentsForDialog(validFetchedStudents);
 
       setAuthOrangtuaUsers((authOrangtuaSnapshot as any).docs.map((docSnap: any) => ({
-        id: docSnap.data().uid, // Auth UID from users collection
+        id: docSnap.data().uid,
         name: docSnap.data().name,
         email: docSnap.data().email,
       })));
@@ -188,15 +217,16 @@ export default function ParentsPage() {
       if (role === 'admin' && classesSnapshot) {
         setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
       }
-      
+
       const fetchedParents: Parent[] = (parentsSnapshot as any).docs.map((docSnap: any) => ({
         id: docSnap.id,
         name: docSnap.data().name,
         email: docSnap.data().email,
         phone: docSnap.data().phone,
+        address: docSnap.data().address,
         studentId: docSnap.data().studentId,
         studentName: docSnap.data().studentName,
-        uid: docSnap.data().uid, // Fetch parent's auth UID if linked
+        uid: docSnap.data().uid,
         createdAt: docSnap.data().createdAt,
       }));
       setParents(fetchedParents);
@@ -224,6 +254,7 @@ export default function ParentsPage() {
         name: selectedParent.name,
         email: selectedParent.email || "",
         phone: selectedParent.phone || "",
+        address: selectedParent.address || "",
         studentId: selectedParent.studentId,
         authUserId: selectedParent.uid || undefined,
       });
@@ -244,16 +275,17 @@ export default function ParentsPage() {
         name: data.name,
         email: data.email || null,
         phone: data.phone || null,
+        address: data.address || null,
         studentId: data.studentId,
-        studentName: selectedStudent.name, 
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Save parent's auth UID
+        studentName: selectedStudent.name,
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
         createdAt: serverTimestamp(),
       });
-      
+
       toast({ title: "Data Orang Tua Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
-      addParentForm.reset({ name: "", email: "", phone: "", studentId: undefined, authUserId: undefined });
-      fetchPageData(); 
+      addParentForm.reset({ name: "", email: "", phone: "", address: "", studentId: undefined, authUserId: undefined });
+      fetchPageData();
     } catch (error: any) {
       console.error("Error adding parent:", error);
       toast({
@@ -278,11 +310,12 @@ export default function ParentsPage() {
         name: data.name,
         email: data.email || null,
         phone: data.phone || null,
+        address: data.address || null,
         studentId: data.studentId,
-        studentName: selectedStudent.name, 
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Update parent's auth UID
+        studentName: selectedStudent.name,
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
       });
-      
+
       toast({ title: "Data Orang Tua Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditDialogOpen(false);
       setSelectedParent(null);
@@ -300,7 +333,7 @@ export default function ParentsPage() {
     try {
       await deleteDoc(doc(db, "parents", parentId));
       toast({ title: "Data Orang Tua Dihapus", description: `${parentName || 'Data'} berhasil dihapus.` });
-      setSelectedParent(null); 
+      setSelectedParent(null);
       fetchPageData();
     } catch (error) {
       console.error("Error deleting parent:", error);
@@ -311,15 +344,20 @@ export default function ParentsPage() {
     }
   };
 
+  const openViewDialog = (parent: Parent) => {
+    setSelectedParentForView(parent);
+    setIsViewParentDialogOpen(true);
+  };
+
   const openEditDialog = (parent: Parent) => {
     setSelectedParent(parent);
     setIsEditDialogOpen(true);
   };
-  
+
   const openDeleteDialog = (parent: Parent) => {
-    setSelectedParent(parent); 
+    setSelectedParent(parent);
   };
-  
+
   const displayedParents = useMemo(() => {
     let filtered = parents;
 
@@ -342,6 +380,65 @@ export default function ParentsPage() {
     }
     return filtered;
   }, [parents, studentsForDialog, searchTerm, selectedClassFilter, role]);
+
+  const totalPages = Math.ceil(displayedParents.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return displayedParents.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, displayedParents]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedClassFilter]);
+
 
   const renderParentFormFields = (formInstance: typeof addParentForm | typeof editParentForm, formType: 'add' | 'edit') => (
     <>
@@ -367,13 +464,20 @@ export default function ParentsPage() {
         )}
       </div>
       <div>
+        <Label htmlFor={`${formType}-parent-address`}>Alamat (Opsional)</Label>
+        <Textarea id={`${formType}-parent-address`} {...formInstance.register("address")} className="mt-1" />
+        {formInstance.formState.errors.address && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
+        )}
+      </div>
+      <div>
         <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid)</Label>
         <Controller
           name="studentId"
           control={formInstance.control}
           render={({ field }) => (
-              <Select 
-                  onValueChange={field.onChange} 
+              <Select
+                  onValueChange={field.onChange}
                   value={field.value || undefined}
                   disabled={isLoadingData}
               >
@@ -458,7 +562,7 @@ export default function ParentsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) {
-                addParentForm.reset({ name: "", email: "", phone: "", studentId: undefined, authUserId: undefined });
+                addParentForm.reset({ name: "", email: "", phone: "", address: "", studentId: undefined, authUserId: undefined });
                 addParentForm.clearErrors();
               }
             }}>
@@ -524,68 +628,86 @@ export default function ParentsPage() {
           )}
           {isLoadingData ? (
              <div className="space-y-2 mt-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
              </div>
-          ) : displayedParents.length > 0 ? (
+          ) : currentTableData.length > 0 ? (
+            <>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama Orang Tua</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Telepon</TableHead>
                     <TableHead>Nama Anak</TableHead>
                     <TableHead>UID Akun Tertaut</TableHead>
-                    {role === 'admin' && <TableHead className="text-right">Aksi</TableHead>}
+                    {role === 'admin' && <TableHead className="text-center w-16">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedParents.map((parent) => (
+                  {currentTableData.map((parent, index) => (
                     <TableRow key={parent.id}>
-                      <TableCell className="font-medium">{parent.name}</TableCell>
-                      <TableCell>{parent.email || "-"}</TableCell>
-                      <TableCell>{parent.phone || "-"}</TableCell>
-                      <TableCell>{parent.studentName || "-"}</TableCell>
+                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className="font-medium truncate" title={parent.name}>{parent.name}</TableCell>
+                      <TableCell className="truncate" title={parent.email}>{parent.email || "-"}</TableCell>
+                      <TableCell className="truncate" title={parent.studentName}>{parent.studentName || "-"}</TableCell>
                       <TableCell className="font-mono text-xs">
                         {parent.uid ? (
                           <div className="flex items-center gap-1">
-                            <UidLinkIcon className="h-3 w-3 text-muted-foreground" /> 
-                            {parent.uid.substring(0,10)}...
+                            <UidLinkIcon className="h-3 w-3 text-muted-foreground" />
+                            <span className="truncate" title={parent.uid}>{parent.uid.substring(0,10)}...</span>
                           </div>
                         ) : (
                           <span className="text-muted-foreground italic">Belum tertaut</span>
                         )}
                       </TableCell>
                       {role === 'admin' && (
-                        <TableCell className="text-right space-x-2">
-                          <Button variant="outline" size="icon" onClick={() => openEditDialog(parent)} aria-label={`Edit ${parent.name}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(parent)} aria-label={`Hapus ${parent.name}`}>
-                                <Trash2 className="h-4 w-4" />
+                        <TableCell className="text-center">
+                           <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${parent.name}`}>
+                                <MoreVertical className="h-4 w-4" />
                               </Button>
-                            </AlertDialogTrigger>
-                            {selectedParent && selectedParent.id === parent.id && ( 
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tindakan ini akan menghapus data orang tua <span className="font-semibold"> {selectedParent?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setSelectedParent(null)}>Batal</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteParent(selectedParent.id, selectedParent.name)}>
-                                    Ya, Hapus Data
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            )}
-                          </AlertDialog>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openViewDialog(parent)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Lihat Detail
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(parent)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(parent); }}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Hapus
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedParent && selectedParent.id === parent.id && (
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tindakan ini akan menghapus data orang tua <span className="font-semibold"> {selectedParent?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => setSelectedParent(null)}>Batal</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteParent(selectedParent.id, selectedParent.name)}>
+                                        Ya, Hapus Data
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       )}
                     </TableRow>
@@ -593,6 +715,28 @@ export default function ParentsPage() {
                 </TableBody>
               </Table>
             </div>
+            {totalPages > 1 && (
+                <Pagination className="mt-6">
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            aria-disabled={currentPage === 1}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            aria-disabled={currentPage === totalPages}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            )}
+            </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || selectedClassFilter !== "all"
@@ -603,6 +747,47 @@ export default function ParentsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isViewParentDialogOpen} onOpenChange={(isOpen) => {
+          setIsViewParentDialogOpen(isOpen);
+          if (!isOpen) { setSelectedParentForView(null); }
+      }}>
+        <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+                <DialogTitle>Detail Orang Tua: {selectedParentForView?.name}</DialogTitle>
+                <DialogDescription>Informasi lengkap mengenai orang tua murid.</DialogDescription>
+            </DialogHeader>
+            {selectedParentForView && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
+                    <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedParentForView.name}</p></div>
+                    <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedParentForView.email || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{selectedParentForView.phone || "-"}</p></div>
+                    <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedParentForView.address || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Nama Anak Terhubung:</Label><p className="font-medium">{selectedParentForView.studentName || "-"}</p></div>
+                    <div>
+                        <Label className="text-muted-foreground">UID Akun Pengguna Tertaut:</Label>
+                        {selectedParentForView.uid ? (
+                            <p className="font-mono text-xs flex items-center gap-1">
+                                <UidLinkIcon className="h-3.5 w-3.5 text-muted-foreground" /> {selectedParentForView.uid}
+                            </p>
+                        ) : (
+                            <p className="italic text-muted-foreground">Belum ditautkan.</p>
+                        )}
+                    </div>
+                     {selectedParentForView.createdAt && (
+                       <div className="sm:col-span-2">
+                          <Label className="text-muted-foreground">Tanggal Dibuat (Profil):</Label>
+                          <p className="font-medium">{format(selectedParentForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                       </div>
+                    )}
+                </div>
+            )}
+            <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {role === 'admin' && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
@@ -640,6 +825,3 @@ export default function ParentsPage() {
     </div>
   );
 }
-
-
-    
