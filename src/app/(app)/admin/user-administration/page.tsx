@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter } from "lucide-react";
+import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter as FilterIcon } from "lucide-react";
 import { useState, useEffect, type ReactNode, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -652,25 +652,24 @@ export default function UserAdministrationPage() {
                 className="pl-8 w-full"
               />
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-               <Button 
-                variant={roleFilter === "all" ? "default" : "outline"} 
-                size="sm" 
-                onClick={() => setRoleFilter("all")}
+            <div className="flex items-center">
+              <Select
+                value={roleFilter}
+                onValueChange={(value) => setRoleFilter(value as Role | "all")}
               >
-                Semua Peran
-              </Button>
-              {ROLES.map((role) => (
-                <Button
-                  key={role}
-                  variant={roleFilter === role ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setRoleFilter(role)}
-                  className="capitalize"
-                >
-                  {roleDisplayNames[role]}
-                </Button>
-              ))}
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter Peran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Peran</SelectItem>
+                  {ROLES.map((roleItem) => (
+                    <SelectItem key={roleItem} value={roleItem} className="capitalize">
+                      {roleDisplayNames[roleItem]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
