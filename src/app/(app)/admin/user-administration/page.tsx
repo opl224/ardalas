@@ -43,7 +43,14 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter as FilterIcon, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { UserCog, PlusCircle, Edit, Trash2, Eye, EyeOff, School, AlertCircle, Search, Filter as FilterIcon, ChevronDown, MoreVertical } from "lucide-react";
 import { useState, useEffect, type ReactNode, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -766,7 +773,7 @@ export default function UserAdministrationPage() {
                     <TableHead className="w-1/4 max-w-[190px]">Email</TableHead>
                     <TableHead className="w-1/6 max-w-[100px]">Peran</TableHead>
                     <TableHead className="w-1/4 max-w-[190px]">Kelas Ditugaskan/Dimiliki</TableHead>
-                    <TableHead className="text-right w-[170px]">Aksi</TableHead>
+                    <TableHead className="text-center w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -781,20 +788,45 @@ export default function UserAdministrationPage() {
                          user.role === 'siswa' ? (user.className || user.classId || '-') :
                          "-"}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                            <Button variant="outline" size="icon" onClick={() => openViewDialog(user)} aria-label={`Lihat detail ${user.name}`}><Eye className="h-4 w-4" /></Button>
-                            <Button variant="outline" size="icon" onClick={() => openEditDialog(user)} aria-label={`Edit ${user.name}`}><Edit className="h-4 w-4" /></Button>
+                      <TableCell className="text-center">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${user.name}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openViewDialog(user)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Lihat Detail
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditDialog(user)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <AlertDialog>
-                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(user)} aria-label={`Hapus ${user.name}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                            {selectedUser && selectedUser.id === user.id && (
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  onSelect={(e) => {
+                                    e.preventDefault(); 
+                                    openDeleteDialog(user);
+                                  }}
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Hapus
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              {selectedUser && selectedUser.id === user.id && (
                                 <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
+                                  <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
+                                  <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
-                            )}
+                              )}
                             </AlertDialog>
-                        </div>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -934,3 +966,4 @@ export default function UserAdministrationPage() {
     
 
     
+
