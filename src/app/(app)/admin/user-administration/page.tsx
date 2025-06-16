@@ -211,7 +211,7 @@ export default function UserAdministrationPage() {
         createdAt: docSnap.data().createdAt,
       }));
       setUsers(fetchedUsers);
-      setCurrentPage(1); // Reset to first page after fetching
+      setCurrentPage(1); 
     } catch (error) {
       console.error("Error fetching users: ", error);
       toast({ title: "Gagal Memuat Pengguna", variant: "destructive" });
@@ -632,23 +632,23 @@ export default function UserAdministrationPage() {
           ) : users.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nama</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Peran</TableHead>
-                    <TableHead>Kelas Ditugaskan/Dimiliki</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className="w-1/4">Nama</TableHead>
+                    <TableHead className="w-1/4">Email</TableHead>
+                    <TableHead className="w-1/6">Peran</TableHead>
+                    <TableHead className="w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>
+                    <TableHead className="text-right w-[120px]">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="font-medium truncate max-w-xs" title={user.name}>{user.name}</TableCell>
+                      <TableCell className="truncate max-w-sm" title={user.email}>{user.email}</TableCell>
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
-                      <TableCell>
+                      <TableCell className="truncate max-w-sm" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
                         {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
                          user.role === 'siswa' ? (user.className || user.classId || '-') :
                          "-"}
