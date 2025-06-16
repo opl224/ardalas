@@ -68,7 +68,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import { format, startOfDay } from "date-fns";
+import { format, startOfDay, getMonth, getYear } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 
 interface ClassMin {
@@ -91,7 +91,7 @@ interface Student {
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
 
-const studentFormSchema = z.object({
+const baseStudentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
@@ -100,9 +100,11 @@ const studentFormSchema = z.object({
   gender: z.enum(GENDERS).optional(),
   address: z.string().optional(),
 });
+
+const studentFormSchema = baseStudentFormSchema; // No specific refine needed for dateOfBirth as a single field
 type StudentFormValues = z.infer<typeof studentFormSchema>;
 
-const editStudentFormSchema = studentFormSchema.extend({
+const editStudentFormSchema = baseStudentFormSchema.extend({
   id: z.string(),
 });
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
@@ -354,19 +356,10 @@ export default function StudentsPage() {
         className: selectedClassObj.name, 
         role: 'siswa', 
         createdAt: serverTimestamp(),
+        dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
+        gender: data.gender || null,
+        address: data.address || null,
       };
-
-      if (authRole === 'admin') {
-        if (data.dateOfBirth) {
-          studentDataForUsersCollection.dateOfBirth = Timestamp.fromDate(startOfDay(data.dateOfBirth));
-        }
-        if (data.gender) {
-          studentDataForUsersCollection.gender = data.gender;
-        }
-        if (data.address) {
-          studentDataForUsersCollection.address = data.address;
-        }
-      }
 
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
@@ -407,13 +400,10 @@ export default function StudentsPage() {
         email: data.email || null,
         classId: data.classId,
         className: selectedClass.name, 
+        dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
+        gender: data.gender || null,
+        address: data.address || null,
       };
-
-      if (authRole === 'admin') {
-        updateData.dateOfBirth = data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null;
-        updateData.gender = data.gender || null;
-        updateData.address = data.address || null;
-      }
       
       await updateDoc(studentDocRef, updateData);
       
@@ -812,5 +802,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-
-
