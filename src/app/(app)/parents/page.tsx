@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon, MoreVertical, Eye } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
+import Image from "next/image"; // Added Image import
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -110,17 +111,21 @@ interface Parent {
   email?: string;
   phone?: string;
   address?: string;
+  gender?: "laki-laki" | "perempuan";
   studentId: string;
   studentName: string;
   uid?: string;
   createdAt?: Timestamp;
 }
 
+const GENDERS = ["laki-laki", "perempuan"] as const;
+
 const parentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   address: z.string().trim().optional(),
+  gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
   studentId: z.string({ required_error: "Pilih murid terkait (UID)." }),
   authUserId: z.string().optional(),
 });
@@ -161,6 +166,7 @@ export default function ParentsPage() {
       email: "",
       phone: "",
       address: "",
+      gender: undefined,
       studentId: undefined,
       authUserId: undefined,
     },
@@ -224,6 +230,7 @@ export default function ParentsPage() {
         email: docSnap.data().email,
         phone: docSnap.data().phone,
         address: docSnap.data().address,
+        gender: docSnap.data().gender,
         studentId: docSnap.data().studentId,
         studentName: docSnap.data().studentName,
         uid: docSnap.data().uid,
@@ -255,6 +262,7 @@ export default function ParentsPage() {
         email: selectedParent.email || "",
         phone: selectedParent.phone || "",
         address: selectedParent.address || "",
+        gender: selectedParent.gender,
         studentId: selectedParent.studentId,
         authUserId: selectedParent.uid || undefined,
       });
@@ -276,6 +284,7 @@ export default function ParentsPage() {
         email: data.email || null,
         phone: data.phone || null,
         address: data.address || null,
+        gender: data.gender,
         studentId: data.studentId,
         studentName: selectedStudent.name,
         uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
@@ -284,7 +293,7 @@ export default function ParentsPage() {
 
       toast({ title: "Data Orang Tua Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
-      addParentForm.reset({ name: "", email: "", phone: "", address: "", studentId: undefined, authUserId: undefined });
+      addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, studentId: undefined, authUserId: undefined });
       fetchPageData();
     } catch (error: any) {
       console.error("Error adding parent:", error);
@@ -311,6 +320,7 @@ export default function ParentsPage() {
         email: data.email || null,
         phone: data.phone || null,
         address: data.address || null,
+        gender: data.gender,
         studentId: data.studentId,
         studentName: selectedStudent.name,
         uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
@@ -471,6 +481,30 @@ export default function ParentsPage() {
         )}
       </div>
       <div>
+        <Label htmlFor={`${formType}-parent-gender`}>Jenis Kelamin</Label>
+        <Controller
+            name="gender"
+            control={formInstance.control}
+            render={({ field }) => (
+                <Select
+                    onValueChange={(value) => field.onChange(value as "laki-laki" | "perempuan")}
+                    value={field.value || undefined}
+                >
+                <SelectTrigger id={`${formType}-parent-gender`} className="mt-1">
+                    <SelectValue placeholder="Pilih jenis kelamin" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="laki-laki">Laki-laki</SelectItem>
+                    <SelectItem value="perempuan">Perempuan</SelectItem>
+                </SelectContent>
+                </Select>
+            )}
+        />
+        {formInstance.formState.errors.gender && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.gender.message}</p>
+        )}
+      </div>
+      <div>
         <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid)</Label>
         <Controller
           name="studentId"
@@ -562,7 +596,7 @@ export default function ParentsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) {
-                addParentForm.reset({ name: "", email: "", phone: "", address: "", studentId: undefined, authUserId: undefined });
+                addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, studentId: undefined, authUserId: undefined });
                 addParentForm.clearErrors();
               }
             }}>
@@ -638,6 +672,7 @@ export default function ParentsPage() {
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama Orang Tua</TableHead>
+                    <TableHead>Gender</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Nama Anak</TableHead>
                     <TableHead>UID Akun Tertaut</TableHead>
@@ -649,6 +684,15 @@ export default function ParentsPage() {
                     <TableRow key={parent.id}>
                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={parent.name}>{parent.name}</TableCell>
+                       <TableCell>
+                        {parent.gender === "laki-laki" ? (
+                          <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
+                        ) : parent.gender === "perempuan" ? (
+                          <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                       <TableCell className="truncate" title={parent.email}>{parent.email || "-"}</TableCell>
                       <TableCell className="truncate" title={parent.studentName}>{parent.studentName || "-"}</TableCell>
                       <TableCell className="font-mono text-xs">
@@ -760,6 +804,7 @@ export default function ParentsPage() {
             {selectedParentForView && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedParentForView.name}</p></div>
+                    <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedParentForView.gender || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedParentForView.email || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{selectedParentForView.phone || "-"}</p></div>
                     <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedParentForView.address || "-"}</p></div>
@@ -825,3 +870,4 @@ export default function ParentsPage() {
     </div>
   );
 }
+
