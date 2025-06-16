@@ -596,9 +596,9 @@ export default function TeachersPage() {
                       <TableCell className="truncate" title={teacher.subject}>{teacher.subject}</TableCell>
                        <TableCell>
                         {teacher.gender === "laki-laki" ? 
-                          <Image src="https://placehold.co/24x24.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
+                          <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
                          teacher.gender === "perempuan" ? 
-                          <Image src="https://placehold.co/24x24.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
+                          <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
                          "-"}
                       </TableCell>
                       <TableCell className="font-mono text-xs">
