@@ -171,7 +171,7 @@ export default function ClassesPage() {
         setClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
       } else if (role === "guru" && user?.uid) {
         if (teachers.length === 0) { 
-          await fetchTeachersForDropdown();
+          await fetchTeachersForDropdown(); // Ensure teachers are fetched for admin too if needed for other contexts
         }
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
@@ -450,56 +450,67 @@ export default function ClassesPage() {
                       <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{classItem.name}</TableCell>
                       <TableCell>{classItem.teacherName || "-"}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${classItem.name}`}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openViewStudentsDialog(classItem)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Lihat Siswa
-                            </DropdownMenuItem>
-                            {role === "admin" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => openEditDialog(classItem)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem
-                                      onSelect={(e) => { e.preventDefault(); openDeleteDialog(classItem); }}
-                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Hapus
-                                    </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  {selectedClass && selectedClass.id === classItem.id && ( 
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setSelectedClass(null)}>Batal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteClass(selectedClass.id, selectedClass.name)}>
-                                          Ya, Hapus Kelas
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  )}
-                                </AlertDialog>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="text-right">
+                        {role === "guru" ? (
+                           <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openViewStudentsDialog(classItem)}
+                            aria-label={`Lihat Siswa di Kelas ${classItem.name}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${classItem.name}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openViewStudentsDialog(classItem)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Lihat Siswa
+                              </DropdownMenuItem>
+                              {role === "admin" && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => openEditDialog(classItem)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem
+                                        onSelect={(e) => { e.preventDefault(); openDeleteDialog(classItem); }}
+                                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Hapus
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    {selectedClass && selectedClass.id === classItem.id && ( 
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel onClick={() => setSelectedClass(null)}>Batal</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteClass(selectedClass.id, selectedClass.name)}>
+                                            Ya, Hapus Kelas
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    )}
+                                  </AlertDialog>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -644,4 +655,3 @@ export default function ClassesPage() {
   );
 }
     
-
