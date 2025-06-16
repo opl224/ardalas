@@ -77,6 +77,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
+import LottieLoader from "@/components/ui/LottieLoader";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+
 
 interface ClassMin {
   id: string;
@@ -126,6 +141,8 @@ const editStudentFormSchema = baseStudentFormSchema.extend({
 });
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 
+const ITEMS_PER_PAGE = 10;
+
 export default function StudentsPage() {
   const { user: authUser, role: authRole, loading: authLoading } = useAuth(); 
   const [students, setStudents] = useState<Student[]>([]);
@@ -142,6 +159,7 @@ export default function StudentsPage() {
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
 
@@ -185,7 +203,7 @@ export default function StudentsPage() {
         const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qClasses));
       } else {
-        promises.push(Promise.resolve(null)); // Placeholder for classes if not admin/guru
+        promises.push(Promise.resolve(null)); 
       }
 
       if (authRole === 'admin') {
@@ -193,7 +211,7 @@ export default function StudentsPage() {
         const qParents = query(parentsCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qParents));
       } else {
-        promises.push(Promise.resolve(null)); // Placeholder for parents if not admin
+        promises.push(Promise.resolve(null)); 
       }
       
       const [classesSnapshot, parentsSnapshot] = await Promise.all(promises);
@@ -348,6 +366,64 @@ export default function StudentsPage() {
     }
     return filtered;
   }, [students, searchTerm, selectedClassFilter]);
+
+  const totalPages = Math.ceil(displayedStudents.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return displayedStudents.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, displayedStudents]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedClassFilter]);
 
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
@@ -555,16 +631,33 @@ export default function StudentsPage() {
               name="dateOfBirth"
               control={formInstance.control}
               render={({ field }) => (
-                <CalendarDatePicker
-                  id={`${formType}-student-dateOfBirth-picker`}
-                  date={{ from: field.value, to: field.value }} 
-                  onDateSelect={({ from }) => field.onChange(from ? startOfDay(from) : undefined)}
-                  numberOfMonths={1}
-                  closeOnSelect={true}
-                  className="w-full justify-start text-left font-normal mt-1"
-                  variant="outline"
-                  yearsRange={100}
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal mt-1",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={field.value}
+                      onSelect={(date) => field.onChange(date ? startOfDay(date) : undefined)}
+                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                      initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={1990}
+                      toYear={new Date().getFullYear()}
+                      locale={indonesiaLocale}
+                    />
+                  </PopoverContent>
+                </Popover>
               )}
             />
             {formInstance.formState.errors.dateOfBirth && (
@@ -777,7 +870,7 @@ export default function StudentsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {displayedStudents.map((student) => (
+                  {currentTableData.map((student) => (
                     <TableRow key={student.id}>
                       <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
                       <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
@@ -845,6 +938,27 @@ export default function StudentsPage() {
                   ))}
                 </TableBody>
               </Table>
+              {totalPages > 1 && (
+                <Pagination className="mt-6">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                        aria-disabled={currentPage === 1}
+                        className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                      />
+                    </PaginationItem>
+                    {renderPageNumbers()}
+                    <PaginationItem>
+                      <PaginationNext 
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                        aria-disabled={currentPage === totalPages}
+                        className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
             </div>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
@@ -863,17 +977,19 @@ export default function StudentsPage() {
           setIsViewStudentDialogOpen(isOpen);
           if (!isOpen) { setSelectedStudentForView(null); }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl"> 
             <DialogHeader>
                 <DialogTitle>Detail Murid: {selectedStudentForView?.name}</DialogTitle>
                 <DialogDescription>Informasi lengkap mengenai murid.</DialogDescription>
             </DialogHeader>
             {selectedStudentForView && (
-                <div className="space-y-3 py-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{selectedStudentForView.nis || "-"}</p></div>
+
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedStudentForView.email || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedStudentForView.className || selectedStudentForView.classId}</p></div>
+                    
                     <div>
                         <Label className="text-muted-foreground">Tanggal Lahir:</Label>
                         <p className="font-medium">
@@ -881,21 +997,22 @@ export default function StudentsPage() {
                         </p>
                     </div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedStudentForView.gender || "-"}</p></div>
-                    <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedStudentForView.address || "-"}</p></div>
-                    {selectedStudentForView?.attendanceNumber != null && (
-                        <div><Label className="text-muted-foreground">Nomor Absen:</Label><p className="font-medium">{selectedStudentForView.attendanceNumber}</p></div>
-                    )}
-                    {selectedStudentForView?.parentName && (
-                        <div><Label className="text-muted-foreground">Orang Tua Terhubung:</Label><p className="font-medium">{selectedStudentForView.parentName}</p></div>
-                    )}
-                    {selectedStudentForView?.linkedParentId && !selectedStudentForView.parentName && (
-                        <div><Label className="text-muted-foreground">ID Orang Tua Terhubung:</Label><p className="font-medium">{selectedStudentForView.linkedParentId} (Nama tidak tersedia)</p></div>
-                    )}
-                    {!selectedStudentForView?.linkedParentId && (
-                        <div><Label className="text-muted-foreground">Orang Tua Terhubung:</Label><p className="font-medium">-</p></div>
-                    )}
+                    
+                    <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedStudentForView.address || "-"}</p></div>
+                    
+                    <div>
+                        <Label className="text-muted-foreground">Nomor Absen:</Label>
+                        <p className="font-medium">{selectedStudentForView.attendanceNumber != null ? selectedStudentForView.attendanceNumber : "-"}</p>
+                    </div>
+                    <div>
+                        <Label className="text-muted-foreground">Orang Tua Terhubung:</Label>
+                        <p className="font-medium">
+                            {selectedStudentForView.parentName || (selectedStudentForView.linkedParentId ? `${selectedStudentForView.linkedParentId} (Nama tidak tersedia)` : "-")}
+                        </p>
+                    </div>
+                    
                     {selectedStudentForView.createdAt && (
-                       <div>
+                       <div className="sm:col-span-2">
                           <Label className="text-muted-foreground">Tanggal Daftar Profil:</Label>
                           <p className="font-medium">{format(selectedStudentForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
                        </div>
