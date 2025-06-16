@@ -463,7 +463,7 @@ export default function UserAdministrationPage() {
                           {allClasses.map((cls) => (
                             <CommandItem
                               key={cls.id}
-                              value={cls.name} // Use name for search, actual value is id
+                              value={cls.name} 
                               onSelect={() => {
                                 const currentValue = field.value || [];
                                 const isSelected = currentValue.includes(cls.id);
@@ -762,11 +762,11 @@ export default function UserAdministrationPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className="w-1/4 max-w-xs">Nama</TableHead>
-                    <TableHead className="w-1/4 max-w-xs">Email</TableHead>
-                    <TableHead className="w-1/6">Peran</TableHead>
-                    <TableHead className="w-1/4 max-w-sm">Kelas Ditugaskan/Dimiliki</TableHead>
-                    <TableHead className="text-right w-[160px]">Aksi</TableHead>
+                    <TableHead className="w-1/4 max-w-[180px]">Nama</TableHead>
+                    <TableHead className="w-1/4 max-w-[190px]">Email</TableHead>
+                    <TableHead className="w-1/6 max-w-[100px]">Peran</TableHead>
+                    <TableHead className="w-1/4 max-w-[190px]">Kelas Ditugaskan/Dimiliki</TableHead>
+                    <TableHead className="text-right w-[170px]">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -781,18 +781,20 @@ export default function UserAdministrationPage() {
                          user.role === 'siswa' ? (user.className || user.classId || '-') :
                          "-"}
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => openViewDialog(user)} aria-label={`Lihat detail ${user.name}`}><Eye className="h-4 w-4" /></Button>
-                        <Button variant="outline" size="icon" onClick={() => openEditDialog(user)} aria-label={`Edit ${user.name}`}><Edit className="h-4 w-4" /></Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(user)} aria-label={`Hapus ${user.name}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                          {selectedUser && selectedUser.id === user.id && (
-                            <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
-                            </AlertDialogContent>
-                          )}
-                        </AlertDialog>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                            <Button variant="outline" size="icon" onClick={() => openViewDialog(user)} aria-label={`Lihat detail ${user.name}`}><Eye className="h-4 w-4" /></Button>
+                            <Button variant="outline" size="icon" onClick={() => openEditDialog(user)} aria-label={`Edit ${user.name}`}><Edit className="h-4 w-4" /></Button>
+                            <AlertDialog>
+                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(user)} aria-label={`Hapus ${user.name}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
+                            {selectedUser && selectedUser.id === user.id && (
+                                <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
+                                </AlertDialogContent>
+                            )}
+                            </AlertDialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
