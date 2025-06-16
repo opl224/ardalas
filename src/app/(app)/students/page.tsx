@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"; 
 import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye } from "lucide-react"; 
+import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -541,13 +542,13 @@ export default function StudentsPage() {
               render={({ field }) => (
                 <CalendarDatePicker
                   id={`${formType}-student-dateOfBirth-picker`}
-                  date={{ from: field.value, to: field.value }} // Pass date as DateRange
-                  onDateSelect={({ from }) => field.onChange(from ? startOfDay(from) : undefined)} // Handle single date selection
-                  numberOfMonths={1} // Use single month for single date picking
-                  closeOnSelect={true} // Close popover on date select
+                  date={{ from: field.value, to: field.value }} 
+                  onDateSelect={({ from }) => field.onChange(from ? startOfDay(from) : undefined)}
+                  numberOfMonths={1}
+                  closeOnSelect={true}
                   className="w-full justify-start text-left font-normal mt-1"
                   variant="outline"
-                  yearsRange={100} // Allow selection from 1990 up to current year
+                  yearsRange={100}
                 />
               )}
             />
@@ -709,6 +710,7 @@ export default function StudentsPage() {
                     <TableHead>NIS</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Kelas</TableHead>
+                    <TableHead>Gender</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -719,6 +721,15 @@ export default function StudentsPage() {
                       <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
                       <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
                       <TableCell className="truncate" title={student.className}>{student.className || student.classId}</TableCell>
+                      <TableCell>
+                        {student.gender === "laki-laki" ? (
+                          <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
+                        ) : student.gender === "perempuan" ? (
+                          <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
                       {(authRole === 'admin' || authRole === 'guru') && (
                         <TableCell className="text-right">
                           <DropdownMenu>
