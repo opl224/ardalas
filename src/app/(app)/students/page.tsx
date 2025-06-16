@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"; 
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye } from "lucide-react"; 
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon } from "lucide-react"; 
 import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
@@ -66,7 +66,6 @@ import {
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext"; 
-import { CalendarDatePicker } from "@/components/calendar-date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { format, startOfDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -90,7 +89,6 @@ import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
 
 
 interface ClassMin {
@@ -852,9 +850,7 @@ export default function StudentsPage() {
 
           {isLoadingCombined ? (
              <div className="space-y-2 mt-4">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
+                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
              </div>
           ) : displayedStudents.length > 0 ? (
             <div className="overflow-x-auto">
