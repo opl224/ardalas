@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import type { ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { Sheet } from "@/components/ui/sheet"; 
@@ -36,6 +36,8 @@ function AppLayoutInternal({ children }: { children: ReactNode }) {
 export default function AppLayout({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [lottieAuthLoadingLoaded, setLottieAuthLoadingLoaded] = useState(false);
+  const [lottieRedirectLoaded, setLottieRedirectLoaded] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -47,24 +49,35 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4 p-4">
+<<<<<<< HEAD
             <LottieLoader width={150} height={150} />
 <<<<<<< HEAD
 =======
             <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
 >>>>>>> 81780d2 (hapus silahkan unggu sebentar dan hilangkan loader skeleton pada lottie-)
+=======
+            <LottieLoader width={150} height={150} onAnimationLoaded={() => setLottieAuthLoadingLoaded(true)} />
+            {lottieAuthLoadingLoaded ? (
+              <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
+            ) : (
+              <div style={{ height: "2rem" }} aria-hidden="true" />
+            )}
+>>>>>>> 44bea24 (buat agar lottie animation keluar bersamaan dengan tulisan, soalnya lott)
         </div>
       </div>
     );
   }
 
   if (!user) {
-    // This state is usually very brief as the router.push above will trigger.
-    // Show a loader here as well for a smoother transition.
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4 p-4">
-          <LottieLoader width={150} height={150} />
-          <h1 className="text-xl font-semibold text-muted-foreground">Mengalihkan ke halaman login...</h1>
+          <LottieLoader width={150} height={150} onAnimationLoaded={() => setLottieRedirectLoaded(true)} />
+          {lottieRedirectLoaded ? (
+            <h1 className="text-xl font-semibold text-muted-foreground">Mengalihkan ke halaman login...</h1>
+          ) : (
+            <div style={{ height: "1.75rem" }} aria-hidden="true" /> // Placeholder for h1 (text-xl)
+          )}
         </div>
       </div>
     );

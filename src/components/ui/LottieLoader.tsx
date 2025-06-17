@@ -9,12 +9,14 @@ interface LottieLoaderProps {
   className?: string;
   width?: number | string; 
   height?: number | string; 
+  onAnimationLoaded?: () => void; // Callback when animation data is loaded
 }
 
 const LottieLoader: React.FC<LottieLoaderProps> = ({
   className,
   width = 32, 
   height = 32, 
+  onAnimationLoaded,
 }) => {
   const [animationData, setAnimationData] = useState<object | null>(null);
   const [errorLottie, setErrorLottie] = useState<string | null>(null);
@@ -22,27 +24,39 @@ const LottieLoader: React.FC<LottieLoaderProps> = ({
   useEffect(() => {
     const loadAnimation = async () => {
       try {
-        // Ensure the path is correct and the file is in the public folder
         const response = await fetch("/lottie-animations/loader-animation.json");
         if (!response.ok) {
           throw new Error(`Failed to fetch Lottie: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
         setAnimationData(data);
+        onAnimationLoaded?.(); // Call the callback
       } catch (err: any) {
         console.error("Error loading Lottie animation:", err);
         setErrorLottie(err.message || "Could not load animation");
+        onAnimationLoaded?.(); // Call callback even on error to unlock text
       }
     };
 
     loadAnimation();
-  }, []);
+  }, [onAnimationLoaded]);
 
-  if (errorLottie || !animationData) {
-    // If animation fails to load, display a fallback or nothing.
-    // For now, returning a simple div to maintain layout if size is important.
-    // Or, you could return null if you prefer it to be invisible on error.
-    return <div className={cn("flex items-center justify-center text-destructive text-xs", className)} style={{ width, height }} aria-label="Animation failed to load"></div>;
+  if (errorLottie) {
+    return (
+      <div 
+        className={cn("flex items-center justify-center text-destructive text-xs p-1 text-center", className)} 
+        style={{ width, height }} 
+        role="img" 
+        aria-label="Animasi gagal dimuat"
+      >
+        ⚠️
+      </div>
+    );
+  }
+
+  if (!animationData) {
+    // Render a placeholder with the same dimensions to prevent layout shift
+    return <div style={{ width, height }} className={cn(className)} aria-busy="true" aria-label="Memuat animasi..." />;
   }
 
   return (
