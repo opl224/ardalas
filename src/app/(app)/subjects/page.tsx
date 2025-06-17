@@ -512,14 +512,14 @@ export default function SubjectsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Nama Subjek</TableHead>
-                    <TableHead>Deskripsi</TableHead>
-                    {(role === "admin" || role === "guru") && <TableHead>Guru Penanggung Jawab</TableHead>}
-                    {role === "admin" && <TableHead className="text-right">Aksi</TableHead>}
+                    <TableHead className="min-w-[200px]">Nama Subjek</TableHead>
+                    <TableHead className="min-w-[250px]">Deskripsi</TableHead>
+                    {(role === "admin" || role === "guru") && <TableHead className="min-w-[180px]">Guru Penanggung Jawab</TableHead>}
+                    {role === "admin" && <TableHead className="text-right min-w-[100px]">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -527,7 +527,7 @@ export default function SubjectsPage() {
                     <TableRow key={subject.id}>
                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium">{subject.name}</TableCell>
-                      <TableCell>{subject.description || "-"}</TableCell>
+                      <TableCell className="truncate max-w-sm" title={subject.description || "-"}>{subject.description || "-"}</TableCell>
                       {(role === "admin" || role === "guru") && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
                       {role === "admin" && (
                         <TableCell className="text-right">

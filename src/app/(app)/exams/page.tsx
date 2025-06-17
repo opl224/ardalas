@@ -418,7 +418,7 @@ export default function ExamsPage() {
                     </Popover>
                     {addExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.date.message}</p>}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                           <Label htmlFor="add-exam-startTime">Waktu Mulai</Label>
                           <Input id="add-exam-startTime" type="time" {...addExamForm.register("startTime")} className="mt-1" />
@@ -450,15 +450,15 @@ export default function ExamsPage() {
             </div>
           ) : exams.length > 0 ? (
             <div className="overflow-x-auto mt-4">
-              <Table>
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Judul Ujian</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    <TableHead>Kelas</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Waktu</TableHead>
-                    {canManageExams && <TableHead className="text-right">Aksi</TableHead>}
+                    <TableHead className="min-w-[180px]">Judul Ujian</TableHead>
+                    <TableHead className="min-w-[150px]">Mata Pelajaran</TableHead>
+                    <TableHead className="min-w-[100px]">Kelas</TableHead>
+                    <TableHead className="min-w-[120px]">Tanggal</TableHead>
+                    <TableHead className="min-w-[120px]">Waktu</TableHead>
+                    {canManageExams && <TableHead className="text-right min-w-[100px]">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -571,7 +571,7 @@ export default function ExamsPage() {
                     </Popover>
                     {editExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.date.message}</p>}
                   </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="edit-exam-startTime">Waktu Mulai</Label>
                         <Input id="edit-exam-startTime" type="time" {...editExamForm.register("startTime")} className="mt-1" />

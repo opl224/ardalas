@@ -69,7 +69,7 @@ interface TeacherStudentAttendanceRecord {
 
 const teacherAttendanceFormSchema = z.object({ 
   classId: z.string({ required_error: "Pilih kelas." }),
-  subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
+  subjectId: z.string({ required_error: "Pilih mata pelajaran." }), 
   date: z.date({ required_error: "Tanggal harus diisi." }),
   studentAttendances: z.array(z.object({
     studentId: z.string(),
@@ -884,7 +884,7 @@ function TeacherAdminAttendanceManagement() {
                   <h3 className="text-lg font-medium">Daftar Siswa ({fields.length} siswa)</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="border-b"><tr><th className="p-2 text-left">Nama Siswa</th><th className="p-2 text-left w-36">Status</th><th className="p-2 text-left">Catatan (Opsional)</th></tr></thead>
+                        <thead className="border-b"><tr><th className="p-2 text-left min-w-[150px]">Nama Siswa</th><th className="p-2 text-left w-36 min-w-[144px]">Status</th><th className="p-2 text-left min-w-[200px]">Catatan (Opsional)</th></tr></thead>
                         <tbody>
                         {fields.map((item, index) => (
                             <tr key={item.id} className="border-b">
@@ -902,7 +902,7 @@ function TeacherAdminAttendanceManagement() {
                                 {form.formState.errors.studentAttendances?.[index]?.status && (<p className="text-sm text-destructive mt-1">{form.formState.errors.studentAttendances?.[index]?.status?.message}</p>)}
                             </td>
                             <td className="p-2">
-                                <Input {...form.register(`studentAttendances.${index}.notes`)} placeholder="Catatan..." className="mt-0" disabled={isSubmitting}/>
+                                <Input {...form.register(`studentAttendances.${index}.notes`)} placeholder="Catatan..." className="mt-0 w-full" disabled={isSubmitting}/>
                             </td>
                             </tr>
                         ))}
@@ -959,8 +959,8 @@ function TeacherAdminAttendanceManagement() {
             </div>
           </div>
         </CardContent>
-        <CardFooter className="flex justify-end">
-          <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting}>{isExporting && <LottieLoader width={16} height={16} className="mr-2" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
+        <CardFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
+          <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting} className="w-full sm:w-auto">{isExporting && <LottieLoader width={16} height={16} className="mr-2" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
@@ -1196,7 +1196,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
             </Button>
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isExporting || todayLessons.length === 0}>
+                    <Button variant="outline" size="sm" disabled={isExporting || todayLessons.length === 0} className="w-full sm:w-auto">
                         {isExporting && <LottieLoader width={16} height={16} className="mr-2" />}
                         <FileDown className="mr-2 h-4 w-4" /> Ekspor
                     </Button>

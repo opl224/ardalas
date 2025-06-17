@@ -297,7 +297,7 @@ export default function EventsPage() {
         />
         {(formInstance.formState.errors as any).date && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).date.message}</p>}
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label htmlFor={`${dialogType}-event-startTime`}>Waktu Mulai (Opsional)</Label>
           <Input id={`${dialogType}-event-startTime`} type="time" {...formInstance.register("startTime")} className="mt-1" />
@@ -328,7 +328,7 @@ export default function EventsPage() {
       </div>
       <div>
         <Label>Target Audiens (Opsional)</Label>
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
           {ROLES.map((roleKey) => (
             <FormField
               key={roleKey}
@@ -410,15 +410,15 @@ export default function EventsPage() {
             <div className="space-y-2 mt-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
           ) : events.length > 0 ? (
             <div className="overflow-x-auto mt-4">
-              <Table>
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Judul</TableHead>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Waktu</TableHead>
-                    <TableHead>Kategori</TableHead>
-                    <TableHead>Target</TableHead>
-                    {canManageEvents && <TableHead className="text-right">Aksi</TableHead>}
+                    <TableHead className="min-w-[200px]">Judul</TableHead>
+                    <TableHead className="min-w-[120px]">Tanggal</TableHead>
+                    <TableHead className="min-w-[120px]">Waktu</TableHead>
+                    <TableHead className="min-w-[150px]">Kategori</TableHead>
+                    <TableHead className="min-w-[150px]">Target</TableHead>
+                    {canManageEvents && <TableHead className="text-right min-w-[100px]">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -484,5 +484,6 @@ export default function EventsPage() {
     </div>
   );
 }
+
 
 

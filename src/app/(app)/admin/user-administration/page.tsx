@@ -765,14 +765,14 @@ export default function UserAdministrationPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className="table-fixed w-full">
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className="w-1/4 max-w-[180px]">Nama</TableHead>
-                    <TableHead className="w-1/4 max-w-[190px]">Email</TableHead>
-                    <TableHead className="w-1/6 max-w-[100px]">Peran</TableHead>
-                    <TableHead className="w-1/4 max-w-[190px]">Kelas Ditugaskan/Dimiliki</TableHead>
+                    <TableHead className="min-w-[150px] w-1/4">Nama</TableHead>
+                    <TableHead className="min-w-[180px] w-1/4">Email</TableHead>
+                    <TableHead className="min-w-[100px] w-1/6">Peran</TableHead>
+                    <TableHead className="min-w-[180px] w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>
                     <TableHead className="text-center w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -875,7 +875,7 @@ export default function UserAdministrationPage() {
                 <DialogDescription>Informasi lengkap mengenai pengguna.</DialogDescription>
             </DialogHeader>
             {selectedUser && (
-                <div className="space-y-3 py-4">
+                <div className="space-y-3 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedUser.name}</p></div>
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedUser.email}</p></div>
                     <div><Label className="text-muted-foreground">UID:</Label><p className="font-mono text-xs">{selectedUser.uid}</p></div>
@@ -966,5 +966,6 @@ export default function UserAdministrationPage() {
     
 
     
+
 
 

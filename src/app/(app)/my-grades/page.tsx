@@ -243,7 +243,7 @@ export default function MyGradesPage() {
         <CardContent>
           {grades.length > 0 ? (
             <div className="overflow-x-auto mt-4">
-              <Table>
+              <Table className="w-full">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Judul</TableHead>
@@ -255,7 +255,7 @@ export default function MyGradesPage() {
                 <TableBody>
                   {grades.map((grade) => (
                     <TableRow key={grade.assignmentId}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium min-w-[200px]">
                         {grade.assignmentTitle}
                         {grade.subjectName && <p className="text-xs text-muted-foreground">{grade.subjectName}</p>}
                          {grade.dateOfAssessment && (
@@ -264,7 +264,7 @@ export default function MyGradesPage() {
                             </p>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="min-w-[120px]">
                         {grade.submissionLink ? (
                           <Button variant="link" asChild className="p-0 h-auto text-sm">
                             <Link href={grade.submissionLink} target="_blank" rel="noopener noreferrer">
@@ -275,10 +275,10 @@ export default function MyGradesPage() {
                           <span className="text-xs text-muted-foreground italic">Belum dikumpulkan</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-[250px] whitespace-pre-line">
+                      <TableCell className="max-w-[250px] whitespace-pre-line min-w-[200px]">
                         {grade.teacherFeedback || "-"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="min-w-[80px]">
                         {grade.score !== undefined ? (
                           grade.score
                         ) : (

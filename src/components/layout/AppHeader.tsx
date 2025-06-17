@@ -305,7 +305,7 @@ export function AppHeader() {
           </SheetTrigger>
         )}
         <div className="flex items-center">
-          <h1 className="text-xl font-semibold font-headline">{pageTitle}</h1>
+          <h1 className="text-xl font-semibold font-headline truncate">{pageTitle}</h1>
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
