@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine, MoreVertical, Search, Filter as FilterIcon } from "lucide-react";
+import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine, MoreVertical, Search, Filter as FilterIcon, BookOpen } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -124,6 +124,7 @@ interface AssignmentData {
 
   submissionStatus?: "Belum Dikerjakan" | "Sudah Dikerjakan" | "Terlambat";
   studentSubmissionLink?: string;
+  studentSubmissionNotes?: string;
   submissionTimestamp?: Timestamp;
   result?: AssignmentResultInfo;
 
@@ -228,6 +229,10 @@ export default function AssignmentsPage() {
 
   const [isViewResultDialogOpen, setIsViewResultDialogOpen] = useState(false);
   const [selectedAssignmentForViewingResult, setSelectedAssignmentForViewingResult] = useState<AssignmentData | null>(null);
+  
+  const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
+  const [selectedAssignmentForDetail, setSelectedAssignmentForDetail] = useState<AssignmentData | null>(null);
+
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
@@ -489,6 +494,7 @@ export default function AssignmentsPage() {
             ...assignment,
             submissionStatus,
             studentSubmissionLink: submission?.submissionLink,
+            studentSubmissionNotes: submission?.notes,
             submissionTimestamp: submission?.submittedAt,
             result: resultForAssignment,
           };
@@ -830,6 +836,12 @@ export default function AssignmentsPage() {
     setSelectedAssignmentForViewingResult(assignment);
     setIsViewResultDialogOpen(true);
   };
+  
+  const openViewDetailDialog = (assignment: AssignmentData) => {
+    setSelectedAssignmentForDetail(assignment);
+    setIsViewDetailDialogOpen(true);
+  };
+
 
   useEffect(() => {
     setCurrentPage(1);
@@ -940,7 +952,7 @@ export default function AssignmentsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <ClipboardCheck className="h-6 w-6 text-primary" />
-             <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+             <div className={cn("flex items-baseline gap-x-1.5", isMobile && "flex-col items-start")}>
                <span className={cn(isMobile && "block")}>Daftar Tugas</span>
               {!isLoading && (
                 <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs block" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
@@ -1056,8 +1068,8 @@ export default function AssignmentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-         <div className="my-4 flex flex-col sm:flex-row items-center gap-4">
-            <div className="relative flex-grow w-full sm:w-auto">
+         <div className="my-4 flex flex-col sm:flex-row items-stretch gap-2">
+            <div className="relative flex-grow">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                 placeholder="Cari tugas..."
@@ -1067,13 +1079,13 @@ export default function AssignmentsPage() {
                 />
             </div>
             {isTeacherRole && teacherUniqueClassCount === 1 ? (
-                 <div className="flex w-full sm:w-auto gap-4">
+                 <div className="flex w-full sm:w-auto gap-2">
                      <Select
                         value={selectedSubjectFilter}
                         onValueChange={setSelectedSubjectFilter}
                         disabled={isLoading || teacherTaughtSubjectsForFilter.length === 0}
                     >
-                        <SelectTrigger className="flex-1">
+                        <SelectTrigger className="flex-1 sm:min-w-[180px]">
                         <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                         <SelectValue placeholder="Filter Mata Pelajaran" />
                         </SelectTrigger>
@@ -1087,7 +1099,7 @@ export default function AssignmentsPage() {
                         <Input
                             id="meetingNumberFilter"
                             type="number"
-                            placeholder="Filter Pertemuan Ke-"
+                            placeholder="Filter P ke-"
                             value={meetingNumberFilter}
                             onChange={(e) => setMeetingNumberFilter(e.target.value)}
                             className="w-full"
@@ -1095,14 +1107,14 @@ export default function AssignmentsPage() {
                     </div>
                 </div>
             ) : (isTeacherOrAdminRole && (teacherUniqueClassCount === null || teacherUniqueClassCount > 1 || isAdminRole)) ? (
-                 <div className="flex w-full sm:w-auto gap-4">
+                 <div className="flex w-full sm:w-auto gap-2">
                 <Select
                     value={selectedClassFilter}
                     onValueChange={setSelectedClassFilter}
                     disabled={isLoading || (isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0}
                      className="flex-1"
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className="sm:min-w-[150px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Kelas" />
                     </SelectTrigger>
@@ -1117,7 +1129,7 @@ export default function AssignmentsPage() {
                     disabled={isLoading || (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0}
                     className="flex-1"
                 >
-                    <SelectTrigger>
+                    <SelectTrigger className="sm:min-w-[180px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Mata Pelajaran" />
                     </SelectTrigger>
@@ -1140,20 +1152,20 @@ export default function AssignmentsPage() {
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
                     {!isMobile && <TableHead className="min-w-[180px]">Judul Tugas</TableHead>}
-                    <TableHead className={cn("truncate", isMobile ? "w-auto px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
+                    <TableHead className={cn("truncate", isMobile ? "w-1/3 px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
                     {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
                     {!isMobile && (isAdminRole ) && <TableHead>Guru</TableHead>}
                     
-                    <TableHead className={cn(isMobile ? "w-auto px-2 text-center" : "")}>Pertemuan</TableHead>
-                    <TableHead className={cn(isMobile ? "w-auto px-2" : "")}>Batas Waktu</TableHead>
+                    {!isMobile && <TableHead className={cn("text-center")}>Pertemuan</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-1/3 px-2" : "")}>Batas Waktu</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>Status</TableHead>}
                     {!isMobile && isTeacherOrAdminRole && <TableHead>Pengumpulan</TableHead>}
                     
-                    <TableHead className={cn("text-right", isMobile ? "w-16 px-1" : "w-16")}>Aksi</TableHead>
+                    <TableHead className={cn("text-right", isMobile ? "w-1/3 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1167,9 +1179,10 @@ export default function AssignmentsPage() {
                       {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableCell className="truncate" title={assignment.className || assignment.classId}>{assignment.className || assignment.classId}</TableCell>}
                       {!isMobile && (isAdminRole) && <TableCell className="truncate" title={assignment.teacherName || assignment.teacherId}>{assignment.teacherName || assignment.teacherId}</TableCell>}
 
-                      <TableCell className={cn("truncate", isMobile ? "px-2 text-center" : "")} title={assignment.meetingNumber ? assignment.meetingNumber.toString() : "-"}>{assignment.meetingNumber || "-"}</TableCell>
+                      {!isMobile && <TableCell className={cn("truncate text-center")} title={assignment.meetingNumber ? assignment.meetingNumber.toString() : "-"}>{assignment.meetingNumber || "-"}</TableCell>}
                       <TableCell className={cn(isMobile ? "px-2 text-xs" : "", isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
-                        {format(assignment.dueDate.toDate(), isMobile ? "dd/MM/yy, HH:mm" : "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
+                        {format(assignment.dueDate.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
+                         {isMobile && <span className="block text-muted-foreground">{format(assignment.dueDate.toDate(), "HH:mm", { locale: indonesiaLocale })}</span>}
                       </TableCell>
 
                       {!isMobile && (isStudentRole || isParentRole) && (
@@ -1206,64 +1219,130 @@ export default function AssignmentsPage() {
                         </TableCell>
                       )}
 
-                      <TableCell className={cn("text-right space-x-2", isMobile ? "px-1" : "")}>
-                        {isTeacherOrAdminRole && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas ${assignment.title}`}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
-                                <Eye className="mr-2 h-4 w-4" /> Lihat Pengumpulan
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
-                                <Edit className="mr-2 h-4 w-4" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem
-                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }}
-                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Hapus
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                {selectedAssignment && selectedAssignment.id === assignment.id && (
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader>
-                                    <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter>
-                                  </AlertDialogContent>
-                                )}
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                      <TableCell className={cn("text-right space-x-1 sm:space-x-2", isMobile ? "px-1" : "")}>
+                        {isMobile ? (
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas`}>
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                     <DropdownMenuItem onClick={() => openViewDetailDialog(assignment)}>
+                                        <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                                    </DropdownMenuItem>
+                                    {isTeacherOrAdminRole && (
+                                        <>
+                                            <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
+                                                <Users className="mr-2 h-4 w-4" /> Lihat Pengumpulan
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
+                                                <Edit className="mr-2 h-4 w-4" /> Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                                    <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                                </DropdownMenuItem>
+                                                </AlertDialogTrigger>
+                                                {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                            </AlertDialog>
+                                        </>
+                                    )}
+                                    {isStudentRole && (
+                                        <>
+                                            {assignment.submissionStatus === "Sudah Dikerjakan" ? (
+                                                <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)}>
+                                                    <FilePenLine className="mr-2 h-4 w-4" /> Edit Pengumpulan
+                                                </DropdownMenuItem>
+                                            ) : (
+                                                <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
+                                                    <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
+                                                </DropdownMenuItem>
+                                            )}
+                                            {assignment.result && (
+                                                <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
+                                                    <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
+                                                </DropdownMenuItem>
+                                            )}
+                                        </>
+                                    )}
+                                     {isParentRole && assignment.result && (
+                                        <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
+                                            <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Anak
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        ) : (
+                            <> {/* Desktop actions */}
+                            {isTeacherOrAdminRole && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas ${assignment.title}`}>
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openViewDetailDialog(assignment)}>
+                                    <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
+                                    <Users className="mr-2 h-4 w-4" /> Lihat Pengumpulan
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
+                                    <Edit className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                    </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    {selectedAssignment && selectedAssignment.id === assignment.id && (
+                                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                                    )}
+                                </AlertDialog>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            )}
+                            {isStudentRole && (
+                            <div className="flex justify-end space-x-2">
+                                <Button variant="ghost" size="icon" onClick={() => openViewDetailDialog(assignment)} aria-label="Lihat Detail Tugas">
+                                    <Eye className="h-4 w-4" />
+                                </Button>
+                            {assignment.submissionStatus === "Sudah Dikerjakan" ? (
+                                <Button variant="outline" size="icon" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} aria-label="Lihat atau Edit Pengumpulan">
+                                <FilePenLine className="h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <Button size="icon" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"} aria-label="Kerjakan Tugas">
+                                <Send className="h-4 w-4" />
+                                </Button>
+                            )}
+                            {assignment.result && (
+                                <Button variant="secondary" size="icon" onClick={() => handleOpenViewResultDialog(assignment)} aria-label="Lihat Hasil">
+                                <BarChart3 className="h-4 w-4" />
+                                </Button>
+                            )}
+                            </div>
+                            )}
+                            {isParentRole && (
+                                <div className="flex justify-end space-x-2">
+                                    <Button variant="ghost" size="icon" onClick={() => openViewDetailDialog(assignment)} aria-label="Lihat Detail Tugas Anak">
+                                        <Eye className="h-4 w-4" />
+                                    </Button>
+                                    {assignment.result && (
+                                        <Button variant="secondary" size="icon" onClick={() => handleOpenViewResultDialog(assignment)} aria-label="Lihat Hasil Anak">
+                                            <BarChart3 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                            </>
                         )}
-                        {isStudentRole && (
-                          <div className="flex justify-end space-x-2">
-                           {assignment.submissionStatus === "Sudah Dikerjakan" ? (
-                             <Button variant="outline" size={isMobile ? "icon" : "sm"} onClick={() => handleOpenSubmitAssignmentDialog(assignment)} aria-label="Lihat atau Edit Pengumpulan">
-                               <FilePenLine className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Edit"}
-                             </Button>
-                           ) : (
-                             <Button size={isMobile ? "icon" : "sm"} onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
-                                <Send className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Kerjakan"}
-                             </Button>
-                           )}
-                           {assignment.result && (
-                             <Button variant="secondary" size={isMobile ? "icon" : "sm"} onClick={() => handleOpenViewResultDialog(assignment)}>
-                                <BarChart3 className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Hasil"}
-                             </Button>
-                           )}
-                          </div>
-                        )}
-                         {isParentRole && assignment.result && (
-                             <Button variant="secondary" size={isMobile ? "icon" : "sm"} onClick={() => handleOpenViewResultDialog(assignment)}>
-                                <BarChart3 className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Hasil Anak"}
-                             </Button>
-                           )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1512,11 +1591,71 @@ export default function AssignmentsPage() {
           </DialogContent>
         </Dialog>
       )}
+      
+      {selectedAssignmentForDetail && (
+        <Dialog open={isViewDetailDialogOpen} onOpenChange={(isOpen) => { setIsViewDetailDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForDetail(null); }}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                Detail Tugas: {selectedAssignmentForDetail.title}
+              </DialogTitle>
+              <DialogDescription>
+                Informasi lengkap mengenai tugas ini.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div><Label className="text-muted-foreground">Judul Tugas:</Label><p className="font-medium">{selectedAssignmentForDetail.title}</p></div>
+              <div><Label className="text-muted-foreground">Mata Pelajaran:</Label><p className="font-medium">{selectedAssignmentForDetail.subjectName || selectedAssignmentForDetail.subjectId}</p></div>
+              <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedAssignmentForDetail.className || selectedAssignmentForDetail.classId}</p></div>
+              <div><Label className="text-muted-foreground">Guru Pemberi Tugas:</Label><p className="font-medium">{selectedAssignmentForDetail.teacherName || selectedAssignmentForDetail.teacherId}</p></div>
+              {selectedAssignmentForDetail.meetingNumber && <div><Label className="text-muted-foreground">Pertemuan Ke-:</Label><p className="font-medium">{selectedAssignmentForDetail.meetingNumber}</p></div>}
+              <div><Label className="text-muted-foreground">Batas Waktu:</Label><p className="font-medium">{format(selectedAssignmentForDetail.dueDate.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p></div>
+              {selectedAssignmentForDetail.description && <div><Label className="text-muted-foreground">Deskripsi:</Label><p className="whitespace-pre-line">{selectedAssignmentForDetail.description}</p></div>}
+              {selectedAssignmentForDetail.fileURL && (
+                <div>
+                  <Label className="text-muted-foreground">File Tugas:</Label>
+                  <Button variant="link" asChild className="p-0 h-auto block">
+                    <NextLink href={selectedAssignmentForDetail.fileURL} target="_blank" rel="noopener noreferrer">
+                      <DownloadCloud className="inline-block mr-1 h-4 w-4" /> Unduh File
+                    </NextLink>
+                  </Button>
+                </div>
+              )}
+               {(isStudentRole || isParentRole) && (
+                <>
+                  {selectedAssignmentForDetail.submissionStatus && <div><Label className="text-muted-foreground">Status Pengumpulan:</Label><p className={cn(selectedAssignmentForDetail.submissionStatus === "Sudah Dikerjakan" && "text-green-600", selectedAssignmentForDetail.submissionStatus === "Terlambat" && "text-destructive", "font-medium")}>{selectedAssignmentForDetail.submissionStatus}</p></div>}
+                  {selectedAssignmentForDetail.studentSubmissionLink && <div><Label className="text-muted-foreground">Link Pengumpulan Anda:</Label><Button variant="link" asChild className="p-0 h-auto block"><NextLink href={selectedAssignmentForDetail.studentSubmissionLink} target="_blank" rel="noopener noreferrer"><LinkIcon className="inline-block mr-1 h-4 w-4"/> Lihat File Anda</NextLink></Button></div>}
+                  {selectedAssignmentForDetail.studentSubmissionNotes && <div><Label className="text-muted-foreground">Catatan Pengumpulan Anda:</Label><p className="whitespace-pre-line">{selectedAssignmentForDetail.studentSubmissionNotes}</p></div>}
+                  {selectedAssignmentForDetail.result && (
+                    <div className="mt-3 pt-3 border-t">
+                      <Label className="text-base font-semibold text-primary">Hasil Penilaian:</Label>
+                      <div className="mt-1 space-y-1">
+                        <p><span className="text-muted-foreground">Nilai:</span> <span className="font-bold text-lg">{selectedAssignmentForDetail.result.score ?? "Belum dinilai"}</span></p>
+                        {selectedAssignmentForDetail.result.feedback && <p><span className="text-muted-foreground">Feedback Guru:</span> {selectedAssignmentForDetail.result.feedback}</p>}
+                        {selectedAssignmentForDetail.result.dateOfAssessment && <p className="text-xs text-muted-foreground">Dinilai pada: {format(selectedAssignmentForDetail.result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</p>}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+              {(isTeacherOrAdminRole) && (
+                <div><Label className="text-muted-foreground">Total Pengumpulan:</Label><p className="font-medium">{selectedAssignmentForDetail.submissionCount ?? 0} / {selectedAssignmentForDetail.totalStudentsInClass ?? 0} siswa</p></div>
+              )}
+
+            </div>
+            <DialogFooter>
+              <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
 
     
+
 
 
 
