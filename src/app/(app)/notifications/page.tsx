@@ -213,7 +213,7 @@ export default function AllNotificationsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm text-foreground pt-0 pb-4 px-4">
-                    <p className="line-clamp-2 truncate">{notification.description}</p>
+                    <p className="truncate">{notification.description}</p>
                   </CardContent>
                 </Card>
               ))}
