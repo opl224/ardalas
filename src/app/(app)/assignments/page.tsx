@@ -666,14 +666,14 @@ export default function AssignmentsPage() {
     }
   };
   const handleEditAssignmentSubmit: SubmitHandler<EditAssignmentFormValues> = async (data) => {
-    if (!selectedAssignment) return;
+    if (!selectedAssignment || !user) return;
     editAssignmentForm.clearErrors();
 
     let denormalizedNames;
     let finalTeacherId = data.teacherId;
 
     if (isTeacherRole && teacherProfileId && user) {
-      finalTeacherId = teacherProfileId; // Should already be set if teacher is editing their own
+      finalTeacherId = teacherProfileId; 
       const subject = teacherTaughtSubjectsForFilter.find(s => s.id === data.subjectId);
       const aClass = teacherTaughtClassesForFilter.find(c => c.id === data.classId);
       denormalizedNames = {
@@ -706,6 +706,37 @@ export default function AssignmentsPage() {
 
       await updateDoc(assignmentDocRef, updateData);
       toast({ title: "Tugas Diperbarui" });
+      
+      // Create notifications for update
+      const batch = writeBatch(db);
+      let descriptionText = `Batas waktu: ${format(data.dueDate, "dd MMM yyyy, HH:mm", {locale: indonesiaLocale})}`;
+      if(data.meetingNumber) {
+        descriptionText += ` (Pertemuan ${data.meetingNumber})`;
+      }
+
+      const notificationBase = {
+        title: `Tugas Diperbarui: ${data.title.substring(0,25)}${data.title.length > 25 ? "..." : ""}`,
+        description: descriptionText,
+        href: `/assignments`, 
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "new_assignment", // Re-use same type, title indicates update
+      };
+
+      const usersRef = collection(db, "users");
+      const qStudents = query(usersRef, where("role", "==", "siswa"), where("classId", "==", data.classId));
+      const studentsSnapshot = await getDocs(qStudents);
+
+      studentsSnapshot.forEach((studentDoc) => {
+        const studentNotificationRef = doc(collection(db, "notifications"));
+        batch.set(studentNotificationRef, { ...notificationBase, userId: studentDoc.id });
+      });
+      
+      const editorNotificationRef = doc(collection(db, "notifications"));
+      batch.set(editorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda memperbarui tugas: ${data.title}` });
+
+      await batch.commit();
+
       setIsEditDialogOpen(false);
       setSelectedAssignment(null);
       fetchAssignments();
@@ -1272,9 +1303,10 @@ export default function AssignmentsPage() {
                               onSelect={(date) => {
                                   if (date) {
                                       const newDueDate = new Date(date);
-                                      newDueDate.setHours(23, 59, 0, 0);
+                                      newDueDate.setHours(23, 59, 0, 0); // Set time to 23:59 when date is selected
                                       editAssignmentForm.setValue("dueDate", newDueDate, { shouldValidate: true });
                                   } else {
+                                      // Handle case where date might be cleared, set to a sensible default like today 23:59
                                       const todayEndOfDay = new Date();
                                       todayEndOfDay.setHours(23, 59, 0, 0);
                                       editAssignmentForm.setValue("dueDate", todayEndOfDay, { shouldValidate: true });
@@ -1285,7 +1317,7 @@ export default function AssignmentsPage() {
                           <div className="p-2 border-t">
                               <Input
                                   type="time"
-                                  defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")}
+                                  defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} // Ensure default time is also formatted
                                   onChange={(e) => {
                                       const timeValue = e.target.value;
                                       if (timeValue) {
@@ -1294,9 +1326,9 @@ export default function AssignmentsPage() {
                                               const hours = parseInt(timeParts[0], 10);
                                               const minutes = parseInt(timeParts[1], 10);
                                                if (!isNaN(hours) && !isNaN(minutes)) {
-                                                  const currentFullDate = editAssignmentForm.watch("dueDate") || new Date();
+                                                  const currentFullDate = editAssignmentForm.watch("dueDate") || new Date(); // Use current date from form or new Date
                                                   const newDateWithUserTime = new Date(currentFullDate);
-                                                  newDateWithUserTime.setHours(hours, minutes, 0, 0);
+                                                  newDateWithUserTime.setHours(hours, minutes, 0, 0); // Set specific time, seconds and ms to 0
                                                   editAssignmentForm.setValue("dueDate", newDateWithUserTime, { shouldValidate: true });
                                               }
                                           }
@@ -1455,4 +1487,3 @@ export default function AssignmentsPage() {
 }
 
     
-
