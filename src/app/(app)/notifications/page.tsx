@@ -156,7 +156,7 @@ export default function AllNotificationsPage() {
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader>
           <CardTitle className="text-xl">Filter Notifikasi</CardTitle>
-          <div className="flex space-x-2 pt-2">
+          <div className="flex space-x-2 pt-2 flex-wrap">
             <Button variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")} size="sm">
               <Filter className="mr-2 h-4 w-4" /> Semua
             </Button>
@@ -183,12 +183,12 @@ export default function AllNotificationsPage() {
               {filteredNotifications.map((notification, index) => (
                 <Card 
                   key={notification.id} 
-                  className={cn("hover:shadow-md transition-shadow", !notification.read && "bg-primary/5 border-primary/30")}
+                  className={cn("hover:shadow-md transition-shadow w-full", !notification.read && "bg-primary/5 border-primary/30")}
                   onClick={() => handleMarkAsRead(notification.id, index)}
                 >
                   <CardHeader className="pb-3 pt-4 px-4">
                     <div className="flex justify-between items-start">
-                        <CardTitle className="text-base font-semibold leading-tight block truncate">
+                        <CardTitle className="text-base font-semibold leading-tight block truncate flex-1 min-w-0">
                             {notification.href ? (
                                 <Link href={notification.href} className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm block truncate">
                                     {notification.title}
