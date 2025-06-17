@@ -112,3 +112,8 @@ body {
     transition-duration: 150ms;
   }
 }
+
+/* Hide default password reveal icon in Edge */
+.hide-password-reveal-icon::-ms-reveal {
+  display: none;
+}

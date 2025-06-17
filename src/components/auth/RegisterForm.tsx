@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -151,7 +152,7 @@ export function RegisterForm() {
                   <FormLabel>Password</FormLabel>
                   <FormControl>
                      <div className="relative">
-                      <Input type={showPassword ? "text" : "password"} placeholder="******" {...field} />
+                      <Input type={showPassword ? "text" : "password"} placeholder="******" {...field} className="hide-password-reveal-icon" />
                       <Button
                         type="button"
                         variant="ghost"
@@ -176,7 +177,7 @@ export function RegisterForm() {
                   <FormLabel>Konfirmasi Password</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type={showConfirmPassword ? "text" : "password"} placeholder="******" {...field} />
+                      <Input type={showConfirmPassword ? "text" : "password"} placeholder="******" {...field} className="hide-password-reveal-icon" />
                        <Button
                         type="button"
                         variant="ghost"

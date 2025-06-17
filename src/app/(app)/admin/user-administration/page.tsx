@@ -657,7 +657,7 @@ export default function UserAdministrationPage() {
                 <div>
                   <Label htmlFor="password">Password</Label>
                   <div className="relative mt-1">
-                    <Input id="password" type={showPassword ? "text" : "password"} {...addUserForm.register("password")} />
+                    <Input id="password" type={showPassword ? "text" : "password"} {...addUserForm.register("password")} className="hide-password-reveal-icon" />
                     <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}>
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </Button>
@@ -966,4 +966,5 @@ export default function UserAdministrationPage() {
     
 
     
+
 

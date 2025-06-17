@@ -104,7 +104,7 @@ export function LoginForm() {
                   <FormLabel>Password</FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input type={showPassword ? "text" : "password"} placeholder="******" {...field} />
+                      <Input type={showPassword ? "text" : "password"} placeholder="******" {...field} className="hide-password-reveal-icon" />
                       <Button
                         type="button"
                         variant="ghost"
