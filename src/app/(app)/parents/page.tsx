@@ -86,6 +86,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface StudentForDialog {
@@ -158,6 +159,7 @@ export default function ParentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addParentForm = useForm<ParentFormValues>({
     resolver: zodResolver(parentFormSchema),
@@ -610,7 +612,19 @@ export default function ParentsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <UserCircle className="h-6 w-6 text-primary" />
-            <span>Daftar Orang Tua {isLoadingData ? '' : `(${displayedParents.length})`}</span>
+             <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+               <span className={cn(isMobile && "block")}>Daftar Orang Tua</span>
+              {!isLoadingData && (
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
+                  {`(${displayedParents.length} orang tua)`}
+                </span>
+              )}
+              {isLoadingData && (
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
+                  (Memuat...)
+                </span>
+              )}
+            </div>
           </CardTitle>
           {(authRole === 'admin' || authRole === 'guru') && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
@@ -622,7 +636,7 @@ export default function ParentsPage() {
             }}>
               <DialogTrigger asChild>
                 <Button size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Orang Tua
+                  <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -687,46 +701,50 @@ export default function ParentsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Nama Orang Tua</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Nama Anak</TableHead>
-                    <TableHead>UID Akun Tertaut</TableHead>
-                    {(authRole === 'admin' || authRole === 'guru') && <TableHead className="text-center w-16">Aksi</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                    <TableHead className={cn(isMobile ? "px-2" : "")}>Nama Orang Tua</TableHead>
+                    {!isMobile && <TableHead>Gender</TableHead>}
+                    {!isMobile && <TableHead>Email</TableHead>}
+                    <TableHead className={cn(isMobile ? "px-2" : "")}>Nama Anak</TableHead>
+                    {!isMobile && <TableHead>UID Akun Tertaut</TableHead>}
+                    {(authRole === 'admin' || authRole === 'guru') && <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-center w-16")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((parent, index) => (
                     <TableRow key={parent.id}>
-                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium truncate" title={parent.name}>{parent.name}</TableCell>
-                       <TableCell>
-                        {parent.gender === "laki-laki" ? (
-                          <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
-                        ) : parent.gender === "perempuan" ? (
-                          <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell className="truncate" title={parent.email}>{parent.email || "-"}</TableCell>
-                      <TableCell className="truncate" title={parent.studentName}>{parent.studentName || "-"}</TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {parent.uid ? (
-                          <div className="flex items-center gap-1">
-                            <UidLinkIcon className="h-3 w-3 text-muted-foreground" />
-                            <span className="truncate" title={parent.uid}>{parent.uid.substring(0,10)}...</span>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground italic">Belum tertaut</span>
-                        )}
-                      </TableCell>
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={parent.name}>{parent.name}</TableCell>
+                       {!isMobile && (
+                        <TableCell>
+                          {parent.gender === "laki-laki" ? (
+                            <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
+                          ) : parent.gender === "perempuan" ? (
+                            <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                       )}
+                      {!isMobile && <TableCell className="truncate" title={parent.email}>{parent.email || "-"}</TableCell>}
+                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={parent.studentName}>{parent.studentName || "-"}</TableCell>
+                      {!isMobile && (
+                        <TableCell className="font-mono text-xs">
+                          {parent.uid ? (
+                            <div className="flex items-center gap-1">
+                              <UidLinkIcon className="h-3 w-3 text-muted-foreground" />
+                              <span className="truncate" title={parent.uid}>{parent.uid.substring(0,10)}...</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground italic">Belum tertaut</span>
+                          )}
+                        </TableCell>
+                      )}
                       {(authRole === 'admin' || authRole === 'guru') && (
-                        <TableCell className="text-center">
+                        <TableCell className={cn(isMobile ? "text-right px-1" : "text-center")}>
                            <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${parent.name}`}>
