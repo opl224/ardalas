@@ -24,13 +24,8 @@ export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="flex flex-col items-center space-y-4">
-<<<<<<< HEAD
         <LottieLoader width={150} height={150} /> 
-<<<<<<< HEAD
-        <h1 className="text-2xl font-semibold">Berusaha masuk...</h1>
-=======
         <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
-        <p className="text-muted-foreground">Silakan tunggu sebentar.</p>
       </div>
     </div>
   );
