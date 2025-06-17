@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -720,14 +721,14 @@ export default function StudentsPage() {
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-6 w-6 text-primary" />
             <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
-              <span>Daftar Murid</span>
+               <span className={cn(isMobile && "block")}>Daftar Murid</span>
               {!isLoadingStudents && (
-                <span className="text-base font-normal text-muted-foreground sm:text-xl sm:font-semibold sm:text-foreground">
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
                   {`(${displayedStudents.length} siswa)`}
                 </span>
               )}
               {isLoadingStudents && (
-                <span className="text-base font-normal text-muted-foreground">
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
                   (Memuat...)
                 </span>
               )}
@@ -747,7 +748,7 @@ export default function StudentsPage() {
               }}
             >
               <DialogTrigger asChild>
-                <Button size="sm" disabled={(authRole === 'admin' || authRole === 'guru') && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
+                 <Button size="sm" disabled={(authRole === 'admin' || authRole === 'guru') && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
                   <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
                 </Button>
               </DialogTrigger>
