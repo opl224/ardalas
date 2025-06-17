@@ -88,6 +88,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface ClassMin {
@@ -175,6 +176,7 @@ export default function UserAdministrationPage() {
   const [isRoleFilterPopoverOpen, setIsRoleFilterPopoverOpen] = useState(false);
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addUserForm = useForm<AddUserFormValues>({
     resolver: zodResolver(addUserFormSchema),
@@ -461,7 +463,7 @@ export default function UserAdministrationPage() {
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                     <Command>
                       <CommandInput placeholder="Cari kelas..." />
                       <CommandList>
@@ -696,7 +698,7 @@ export default function UserAdministrationPage() {
           </Dialog>
         </CardHeader>
         <CardContent>
-          <div className="my-4 flex flex-col sm:flex-row gap-4">
+          <div className="my-4 flex flex-col sm:flex-row gap-2">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -709,14 +711,14 @@ export default function UserAdministrationPage() {
             <div className="flex items-center">
             <Popover open={isRoleFilterPopoverOpen} onOpenChange={setIsRoleFilterPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full sm:w-[200px] justify-start">
+                    <Button variant="outline" className="w-full sm:w-auto justify-start"> {/* sm:w-auto for better mobile stacking */}
                     <FilterIcon className="mr-2 h-4 w-4" />
                     {roleFilter.length > 0
                         ? roleFilter.map(r => roleDisplayNames[r]).join(', ')
                         : "Filter Peran"}
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0" align="start">
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"> {/* Use trigger width */}
                     <Command>
                     <CommandInput placeholder="Filter peran..." />
                     <CommandList>
@@ -769,10 +771,10 @@ export default function UserAdministrationPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className="min-w-[150px] w-1/4">Nama</TableHead>
-                    <TableHead className="min-w-[180px] w-1/4">Email</TableHead>
-                    <TableHead className="min-w-[100px] w-1/6">Peran</TableHead>
-                    <TableHead className="min-w-[180px] w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>
+                    <TableHead className={cn(isMobile ? "w-1/2" : "min-w-[150px] w-1/4")}>Nama</TableHead>
+                    {!isMobile && <TableHead className="min-w-[180px] w-1/4">Email</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-1/2" : "min-w-[100px] w-1/6")}>Peran</TableHead>
+                    {!isMobile && <TableHead className="min-w-[180px] w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>}
                     <TableHead className="text-center w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -781,13 +783,15 @@ export default function UserAdministrationPage() {
                     <TableRow key={user.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
-                      <TableCell className="truncate" title={user.email}>{user.email}</TableCell>
+                      {!isMobile && <TableCell className="truncate" title={user.email}>{user.email}</TableCell>}
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
-                      <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
-                        {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
-                         user.role === 'siswa' ? (user.className || user.classId || '-') :
-                         "-"}
-                      </TableCell>
+                      {!isMobile && (
+                        <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
+                          {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
+                           user.role === 'siswa' ? (user.className || user.classId || '-') :
+                           "-"}
+                        </TableCell>
+                      )}
                       <TableCell className="text-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -821,7 +825,7 @@ export default function UserAdministrationPage() {
                               {selectedUser && selectedUser.id === user.id && (
                                 <AlertDialogContent>
                                   <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
+                                  <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={()={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                               )}
                             </AlertDialog>
@@ -966,6 +970,7 @@ export default function UserAdministrationPage() {
     
 
     
+
 
 
 
