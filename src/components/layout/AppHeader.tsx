@@ -199,7 +199,7 @@ function NotificationBell() {
                     <p className="font-semibold text-sm line-clamp-1">{notification.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/80">
-                      {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || "Baru saja"}
+                      {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) || "Baru saja"}
                     </p>
                   </Link>
                 ) : (
@@ -207,7 +207,7 @@ function NotificationBell() {
                     <p className="font-semibold text-sm line-clamp-1">{notification.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/80">
-                      {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) || "Baru saja"}
+                      {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) || "Baru saja"}
                     </p>
                   </div>
                 )}

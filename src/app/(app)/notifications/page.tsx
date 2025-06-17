@@ -203,7 +203,7 @@ export default function AllNotificationsPage() {
                     </div>
                     <CardDescription className="text-xs text-muted-foreground pt-0.5">
                       {notification.createdAt && typeof notification.createdAt.toDate === 'function'
-                        ? format(notification.createdAt.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })
+                        ? notification.createdAt.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
                         : "Tanggal tidak valid"}
                       {notification.type && NOTIFICATION_TYPE_MAP[notification.type] && (
                         <span className="ml-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
