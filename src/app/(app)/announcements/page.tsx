@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Filter, Search, Megaphone, Edit, Trash2, AlertCircle } from "lucide-react";
+import { PlusCircle, Filter, Search, Megaphone, Edit, Trash2, AlertCircle, MoreVertical } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +32,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ROLES, Role, roleDisplayNames } from "@/config/roles";
 import Link from "next/link";
 import { useState, useEffect } from "react";
@@ -604,27 +611,43 @@ export default function AnnouncementsPage() {
                   </div>
                 </div>
                 {canManageAnnouncements && (user?.uid === announcement.createdById || role === 'admin') && (
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="icon" onClick={() => openEditDialog(announcement)} aria-label={`Edit ${announcement.title}`}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(announcement)} aria-label={`Hapus ${announcement.title}`}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      {selectedAnnouncement && selectedAnnouncement.id === announcement.id && (
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus pengumuman <span className="font-semibold">"{selectedAnnouncement?.title}"</span>.</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setSelectedAnnouncement(null)}>Batal</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteAnnouncement(selectedAnnouncement.id, selectedAnnouncement.title)}>Ya, Hapus Pengumuman</AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      )}
-                    </AlertDialog>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${announcement.title}`}>
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditDialog(announcement)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              openDeleteDialog(announcement);
+                            }}
+                            className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Hapus
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        {selectedAnnouncement && selectedAnnouncement.id === announcement.id && (
+                          <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus pengumuman <span className="font-semibold">"{selectedAnnouncement?.title}"</span>.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel onClick={() => setSelectedAnnouncement(null)}>Batal</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteAnnouncement(selectedAnnouncement.id, selectedAnnouncement.title)}>Ya, Hapus Pengumuman</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        )}
+                      </AlertDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
             </CardHeader>
@@ -670,6 +693,5 @@ export default function AnnouncementsPage() {
     </div>
   );
 }
-
-
     
+
