@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine, MoreVertical, Search, Filter as FilterIcon, BookOpen } from "lucide-react";
+import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine, MoreVertical, Search, Filter as FilterIcon, BookOpen, Users } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -1068,7 +1068,7 @@ export default function AssignmentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-         <div className="my-4 flex flex-col sm:flex-row items-stretch gap-2">
+         <div className="my-4 flex flex-col md:flex-row items-stretch gap-2">
             <div className="relative flex-grow">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -1079,7 +1079,7 @@ export default function AssignmentsPage() {
                 />
             </div>
             {isTeacherRole && teacherUniqueClassCount === 1 ? (
-                 <div className="flex w-full sm:w-auto gap-2">
+                 <div className="flex w-full md:w-auto gap-2">
                      <Select
                         value={selectedSubjectFilter}
                         onValueChange={setSelectedSubjectFilter}
@@ -1107,14 +1107,14 @@ export default function AssignmentsPage() {
                     </div>
                 </div>
             ) : (isTeacherOrAdminRole && (teacherUniqueClassCount === null || teacherUniqueClassCount > 1 || isAdminRole)) ? (
-                 <div className="flex w-full sm:w-auto gap-2">
+                 <div className="flex w-full md:w-auto gap-2">
                 <Select
                     value={selectedClassFilter}
                     onValueChange={setSelectedClassFilter}
                     disabled={isLoading || (isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0}
                      className="flex-1"
                 >
-                    <SelectTrigger className="sm:min-w-[150px]">
+                    <SelectTrigger className="md:min-w-[150px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Kelas" />
                     </SelectTrigger>
@@ -1129,7 +1129,7 @@ export default function AssignmentsPage() {
                     disabled={isLoading || (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0}
                     className="flex-1"
                 >
-                    <SelectTrigger className="sm:min-w-[180px]">
+                    <SelectTrigger className="md:min-w-[180px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Mata Pelajaran" />
                     </SelectTrigger>
@@ -1152,20 +1152,20 @@ export default function AssignmentsPage() {
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
                     {!isMobile && <TableHead className="min-w-[180px]">Judul Tugas</TableHead>}
-                    <TableHead className={cn("truncate", isMobile ? "w-1/3 px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
+                    <TableHead className={cn("truncate", isMobile ? "w-1/2 px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
                     {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
                     {!isMobile && (isAdminRole ) && <TableHead>Guru</TableHead>}
                     
                     {!isMobile && <TableHead className={cn("text-center")}>Pertemuan</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-1/3 px-2" : "")}>Batas Waktu</TableHead>
+                    <TableHead className={cn(isMobile ? "w-1/2 px-2" : "")}>Batas Waktu</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>Status</TableHead>}
                     {!isMobile && isTeacherOrAdminRole && <TableHead>Pengumpulan</TableHead>}
                     
-                    <TableHead className={cn("text-right", isMobile ? "w-1/3 px-1" : "w-16")}>Aksi</TableHead>
+                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1220,129 +1220,60 @@ export default function AssignmentsPage() {
                       )}
 
                       <TableCell className={cn("text-right space-x-1 sm:space-x-2", isMobile ? "px-1" : "")}>
-                        {isMobile ? (
-                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas`}>
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                     <DropdownMenuItem onClick={() => openViewDetailDialog(assignment)}>
-                                        <Eye className="mr-2 h-4 w-4" /> Lihat Detail
-                                    </DropdownMenuItem>
-                                    {isTeacherOrAdminRole && (
-                                        <>
-                                            <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
-                                                <Users className="mr-2 h-4 w-4" /> Lihat Pengumpulan
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
-                                                <Edit className="mr-2 h-4 w-4" /> Edit
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                                    <Trash2 className="mr-2 h-4 w-4" /> Hapus
-                                                </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                                {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
-                                            </AlertDialog>
-                                        </>
-                                    )}
-                                    {isStudentRole && (
-                                        <>
-                                            {assignment.submissionStatus === "Sudah Dikerjakan" ? (
-                                                <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)}>
-                                                    <FilePenLine className="mr-2 h-4 w-4" /> Edit Pengumpulan
-                                                </DropdownMenuItem>
-                                            ) : (
-                                                <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
-                                                    <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
-                                                </DropdownMenuItem>
-                                            )}
-                                            {assignment.result && (
-                                                <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
-                                                    <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
-                                                </DropdownMenuItem>
-                                            )}
-                                        </>
-                                    )}
-                                     {isParentRole && assignment.result && (
-                                        <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
-                                            <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Anak
-                                        </DropdownMenuItem>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        ) : (
-                            <> {/* Desktop actions */}
-                            {isTeacherOrAdminRole && (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas ${assignment.title}`}>
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Opsi untuk tugas`}>
+                              <MoreVertical className="h-4 w-4" />
+                          </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => openViewDetailDialog(assignment)}>
-                                    <Eye className="mr-2 h-4 w-4" /> Lihat Detail
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
-                                    <Users className="mr-2 h-4 w-4" /> Lihat Pengumpulan
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
-                                    <Edit className="mr-2 h-4 w-4" /> Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                        <Trash2 className="mr-2 h-4 w-4" /> Hapus
-                                    </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    {selectedAssignment && selectedAssignment.id === assignment.id && (
-                                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                                    )}
-                                </AlertDialog>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            )}
-                            {isStudentRole && (
-                            <div className="flex justify-end space-x-2">
-                                <Button variant="ghost" size="icon" onClick={() => openViewDetailDialog(assignment)} aria-label="Lihat Detail Tugas">
-                                    <Eye className="h-4 w-4" />
-                                </Button>
-                            {assignment.submissionStatus === "Sudah Dikerjakan" ? (
-                                <Button variant="outline" size="icon" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} aria-label="Lihat atau Edit Pengumpulan">
-                                <FilePenLine className="h-4 w-4" />
-                                </Button>
-                            ) : (
-                                <Button size="icon" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"} aria-label="Kerjakan Tugas">
-                                <Send className="h-4 w-4" />
-                                </Button>
-                            )}
-                            {assignment.result && (
-                                <Button variant="secondary" size="icon" onClick={() => handleOpenViewResultDialog(assignment)} aria-label="Lihat Hasil">
-                                <BarChart3 className="h-4 w-4" />
-                                </Button>
-                            )}
-                            </div>
-                            )}
-                            {isParentRole && (
-                                <div className="flex justify-end space-x-2">
-                                    <Button variant="ghost" size="icon" onClick={() => openViewDetailDialog(assignment)} aria-label="Lihat Detail Tugas Anak">
-                                        <Eye className="h-4 w-4" />
-                                    </Button>
-                                    {assignment.result && (
-                                        <Button variant="secondary" size="icon" onClick={() => handleOpenViewResultDialog(assignment)} aria-label="Lihat Hasil Anak">
-                                            <BarChart3 className="h-4 w-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                            )}
-                            </>
-                        )}
+                                  <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                              </DropdownMenuItem>
+                              {isTeacherOrAdminRole && (
+                                  <>
+                                      <DropdownMenuItem onClick={() => handleOpenViewSubmissions(assignment)}>
+                                          <Users className="mr-2 h-4 w-4" /> Lihat Pengumpulan
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => openEditDialog(assignment)}>
+                                          <Edit className="mr-2 h-4 w-4" /> Edit
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                          <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(assignment); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                              <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                          </DropdownMenuItem>
+                                          </AlertDialogTrigger>
+                                          {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                      </AlertDialog>
+                                  </>
+                              )}
+                              {isStudentRole && (
+                                  <>
+                                      {assignment.submissionStatus === "Sudah Dikerjakan" ? (
+                                          <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)}>
+                                              <FilePenLine className="mr-2 h-4 w-4" /> Edit Pengumpulan
+                                          </DropdownMenuItem>
+                                      ) : (
+                                          <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
+                                              <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
+                                          </DropdownMenuItem>
+                                      )}
+                                      {assignment.result && (
+                                          <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
+                                              <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
+                                          </DropdownMenuItem>
+                                      )}
+                                  </>
+                              )}
+                                {isParentRole && assignment.result && (
+                                  <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
+                                      <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Anak
+                                  </DropdownMenuItem>
+                              )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1655,6 +1586,7 @@ export default function AssignmentsPage() {
 }
 
     
+
 
 
 
