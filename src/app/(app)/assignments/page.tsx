@@ -1056,8 +1056,8 @@ export default function AssignmentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-         <div className="my-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="relative sm:col-span-1">
+         <div className="my-4 flex flex-col sm:flex-row items-center gap-4">
+            <div className="relative flex-grow w-full sm:w-auto">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                 placeholder="Cari tugas..."
@@ -1067,13 +1067,13 @@ export default function AssignmentsPage() {
                 />
             </div>
             {isTeacherRole && teacherUniqueClassCount === 1 ? (
-                <div className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <div className="flex w-full sm:w-auto gap-4">
                      <Select
                         value={selectedSubjectFilter}
                         onValueChange={setSelectedSubjectFilter}
                         disabled={isLoading || teacherTaughtSubjectsForFilter.length === 0}
                     >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="flex-1">
                         <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                         <SelectValue placeholder="Filter Mata Pelajaran" />
                         </SelectTrigger>
@@ -1082,7 +1082,7 @@ export default function AssignmentsPage() {
                         {teacherTaughtSubjectsForFilter.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                         </SelectContent>
                     </Select>
-                    <div>
+                    <div className="flex-1">
                         <Label htmlFor="meetingNumberFilter" className="sr-only">Filter Pertemuan Ke-</Label>
                         <Input
                             id="meetingNumberFilter"
@@ -1095,13 +1095,14 @@ export default function AssignmentsPage() {
                     </div>
                 </div>
             ) : (isTeacherOrAdminRole && (teacherUniqueClassCount === null || teacherUniqueClassCount > 1 || isAdminRole)) ? (
-                <>
+                 <div className="flex w-full sm:w-auto gap-4">
                 <Select
                     value={selectedClassFilter}
                     onValueChange={setSelectedClassFilter}
                     disabled={isLoading || (isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0}
+                     className="flex-1"
                 >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger>
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Kelas" />
                     </SelectTrigger>
@@ -1114,8 +1115,9 @@ export default function AssignmentsPage() {
                     value={selectedSubjectFilter}
                     onValueChange={setSelectedSubjectFilter}
                     disabled={isLoading || (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0}
+                    className="flex-1"
                 >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger>
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Mata Pelajaran" />
                     </SelectTrigger>
@@ -1124,7 +1126,7 @@ export default function AssignmentsPage() {
                     {(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
-                </>
+                </div>
             ) : null}
          </div>
 
@@ -1165,7 +1167,7 @@ export default function AssignmentsPage() {
                       {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableCell className="truncate" title={assignment.className || assignment.classId}>{assignment.className || assignment.classId}</TableCell>}
                       {!isMobile && (isAdminRole) && <TableCell className="truncate" title={assignment.teacherName || assignment.teacherId}>{assignment.teacherName || assignment.teacherId}</TableCell>}
 
-                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{assignment.meetingNumber || "-"}</TableCell>
+                      <TableCell className={cn("truncate", isMobile ? "px-2 text-center" : "")} title={assignment.meetingNumber ? assignment.meetingNumber.toString() : "-"}>{assignment.meetingNumber || "-"}</TableCell>
                       <TableCell className={cn(isMobile ? "px-2 text-xs" : "", isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
                         {format(assignment.dueDate.toDate(), isMobile ? "dd/MM/yy, HH:mm" : "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
                       </TableCell>
@@ -1515,5 +1517,6 @@ export default function AssignmentsPage() {
 }
 
     
+
 
 
