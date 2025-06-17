@@ -62,6 +62,7 @@ import {
   orderBy,
   where,
   limit,
+  documentId,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -85,6 +86,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import LottieLoader from "@/components/ui/LottieLoader";
 
 
 // Minimal interfaces for dropdowns
@@ -116,7 +118,7 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 const baseLessonObjectSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   classId: z.string({ required_error: "Pilih kelas." }),
-  teacherId: z.string({ required_error: "Pilih guru." }), // This will store the Document ID from 'teachers' collection
+  teacherId: z.string({ required_error: "Guru pengajar harus ditentukan." }), 
   dayOfWeek: z.enum(DAYS_OF_WEEK, { required_error: "Pilih hari." }),
   startTime: z.string().regex(timeRegex, { message: "Format waktu mulai JJ:MM (e.g., 07:00)." }),
   endTime: z.string().regex(timeRegex, { message: "Format waktu selesai JJ:MM (e.g., 08:30)." }),
@@ -153,11 +155,19 @@ type EditLessonFormValues = z.infer<typeof editLessonFormSchema>;
 const ITEMS_PER_PAGE = 10;
 
 export default function LessonsPage() {
-  const { user, role, loading: authLoading } = useAuth();
+  const { user: authUser, role, loading: authLoading } = useAuth();
   const [allLessons, setAllLessons] = useState<LessonData[]>([]);
+  
+  // For Admin: all subjects, classes, teachers for forms & filters
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
+
+  // For Guru form dialogs: filtered lists
+  const [teacherDocId, setTeacherDocId] = useState<string | null>(null);
+  const [formDialogClasses, setFormDialogClasses] = useState<ClassMin[]>([]);
+  const [formDialogSubjects, setFormDialogSubjects] = useState<SubjectMin[]>([]);
+  const [isLoadingFormDropdownData, setIsLoadingFormDropdownData] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -166,7 +176,7 @@ export default function LessonsPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all"); // Used by admin/guru for table filtering
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
@@ -176,7 +186,7 @@ export default function LessonsPage() {
     defaultValues: {
       subjectId: undefined,
       classId: undefined,
-      teacherId: undefined,
+      teacherId: undefined, // Will be pre-filled for guru
       dayOfWeek: undefined,
       startTime: "",
       endTime: "",
@@ -194,9 +204,9 @@ export default function LessonsPage() {
     return () => clearInterval(timer);
   }, []);
 
-
-  const fetchDropdownData = async () => {
-    if (role !== "admin" && role !== "guru") return;
+  const fetchAdminDropdownData = async () => {
+    if (role !== "admin") return;
+    setIsLoading(true); // Re-use main loading for admin dropdowns
     try {
       const [subjectsSnapshot, classesSnapshot, teachersSnapshot] = await Promise.all([
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
@@ -207,8 +217,77 @@ export default function LessonsPage() {
       setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }))); 
     } catch (error) {
-      console.error("Error fetching dropdown data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
+      console.error("Error fetching admin dropdown data: ", error);
+      toast({ title: "Gagal Memuat Data Pendukung Admin", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchGuruFormDropdownData = async () => {
+    if (role !== "guru" || !authUser?.uid) return;
+    setIsLoadingFormDropdownData(true);
+    try {
+      const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+      const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+      if (teacherProfileSnapshot.empty) {
+        toast({ title: "Profil Guru Tidak Ditemukan", variant: "warning" });
+        setTeacherDocId(null);
+        setFormDialogClasses([]);
+        setFormDialogSubjects([]);
+        setIsLoadingFormDropdownData(false);
+        return;
+      }
+      const loggedInTeacherDocId = teacherProfileSnapshot.docs[0].id;
+      setTeacherDocId(loggedInTeacherDocId);
+
+      // Set teacherId in forms when teacherDocId is available
+      addLessonForm.setValue("teacherId", loggedInTeacherDocId);
+      if (selectedLesson && editLessonForm.getValues("teacherId") !== loggedInTeacherDocId) {
+        editLessonForm.setValue("teacherId", loggedInTeacherDocId);
+      }
+
+
+      const lessonsTaughtQuery = query(collection(db, "lessons"), where("teacherId", "==", loggedInTeacherDocId));
+      const lessonsTaughtSnapshot = await getDocs(lessonsTaughtQuery);
+      
+      const uniqueClassIds = new Set<string>();
+      const uniqueSubjectIds = new Set<string>();
+      lessonsTaughtSnapshot.docs.forEach(doc => {
+        uniqueClassIds.add(doc.data().classId);
+        uniqueSubjectIds.add(doc.data().subjectId);
+      });
+
+      let fetchedClasses: ClassMin[] = [];
+      if (uniqueClassIds.size > 0) {
+        const classChunks = [];
+        const classIdsArray = Array.from(uniqueClassIds);
+        for (let i = 0; i < classIdsArray.length; i += 30) { classChunks.push(classIdsArray.slice(i, i + 30)); }
+        const classPromises = classChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))));
+        const classSnapshots = await Promise.all(classPromises);
+        classSnapshots.forEach(snap => snap.docs.forEach(d => fetchedClasses.push({ id: d.id, name: d.data().name })));
+        fetchedClasses.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      setFormDialogClasses(fetchedClasses);
+
+      let fetchedSubjects: SubjectMin[] = [];
+      if (uniqueSubjectIds.size > 0) {
+        const subjectChunks = [];
+        const subjectIdsArray = Array.from(uniqueSubjectIds);
+        for (let i = 0; i < subjectIdsArray.length; i += 30) { subjectChunks.push(subjectIdsArray.slice(i, i + 30)); }
+        const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db, "subjects"), where(documentId(), "in", chunk))));
+        const subjectSnapshots = await Promise.all(subjectPromises);
+        subjectSnapshots.forEach(snap => snap.docs.forEach(d => fetchedSubjects.push({ id: d.id, name: d.data().name })));
+        fetchedSubjects.sort((a,b) => a.name.localeCompare(b.name));
+      }
+      setFormDialogSubjects(fetchedSubjects);
+
+    } catch (error) {
+      console.error("Error fetching guru form dropdown data: ", error);
+      toast({ title: "Gagal Memuat Data Form Guru", variant: "destructive" });
+    } finally {
+      setIsLoadingFormDropdownData(false);
     }
   };
   
@@ -216,34 +295,41 @@ export default function LessonsPage() {
     if (authLoading) return;
     setIsLoading(true);
     try {
-      if (role === "admin" || role === "guru") {
-        await fetchDropdownData();
-      } else if (role === "siswa" || role === "orangtua") {
+      // For student/parent, only all classes are needed for potential filtering/display if design changes.
+      // Actual lesson data is filtered by classId in the query.
+      if (role === "siswa" || role === "orangtua") {
          const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
          setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       }
+
       const lessonsCollectionRef = collection(db, "lessons");
       let q;
 
-      if (role === "siswa" && user?.classId) {
-        q = query(lessonsCollectionRef, where("classId", "==", user.classId));
-      } else if (role === "orangtua" && user?.linkedStudentClassId) {
-        q = query(lessonsCollectionRef, where("classId", "==", user.linkedStudentClassId));
-      } else if (role === "orangtua" && !user?.linkedStudentClassId) { 
+      if (role === "siswa" && authUser?.classId) {
+        q = query(lessonsCollectionRef, where("classId", "==", authUser.classId));
+      } else if (role === "orangtua" && authUser?.linkedStudentClassId) {
+        q = query(lessonsCollectionRef, where("classId", "==", authUser.linkedStudentClassId));
+      } else if (role === "orangtua" && !authUser?.linkedStudentClassId) { 
         setAllLessons([]);
         setIsLoading(false);
         return;
-      } else if (role === "guru" && user?.uid) {
-        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
-        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
-        if (!teacherProfileSnapshot.empty) {
-          const teacherProfileId = teacherProfileSnapshot.docs[0].id;
-          q = query(lessonsCollectionRef, where("teacherId", "==", teacherProfileId));
-        } else {
-          setAllLessons([]);
-          setIsLoading(false);
-          return;
+      } else if (role === "guru" && authUser?.uid) {
+        // Fetch teacherDocId if not already fetched (e.g., on page load)
+        let currentTeacherDocId = teacherDocId;
+        if (!currentTeacherDocId) {
+            const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+            if (!teacherProfileSnapshot.empty) {
+                currentTeacherDocId = teacherProfileSnapshot.docs[0].id;
+                setTeacherDocId(currentTeacherDocId);
+            }
         }
+        if (currentTeacherDocId) {
+            q = query(lessonsCollectionRef, where("teacherId", "==", currentTeacherDocId));
+        } else {
+            setAllLessons([]); setIsLoading(false); return;
+        }
+
       } else if (role === "admin") {
          q = query(lessonsCollectionRef, orderBy("createdAt", "desc"));
       } else {
@@ -282,16 +368,26 @@ export default function LessonsPage() {
   };
 
   useEffect(() => {
-    fetchLessons();
-  }, [role, user, authLoading]);
+    if (!authLoading && role === "admin") {
+        fetchAdminDropdownData(); // For admin table filters and form
+    }
+    fetchLessons(); // For table data for all roles
+  }, [role, authUser, authLoading]);
 
   useEffect(() => {
     if (selectedLesson && isEditDialogOpen) {
+      if (role === "guru") {
+        // Ensure guru-specific dropdown data is loaded if dialog is opened directly
+        if (!teacherDocId || formDialogClasses.length === 0 || formDialogSubjects.length === 0) {
+          fetchGuruFormDropdownData();
+        }
+         editLessonForm.setValue("teacherId", teacherDocId || ""); // Pre-fill and disable
+      }
       editLessonForm.reset({
         id: selectedLesson.id,
         subjectId: selectedLesson.subjectId,
         classId: selectedLesson.classId,
-        teacherId: selectedLesson.teacherId, 
+        teacherId: role === "guru" ? teacherDocId || "" : selectedLesson.teacherId,
         dayOfWeek: selectedLesson.dayOfWeek as typeof DAYS_OF_WEEK[number],
         startTime: selectedLesson.startTime,
         endTime: selectedLesson.endTime,
@@ -299,24 +395,31 @@ export default function LessonsPage() {
         materials: selectedLesson.materials || "",
       });
     }
-  }, [selectedLesson, isEditDialogOpen, editLessonForm]);
+  }, [selectedLesson, isEditDialogOpen, editLessonForm, role, teacherDocId, formDialogClasses, formDialogSubjects]);
 
-  const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
-    const subject = subjects.find(s => s.id === data.subjectId);
-    const aClass = classes.find(c => c.id === data.classId);
-    const teacher = teachers.find(t => t.id === data.teacherId); 
-    return {
-      subjectName: subject?.name,
-      className: aClass?.name,
-      teacherName: teacher?.name,
-    };
-  };
 
   const handleAddLessonSubmit: SubmitHandler<LessonFormValues> = async (data) => {
     addLessonForm.clearErrors();
-    const { subjectName, className, teacherName } = getDenormalizedNames(data);
+    let subjectName, className, teacherName, finalTeacherId;
+
+    if (role === "guru") {
+        if (!teacherDocId || !authUser?.displayName) {
+            toast({title: "Error", description: "Profil guru tidak ditemukan.", variant: "destructive"});
+            return;
+        }
+        finalTeacherId = teacherDocId;
+        teacherName = authUser.displayName;
+        subjectName = formDialogSubjects.find(s => s.id === data.subjectId)?.name;
+        className = formDialogClasses.find(c => c.id === data.classId)?.name;
+    } else { // Admin
+        const denormalized = getDenormalizedNames(data);
+        subjectName = denormalized.subjectName;
+        className = denormalized.className;
+        teacherName = denormalized.teacherName;
+        finalTeacherId = data.teacherId;
+    }
     
-    if (!subjectName || !className || !teacherName) {
+    if (!subjectName || !className || !teacherName || !finalTeacherId) {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek, kelas, dan guru valid.", variant: "destructive"});
       return;
     }
@@ -324,6 +427,7 @@ export default function LessonsPage() {
     try {
       await addDoc(collection(db, "lessons"), {
         ...data, 
+        teacherId: finalTeacherId,
         subjectName,
         className,
         teacherName,
@@ -342,9 +446,26 @@ export default function LessonsPage() {
   const handleEditLessonSubmit: SubmitHandler<EditLessonFormValues> = async (data) => {
     if (!selectedLesson) return;
     editLessonForm.clearErrors();
-    const { subjectName, className, teacherName } = getDenormalizedNames(data);
+    let subjectName, className, teacherName, finalTeacherId;
 
-    if (!subjectName || !className || !teacherName) {
+    if (role === "guru") {
+        if (!teacherDocId || !authUser?.displayName) {
+            toast({title: "Error", description: "Profil guru tidak ditemukan.", variant: "destructive"});
+            return;
+        }
+        finalTeacherId = teacherDocId;
+        teacherName = authUser.displayName;
+        subjectName = formDialogSubjects.find(s => s.id === data.subjectId)?.name;
+        className = formDialogClasses.find(c => c.id === data.classId)?.name;
+    } else { // Admin
+        const denormalized = getDenormalizedNames(data);
+        subjectName = denormalized.subjectName;
+        className = denormalized.className;
+        teacherName = denormalized.teacherName;
+        finalTeacherId = data.teacherId;
+    }
+
+    if (!subjectName || !className || !teacherName || !finalTeacherId) {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek, kelas, dan guru valid.", variant: "destructive"});
       return;
     }
@@ -353,6 +474,7 @@ export default function LessonsPage() {
       const lessonDocRef = doc(db, "lessons", data.id);
       await updateDoc(lessonDocRef, {
         ...data, 
+        teacherId: finalTeacherId,
         subjectName,
         className,
         teacherName,
@@ -365,6 +487,18 @@ export default function LessonsPage() {
       console.error("Error editing lesson:", error);
       toast({ title: "Gagal Memperbarui Pelajaran", variant: "destructive" });
     }
+  };
+  
+  // Admin specific helper
+  const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
+    const subject = subjects.find(s => s.id === data.subjectId);
+    const aClass = classes.find(c => c.id === data.classId);
+    const teacher = teachers.find(t => t.id === data.teacherId); 
+    return {
+      subjectName: subject?.name,
+      className: aClass?.name,
+      teacherName: teacher?.name,
+    };
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
@@ -381,6 +515,9 @@ export default function LessonsPage() {
 
   const openEditDialog = (lesson: LessonData) => {
     setSelectedLesson(lesson);
+    if (role === 'guru' && (!teacherDocId || formDialogClasses.length === 0 || formDialogSubjects.length === 0)) {
+        fetchGuruFormDropdownData(); // Ensure data is ready for guru edit form
+    }
     setIsEditDialogOpen(true);
   };
 
@@ -391,11 +528,11 @@ export default function LessonsPage() {
   const filteredAndSortedLessons = useMemo(() => {
     let tempLessons = [...allLessons];
 
-    if ((role === "admin" || role === "guru") && selectedClassFilter !== "all") {
+    if ((role === "admin") && selectedClassFilter !== "all") {
       tempLessons = tempLessons.filter(lesson => lesson.classId === selectedClassFilter);
     }
 
-    if ((role === "admin" || role === "guru") && searchTerm) {
+    if ((role === "admin") && searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       tempLessons = tempLessons.filter(lesson =>
         (lesson.subjectName && lesson.subjectName.toLowerCase().includes(lowerSearchTerm)) ||
@@ -499,7 +636,7 @@ export default function LessonsPage() {
       return "Tidak ada jadwal pelajaran untuk kelas Anda saat ini.";
     }
     if (role === "orangtua") {
-      if (!user?.linkedStudentClassId) {
+      if (!authUser?.linkedStudentClassId) {
         return (
           <div className="flex flex-col items-center text-center">
              <AlertCircle className="w-10 h-10 mb-2 text-destructive" />
@@ -521,7 +658,7 @@ export default function LessonsPage() {
           {canManageLessons 
             ? "Kelola jadwal pelajaran, materi ajar, dan silabus."
             : isStudentOrParent
-            ? (role === "siswa" ? "Lihat jadwal pelajaran Anda." : `Lihat jadwal pelajaran anak Anda (${user?.linkedStudentName || 'Siswa'}).`)
+            ? (role === "siswa" ? "Lihat jadwal pelajaran Anda." : `Lihat jadwal pelajaran anak Anda (${authUser?.linkedStudentName || 'Siswa'}).`)
             : "Lihat jadwal pelajaran."
           }
         </p>
@@ -536,9 +673,11 @@ export default function LessonsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) { addLessonForm.reset(); addLessonForm.clearErrors(); }
+              else if (role === 'guru') { fetchGuruFormDropdownData(); }
+              else if (role === 'admin' && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) { fetchAdminDropdownData(); }
             }}>
               <DialogTrigger asChild>
-                <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchDropdownData(); }}>
+                <Button size="sm">
                   <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pelajaran
                 </Button>
               </DialogTrigger>
@@ -552,40 +691,45 @@ export default function LessonsPage() {
                 <form onSubmit={addLessonForm.handleSubmit(handleAddLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                   <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addLessonForm.getValues("subjectId")}>
-                      <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                    <Select onValueChange={(value) => addLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={addLessonForm.getValues("subjectId") || undefined} disabled={isLoadingFormDropdownData && role ==='guru'}>
+                      <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat mapel..." : "Pilih mata pelajaran"} /></SelectTrigger>
                       <SelectContent>
-                        {subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        {(role === 'guru' ? formDialogSubjects : subjects).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {addLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
                     <Label htmlFor="add-lesson-classId">Kelas</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addLessonForm.getValues("classId")}>
-                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined} disabled={isLoadingFormDropdownData && role==='guru'}>
+                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat kelas..." : "Pilih kelas"} /></SelectTrigger>
                       <SelectContent>
-                        {classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                         {(role === 'guru' ? formDialogClasses : classes).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
                   </div>
-                  <div>
-                    <Label htmlFor="add-lesson-teacherId">Guru Pengajar</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addLessonForm.getValues("teacherId")}>
-                      <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                      <SelectContent>
-                        {teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                        {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
-                  </div>
+                  {role === 'admin' && (
+                    <div>
+                      <Label htmlFor="add-lesson-teacherId">Guru Pengajar</Label>
+                      <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={addLessonForm.getValues("teacherId") || undefined}>
+                        <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                        <SelectContent>
+                          {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
+                    </div>
+                  )}
+                  {role === 'guru' && authUser && (
+                    <div>
+                        <Label>Guru Pengajar</Label>
+                        <Input value={authUser.displayName || "Nama Guru Tidak Tersedia"} className="mt-1 bg-muted" readOnly />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor="add-lesson-dayOfWeek">Hari</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} defaultValue={addLessonForm.getValues("dayOfWeek")}>
+                    <Select onValueChange={(value) => addLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} value={addLessonForm.getValues("dayOfWeek") || undefined}>
                       <SelectTrigger id="add-lesson-dayOfWeek" className="mt-1"><SelectValue placeholder="Pilih hari" /></SelectTrigger>
                       <SelectContent>
                         {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
@@ -615,7 +759,10 @@ export default function LessonsPage() {
                   </div>
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                    <Button type="submit" disabled={addLessonForm.formState.isSubmitting}>{addLessonForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Jadwal"}</Button>
+                    <Button type="submit" disabled={addLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData)}>
+                        {(addLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData))&& <LottieLoader width={16} height={16} className="mr-2"/>}
+                        {addLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData) ? "Menyimpan..." : "Simpan Jadwal"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -623,7 +770,7 @@ export default function LessonsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {canManageLessons && (
+          {(role === "admin") && ( // Only admin sees these filters
             <div className="my-4 flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -666,8 +813,8 @@ export default function LessonsPage() {
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Mata Pelajaran</TableHead>
-                    {!isStudentOrParent && <TableHead>Kelas</TableHead>}
-                    <TableHead>Guru</TableHead>
+                    {!(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
+                                        {(role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
                     <TableHead>Hari</TableHead>
                     <TableHead>Waktu</TableHead>
                     {canManageLessons && <TableHead>Topik</TableHead>}
@@ -681,8 +828,8 @@ export default function LessonsPage() {
                       <TableRow key={lesson.id}>
                         <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                         <TableCell className="font-medium">{lesson.subjectName || lesson.subjectId}</TableCell>
-                        {!isStudentOrParent && <TableCell>{lesson.className || lesson.classId}</TableCell>}
-                        <TableCell>{lesson.teacherName || lesson.teacherId}</TableCell>
+                        {!(isStudentOrParent || role === 'guru') && <TableCell>{lesson.className || lesson.classId}</TableCell>}
+                                                {(role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell>{lesson.teacherName || lesson.teacherId}</TableCell>}
                         <TableCell>{lesson.dayOfWeek}</TableCell>
                         <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
                         {canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
@@ -783,7 +930,8 @@ export default function LessonsPage() {
       {canManageLessons && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
           setIsEditDialogOpen(isOpen);
-          if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); }
+            if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); }
+            else if (role === 'guru' && selectedLesson) { fetchGuruFormDropdownData(); } // Fetch on open for edit too
         }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
@@ -795,37 +943,45 @@ export default function LessonsPage() {
                 <Input type="hidden" {...editLessonForm.register("id")} />
                 <div>
                   <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran</Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editLessonForm.getValues("subjectId")}>
-                    <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                  <Select onValueChange={(value) => editLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={editLessonForm.getValues("subjectId") || undefined} disabled={(isLoadingFormDropdownData && role==='guru')}>
+                    <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat mapel..." : "Pilih mata pelajaran"} /></SelectTrigger>
                     <SelectContent>
-                      {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                       {(role === 'guru' ? formDialogSubjects : subjects).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="edit-lesson-classId">Kelas</Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editLessonForm.getValues("classId")}>
-                    <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                  <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined} disabled={(isLoadingFormDropdownData && role==='guru')}>
+                    <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat kelas..." : "Pilih kelas"} /></SelectTrigger>
                     <SelectContent>
-                      {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {(role === 'guru' ? formDialogClasses : classes).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.classId.message}</p>}
                 </div>
-                 <div>
-                  <Label htmlFor="edit-lesson-teacherId">Guru Pengajar</Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={editLessonForm.getValues("teacherId")}>
-                    <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                    <SelectContent>
-                      {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
-                </div>
+                {role === 'admin' && (
+                    <div>
+                    <Label htmlFor="edit-lesson-teacherId">Guru Pengajar</Label>
+                    <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
+                        <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                        <SelectContent>
+                        {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
+                    </div>
+                )}
+                {role === 'guru' && authUser && (
+                    <div>
+                        <Label>Guru Pengajar</Label>
+                        <Input value={authUser.displayName || "Nama Guru Tidak Tersedia"} className="mt-1 bg-muted" readOnly />
+                    </div>
+                )}
                 <div>
                   <Label htmlFor="edit-lesson-dayOfWeek">Hari</Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} defaultValue={editLessonForm.getValues("dayOfWeek")}>
+                  <Select onValueChange={(value) => editLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} value={editLessonForm.getValues("dayOfWeek") || undefined}>
                     <SelectTrigger id="edit-lesson-dayOfWeek" className="mt-1"><SelectValue placeholder="Pilih hari" /></SelectTrigger>
                     <SelectContent>
                       {DAYS_OF_WEEK.map(day => <SelectItem key={day} value={day}>{day}</SelectItem>)}
@@ -855,7 +1011,10 @@ export default function LessonsPage() {
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                  <Button type="submit" disabled={editLessonForm.formState.isSubmitting}>{editLessonForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+                  <Button type="submit" disabled={editLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData)}>
+                    {(editLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData)) && <LottieLoader width={16} height={16} className="mr-2"/>}
+                    {editLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData) ? "Menyimpan..." : "Simpan Perubahan"}
+                    </Button>
                 </DialogFooter>
               </form>
             )}
@@ -865,5 +1024,3 @@ export default function LessonsPage() {
     </div>
   );
 }
-
-
