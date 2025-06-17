@@ -88,9 +88,6 @@ import {
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { CalendarDatePicker } from "@/components/calendar-date-picker";
-// import { CalendarDatePicker } from "@/components/calendar-date-picker";
-// import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-// import { Calendar } from "@/components/ui/calendar";
 
 
 interface ClassMin {
@@ -208,7 +205,11 @@ export default function StudentsPage() {
         const qParents = query(parentsCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qParents));
       } else {
-        promises.push(Promise.resolve(null)); 
+        // For student/parent, classes are still needed if student filter by className (though not used for student page directly)
+        // or if linked parent info needs class name.
+        const classesCollectionRef = collection(db, "classes");
+        const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
+        promises.push(getDocs(qClasses));
         promises.push(Promise.resolve(null)); 
       }
       
@@ -805,8 +806,8 @@ export default function StudentsPage() {
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama</TableHead>
-                    <TableHead>NIS</TableHead>
-                    <TableHead>Email</TableHead>
+                    { (authRole === 'admin' || authRole === 'guru') && <TableHead>NIS</TableHead> }
+                    { (authRole === 'admin' || authRole === 'guru') && <TableHead>Email</TableHead> }
                     <TableHead>Kelas</TableHead>
                     <TableHead>Gender</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && <TableHead className="text-right">Aksi</TableHead>}
@@ -817,8 +818,8 @@ export default function StudentsPage() {
                     <TableRow key={student.id}>
                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
-                      <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
-                      <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
+                      { (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
+                      { (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
                       <TableCell className="truncate" title={student.className}>{student.className || student.classId}</TableCell>
                       <TableCell>
                         {student.gender === "laki-laki" ? (
