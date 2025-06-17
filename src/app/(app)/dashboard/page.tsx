@@ -65,7 +65,7 @@ interface DashboardStats {
   adminTotalTeachers: number;
   adminTotalSubjects: number;
   adminTotalClasses: number;
-  adminTotalParents: number; 
+  adminTotalParents: number;
   // Teacher specific
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
@@ -194,7 +194,7 @@ export default function DashboardPage() {
                     newStats.teacherTotalStudentsTaught = 0;
                 }
             } else {
-                 console.warn(\`No teacher profile found in 'teachers' collection linked to Auth UID: \${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.\`);
+                 console.warn(`No teacher profile found in 'teachers' collection linked to Auth UID: ${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.`);
             }
         } else if (role === 'orangtua' && user.uid && user.linkedStudentClassId) {
             const classId = user.linkedStudentClassId;
@@ -369,7 +369,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-xs text-muted-foreground pt-1">
                       {loadingStats ? <Skeleton className="h-4 w-24" /> :
-                       \`(\${stats.parentChildClassStudentCount || 0} siswa)\`
+                       `(${stats.parentChildClassStudentCount || 0} siswa)`
                       }
                     </div>
                     {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
