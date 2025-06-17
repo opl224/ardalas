@@ -42,8 +42,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDatePicker } from "@/components/calendar-date-picker"; 
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical } from "lucide-react";
+import { CalendarDatePicker } from "@/components/calendar-date-picker";
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical, Eye } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -66,8 +66,8 @@ import {
   orderBy,
   where,
   writeBatch,
-  Query as FirebaseQuery, 
-  DocumentData, 
+  Query as FirebaseQuery,
+  DocumentData,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -78,6 +78,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   Pagination,
@@ -89,6 +90,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface ClassMin { id: string; name: string; }
@@ -101,7 +103,7 @@ type AssessmentType = typeof ASSESSMENT_TYPES[number];
 
 interface ResultData {
   id: string;
-  studentId: string; 
+  studentId: string;
   studentName: string;
   classId: string;
   className: string;
@@ -124,11 +126,11 @@ interface ResultData {
 
 const baseResultFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
-  studentId: z.string({ required_error: "Pilih siswa." }), 
+  studentId: z.string({ required_error: "Pilih siswa." }),
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
   assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
-  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."), 
+  score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."),
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
   feedback: z.string().optional(),
   assignmentId: z.string().optional(),
@@ -145,6 +147,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function ResultsPage() {
   const { user, role, loading: authLoading } = useAuth();
+  const { isMobile } = useSidebar();
   const [results, setResults] = useState<ResultData[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [students, setStudents] = useState<StudentMin[]>([]);
@@ -158,7 +161,9 @@ export default function ResultsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<ResultData | null>(null);
-  
+  const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
+  const [selectedResultForDetail, setSelectedResultForDetail] = useState<ResultData | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAssessmentTypeFilter, setSelectedAssessmentTypeFilter] = useState<AssessmentType | "all">("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -203,7 +208,7 @@ export default function ResultsPage() {
       setStudents(studentsAuthSnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
-            id: docSnap.id, 
+            id: docSnap.id,
             name: data.name,
             classId: data.classId,
             className: data.className,
@@ -285,7 +290,7 @@ export default function ResultsPage() {
             submissionsSnapshots.forEach(snapshot => {
                 snapshot.forEach(doc => {
                     const subData = doc.data();
-                    if (subData.assignmentId) { 
+                    if (subData.assignmentId) {
                       submissionsMap.set(subData.assignmentId, { link: subData.submissionLink, notes: subData.notes });
                     }
                 });
@@ -315,8 +320,8 @@ export default function ResultsPage() {
 
  useEffect(() => {
     if (authLoading) {
-      setIsLoadingData(true); 
-      setIsLoadingResults(true); 
+      setIsLoadingData(true);
+      setIsLoadingResults(true);
       return;
     }
 
@@ -330,22 +335,22 @@ export default function ResultsPage() {
       setIsLoadingResults(false);
       return;
     }
-    
+
     const loadAllData = async () => {
       setIsLoadingData(true);
       setIsLoadingResults(true);
 
       if (role === "admin" || role === "guru") {
-        await fetchDropdownData(); 
+        await fetchDropdownData();
       } else {
-        setIsLoadingData(false); 
+        setIsLoadingData(false);
       }
-      await fetchResults(); 
+      await fetchResults();
     };
 
     loadAllData();
 
-  }, [authLoading, user, role]); 
+  }, [authLoading, user, role]);
 
   const watchClassId = addResultForm.watch("classId");
   const watchSubjectIdForAdd = addResultForm.watch("subjectId");
@@ -391,7 +396,7 @@ export default function ResultsPage() {
     } else {
       setFilteredAssignments([]);
     }
-    if (addResultForm.getValues("assignmentId") !== undefined && (!currentClassIdValue || !watchSubjectIdForAdd)) { 
+    if (addResultForm.getValues("assignmentId") !== undefined && (!currentClassIdValue || !watchSubjectIdForAdd)) {
       addResultForm.setValue("assignmentId", undefined, { shouldValidate: true });
     }
   }, [watchClassId, watchSubjectIdForAdd, assignments, addResultForm]);
@@ -407,7 +412,7 @@ export default function ResultsPage() {
          }
      } else if (watchAssignmentId === "" || watchAssignmentId === undefined) {
          const currentTitle = addResultForm.getValues("assessmentTitle");
-         const previousAssignmentId = addResultForm.formState.defaultValues?.assignmentId; 
+         const previousAssignmentId = addResultForm.formState.defaultValues?.assignmentId;
          const wasTitleFromAssignment = assignments.some(a => a.id === previousAssignmentId && a.title === currentTitle);
 
          if (!addResultForm.formState.dirtyFields.assessmentTitle && (wasTitleFromAssignment || !currentTitle) ) {
@@ -459,7 +464,7 @@ export default function ResultsPage() {
       editResultForm.reset({
         id: selectedResult.id,
         classId: initialClassId,
-        studentId: selectedResult.studentId, 
+        studentId: selectedResult.studentId,
         subjectId: initialSubjectId,
         assessmentType: selectedResult.assessmentType,
         assessmentTitle: selectedResult.assessmentTitle,
@@ -473,12 +478,12 @@ export default function ResultsPage() {
   }, [selectedResult, isEditDialogOpen, editResultForm, students, assignments]);
 
   const getDenormalizedNames = (data: ResultFormValues | EditResultFormValues) => {
-    const student = students.find(s => s.id === data.studentId); 
+    const student = students.find(s => s.id === data.studentId);
     const aClass = classes.find(c => c.id === data.classId);
     const subject = subjects.find(s => s.id === data.subjectId);
     return {
       studentName: student?.name,
-      className: aClass?.name || student?.className, 
+      className: aClass?.name || student?.className,
       subjectName: subject?.name,
     };
   };
@@ -499,7 +504,7 @@ export default function ResultsPage() {
     }
 
     const resultData: any = {
-        ...data, 
+        ...data,
         studentName,
         className,
         subjectName,
@@ -544,7 +549,7 @@ export default function ResultsPage() {
     }
 
     const resultData: any = {
-        ...data, 
+        ...data,
         studentName,
         className,
         subjectName,
@@ -583,6 +588,11 @@ export default function ResultsPage() {
     }
   };
 
+  const openViewDetailDialog = (result: ResultData) => {
+    setSelectedResultForDetail(result);
+    setIsViewDetailDialogOpen(true);
+  };
+
   const openEditDialog = (result: ResultData) => {
     setSelectedResult(result);
     setIsEditDialogOpen(true);
@@ -602,7 +612,7 @@ export default function ResultsPage() {
 
     if (canManageResults && searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
-      tempResults = tempResults.filter(result => 
+      tempResults = tempResults.filter(result =>
         result.studentName?.toLowerCase().includes(lowerSearch) ||
         result.className?.toLowerCase().includes(lowerSearch) ||
         result.subjectName?.toLowerCase().includes(lowerSearch) ||
@@ -626,7 +636,7 @@ export default function ResultsPage() {
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
-    const maxPagesToShow = 5; 
+    const maxPagesToShow = 5;
     let startPage, endPage;
 
     if (totalPages <= maxPagesToShow) {
@@ -826,7 +836,7 @@ export default function ResultsPage() {
                 <Input id={`${dialogType}-result-score`} type="number" {...formInstance.register("score")} className="mt-1" />
                 {formInstance.formState.errors.score && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.score.message}</p>}
             </div>
-            
+
             <div>
               <Label htmlFor={`${dialogType}-result-dateOfAssessment`}>Tanggal Asesmen</Label>
               <Controller
@@ -839,9 +849,9 @@ export default function ResultsPage() {
                     onDateSelect={(range) => field.onChange(range.from)}
                     numberOfMonths={1}
                     closeOnSelect={true}
-                    yearsRange={5} 
+                    yearsRange={5}
                     className="mt-1 w-full"
-                    variant="outline" 
+                    variant="outline"
                   />
                 )}
               />
@@ -854,6 +864,8 @@ export default function ResultsPage() {
         </>
     );
   };
+
+  const studentNameForTitle = role === "siswa" ? user?.displayName : (role === "orangtua" ? user?.linkedStudentName : null);
 
   return (
     <div className="space-y-6">
@@ -882,7 +894,7 @@ export default function ResultsPage() {
                 <Select
                   value={selectedAssessmentTypeFilter}
                   onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
-                  
+
                 >
                   <SelectTrigger className="w-full sm:w-[200px]">
                       <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -938,75 +950,83 @@ export default function ResultsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    {canManageResults && <TableHead className="w-[50px]">No.</TableHead>}
-                    {canManageResults && <TableHead>Siswa</TableHead>}
-                    {canManageResults && <TableHead>Kelas</TableHead>}
-                    {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
-                    
-                    {(role === 'siswa' || role === 'orangtua') ? (
-                      <>
-                        <TableHead className="w-[50px]">No.</TableHead>
-                        <TableHead>Judul</TableHead>
-                        <TableHead>Link Tugas</TableHead>
-                        <TableHead>Feedback Guru</TableHead>
-                        <TableHead>Nilai</TableHead>
-                      </>
+                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                    <TableHead className={cn(isMobile && "px-2")}>{(role === 'siswa' || role === 'orangtua') ? 'Judul Asesmen' : 'Siswa'}</TableHead>
+                    {isMobile ? (
+                         <TableHead className="w-16 px-1 text-center">Nilai</TableHead>
                     ) : (
                       <>
-                        <TableHead>Asesmen</TableHead>
-                        <TableHead>Nilai</TableHead>
-                        <TableHead>Feedback Guru</TableHead>
-                        <TableHead>Tanggal Asesmen</TableHead>
+                        {canManageResults && <TableHead>Kelas</TableHead>}
+                        {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
+                        {(role === 'siswa' || role === 'orangtua') ? (
+                          <>
+                            <TableHead>Link Tugas</TableHead>
+                            <TableHead>Feedback Guru</TableHead>
+                            <TableHead>Nilai</TableHead>
+                          </>
+                        ) : (
+                          <>
+                            <TableHead>Asesmen</TableHead>
+                            <TableHead>Nilai</TableHead>
+                            <TableHead>Feedback Guru</TableHead>
+                            <TableHead>Tanggal Asesmen</TableHead>
+                          </>
+                        )}
                       </>
                     )}
-                    {canManageResults && <TableHead className="text-right">Aksi</TableHead>}
+                     <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((result, index) => (
                     <TableRow key={result.id}>
-                      {canManageResults && <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>}
-                      {canManageResults && <TableCell className="font-medium truncate" title={result.studentName}>{result.studentName}</TableCell>}
-                      {canManageResults && <TableCell className="truncate" title={result.className}>{result.className}</TableCell>}
-                      {(role === 'admin' || role === 'guru') && <TableCell className="truncate" title={result.subjectName}>{result.subjectName}</TableCell>}
-                      
-                      {(role === 'siswa' || role === 'orangtua') ? (
-                        <>
-                          <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                          <TableCell className="truncate" title={result.assessmentTitle}>
-                            {result.assessmentTitle}
-                            {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
-                          </TableCell>
-                          <TableCell>
-                            {result.studentSubmissionLink ? (
-                              <Button variant="link" asChild className="p-0 h-auto text-sm">
-                                <Link href={result.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
-                                  <LinkIcon className="mr-1 h-3 w-3" />Lihat Pengumpulan
-                                </Link>
-                              </Button>
-                            ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">Tidak ada pengumpulan</span> : "-")}
-                          </TableCell>
-                          <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
-                           <TableCell>{result.score}</TableCell>
-                        </>
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                       <TableCell className={cn("font-medium truncate", isMobile && "px-2")} title={(role === 'siswa' || role === 'orangtua') ? result.assessmentTitle : result.studentName}>
+                        {(role === 'siswa' || role === 'orangtua')
+                          ? `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : ''}`
+                          : result.studentName
+                        }
+                      </TableCell>
+
+                      {isMobile ? (
+                        <TableCell className="text-center px-1">{result.score}</TableCell>
                       ) : (
                         <>
-                          <TableCell className="truncate" title={result.assessmentTitle}>
-                            {result.assessmentTitle} ({result.assessmentType})
-                            {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
-                          </TableCell>
-                          <TableCell>{result.score}</TableCell>
-                          <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
-                          <TableCell>
-                            {format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
-                          </TableCell>
+                          {canManageResults && <TableCell className="truncate" title={result.className}>{result.className}</TableCell>}
+                          {(role === 'admin' || role === 'guru') && <TableCell className="truncate" title={result.subjectName}>{result.subjectName}</TableCell>}
+                          {(role === 'siswa' || role === 'orangtua') ? (
+                            <>
+                              <TableCell>
+                                {result.studentSubmissionLink ? (
+                                  <Button variant="link" asChild className="p-0 h-auto text-sm">
+                                    <Link href={result.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
+                                      <LinkIcon className="mr-1 h-3 w-3" />Lihat
+                                    </Link>
+                                  </Button>
+                                ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">N/A</span> : "-")}
+                              </TableCell>
+                              <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
+                              <TableCell>{result.score}</TableCell>
+                            </>
+                          ) : (
+                            <>
+                              <TableCell className="truncate" title={result.assessmentTitle}>
+                                {result.assessmentTitle} ({result.assessmentType})
+                                {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
+                              </TableCell>
+                              <TableCell>{result.score}</TableCell>
+                              <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
+                              <TableCell>
+                                {format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
+                              </TableCell>
+                            </>
+                          )}
                         </>
                       )}
-                      {canManageResults && (
-                        <TableCell className="text-right">
+                      <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                            <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" aria-label={`Aksi untuk hasil ${result.studentName}`}>
@@ -1014,39 +1034,47 @@ export default function ResultsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openEditDialog(result)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                <span>Edit</span>
+                              <DropdownMenuItem onClick={() => openViewDetailDialog(result)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Lihat Detail
                               </DropdownMenuItem>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem
-                                    onSelect={(e) => {e.preventDefault(); openDeleteDialog(result);}}
-                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    <span>Hapus</span>
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                {selectedResult && selectedResult.id === result.id && (
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel onClick={() => setSelectedResult(null)}>Batal</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteResult(selectedResult.id)}>Ya, Hapus Hasil</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                )}
-                              </AlertDialog>
+                              {canManageResults && (
+                                <>
+                                <DropdownMenuItem onClick={() => openEditDialog(result)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  <span>Edit</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem
+                                      onSelect={(e) => {e.preventDefault(); openDeleteDialog(result);}}
+                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      <span>Hapus</span>
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  {selectedResult && selectedResult.id === result.id && (
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setSelectedResult(null)}>Batal</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteResult(selectedResult.id)}>Ya, Hapus Hasil</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  )}
+                                </AlertDialog>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1056,16 +1084,16 @@ export default function ResultsPage() {
                 <Pagination className="mt-6">
                     <PaginationContent>
                         <PaginationItem>
-                        <PaginationPrevious 
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                        <PaginationPrevious
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                             aria-disabled={currentPage === 1}
                             className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
                         />
                         </PaginationItem>
                         {renderPageNumbers()}
                         <PaginationItem>
-                        <PaginationNext 
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                        <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                             aria-disabled={currentPage === totalPages}
                             className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
                         />
@@ -1077,7 +1105,7 @@ export default function ResultsPage() {
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
-                 (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." : 
+                 (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." :
                  searchTerm || selectedAssessmentTypeFilter !== "all" ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian Anda." :
                  "Belum ada data hasil belajar yang sesuai."}
             </div>
@@ -1116,6 +1144,59 @@ export default function ResultsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog open={isViewDetailDialogOpen} onOpenChange={(isOpen) => {
+          setIsViewDetailDialogOpen(isOpen);
+          if (!isOpen) setSelectedResultForDetail(null);
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detail Hasil Belajar</DialogTitle>
+            <DialogDescription>Informasi lengkap mengenai hasil asesmen.</DialogDescription>
+          </DialogHeader>
+          {selectedResultForDetail && (
+            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+              <div><Label className="text-muted-foreground">Nama Siswa:</Label><p className="font-medium">{selectedResultForDetail.studentName}</p></div>
+              <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedResultForDetail.className}</p></div>
+              <div><Label className="text-muted-foreground">Mata Pelajaran:</Label><p className="font-medium">{selectedResultForDetail.subjectName}</p></div>
+              <div><Label className="text-muted-foreground">Judul Asesmen:</Label><p className="font-medium">{selectedResultForDetail.assessmentTitle}</p></div>
+              {selectedResultForDetail.meetingNumber && <div><Label className="text-muted-foreground">Pertemuan Ke-:</Label><p className="font-medium">{selectedResultForDetail.meetingNumber}</p></div>}
+              <div><Label className="text-muted-foreground">Tipe Asesmen:</Label><p className="font-medium">{selectedResultForDetail.assessmentType}</p></div>
+              <div><Label className="text-muted-foreground">Nilai:</Label><p className="font-semibold text-lg">{selectedResultForDetail.score}</p></div>
+              <div>
+                <Label className="text-muted-foreground">Tanggal Asesmen:</Label>
+                <p className="font-medium">{format(selectedResultForDetail.dateOfAssessment.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p>
+              </div>
+              {selectedResultForDetail.feedback && (
+                <div><Label className="text-muted-foreground">Umpan Balik Guru:</Label><p className="whitespace-pre-line bg-muted/50 p-2 rounded-md">{selectedResultForDetail.feedback}</p></div>
+              )}
+              {selectedResultForDetail.studentSubmissionLink && (
+                <div>
+                  <Label className="text-muted-foreground">Link Pengumpulan Siswa:</Label>
+                  <Button variant="link" asChild className="p-0 h-auto block">
+                    <Link href={selectedResultForDetail.studentSubmissionLink} target="_blank" rel="noopener noreferrer">
+                      <LinkIcon className="inline-block mr-1 h-3.5 w-3.5" /> Lihat File
+                    </Link>
+                  </Button>
+                </div>
+              )}
+              {selectedResultForDetail.submissionNotes && (
+                 <div><Label className="text-muted-foreground">Catatan Pengumpulan Siswa:</Label><p className="whitespace-pre-line text-xs bg-muted/30 p-2 rounded-md">{selectedResultForDetail.submissionNotes}</p></div>
+              )}
+              {selectedResultForDetail.recordedByName && (
+                <div><Label className="text-muted-foreground">Dicatat Oleh:</Label><p className="font-medium">{selectedResultForDetail.recordedByName}</p></div>
+              )}
+              {selectedResultForDetail.updatedAt && (
+                <div><Label className="text-muted-foreground">Terakhir Diperbarui:</Label><p className="font-medium">{format(selectedResultForDetail.updatedAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p></div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
