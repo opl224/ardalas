@@ -84,6 +84,7 @@ import { cn } from "@/lib/utils";
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import LottieLoader from "@/components/ui/LottieLoader";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface AuthUserMin {
@@ -141,6 +142,7 @@ export default function TeachersPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addTeacherForm = useForm<TeacherFormValues>({
     resolver: zodResolver(teacherFormSchema),
@@ -540,7 +542,7 @@ export default function TeachersPage() {
           </Dialog>
         </CardHeader>
         <CardContent>
-          <div className="my-4 flex flex-col sm:flex-row gap-4">
+          <div className="my-4 flex flex-col sm:flex-row gap-2">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -580,10 +582,10 @@ export default function TeachersPage() {
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama Profil</TableHead>
-                    <TableHead>Email Profil</TableHead>
+                    {!isMobile && <TableHead>Email Profil</TableHead>}
                     <TableHead>Mapel</TableHead>
-                    <TableHead>Gender</TableHead>
-                    <TableHead>UID Akun Tertaut</TableHead>
+                    {!isMobile && <TableHead>Gender</TableHead>}
+                    {!isMobile && <TableHead>UID Akun Tertaut</TableHead>}
                     <TableHead className="text-center w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -592,25 +594,29 @@ export default function TeachersPage() {
                     <TableRow key={teacher.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={teacher.name}>{teacher.name}</TableCell>
-                      <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>
+                      {!isMobile && <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>}
                       <TableCell className="truncate" title={teacher.subject}>{teacher.subject}</TableCell>
-                       <TableCell>
-                        {teacher.gender === "laki-laki" ? 
-                          <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
-                         teacher.gender === "perempuan" ? 
-                          <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
-                         "-"}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {teacher.uid ? (
-                          <div className="flex items-center gap-1">
-                            <UidLinkIcon className="h-3 w-3 text-muted-foreground" /> 
-                            {teacher.uid.substring(0,10)}...
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground italic">Belum tertaut</span>
-                        )}
-                      </TableCell>
+                      {!isMobile && (
+                        <TableCell>
+                          {teacher.gender === "laki-laki" ? 
+                            <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
+                          teacher.gender === "perempuan" ? 
+                            <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
+                          "-"}
+                        </TableCell>
+                      )}
+                      {!isMobile && (
+                        <TableCell className="font-mono text-xs">
+                          {teacher.uid ? (
+                            <div className="flex items-center gap-1">
+                              <UidLinkIcon className="h-3 w-3 text-muted-foreground" /> 
+                              {teacher.uid.substring(0,10)}...
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground italic">Belum tertaut</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-center">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -709,7 +715,7 @@ export default function TeachersPage() {
                 <DialogDescription>Informasi lengkap mengenai profil guru.</DialogDescription>
             </DialogHeader>
             {selectedTeacherForView && (
-                <div className="space-y-3 py-4 text-sm">
+                <div className="space-y-3 py-4 text-sm max-h-[60vh] overflow-y-auto pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedTeacherForView.name}</p></div>
                     <div><Label className="text-muted-foreground">Email Profil:</Label><p className="font-medium">{selectedTeacherForView.email}</p></div>
                     <div><Label className="text-muted-foreground">Mata Pelajaran Utama:</Label><p className="font-medium">{selectedTeacherForView.subject}</p></div>
@@ -774,3 +780,4 @@ export default function TeachersPage() {
   );
 }
     
+
