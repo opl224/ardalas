@@ -16,6 +16,7 @@ import {
   doc,
   updateDoc,
   Timestamp,
+  writeBatch,
 } from "firebase/firestore";
 import { BellRing, AlertCircle, FileText, Megaphone, Filter, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
@@ -23,6 +24,7 @@ import { id as indonesiaLocale } from "date-fns/locale";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area"; // Added ScrollArea
 
 interface NotificationDoc {
   id: string;
@@ -110,6 +112,31 @@ export default function AllNotificationsPage() {
       console.error("Error marking notification as read:", error);
       toast({
         title: "Update Notifikasi Gagal",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleMarkAllAsRead = async () => {
+    if (!user) return;
+    const unreadNotifications = notifications.filter(n => !n.read);
+    if (unreadNotifications.length === 0) return;
+
+    const batch = writeBatch(db);
+    unreadNotifications.forEach(notification => {
+      const notificationRef = doc(db, "notifications", notification.id);
+      batch.update(notificationRef, { read: true });
+    });
+    
+    try {
+      await batch.commit();
+      // Optimistically update UI, or rely on listener if you have one for all notifications
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      toast({
+        title: "Update Notifikasi Gagal",
+        description: "Gagal menandai semua notifikasi sebagai dibaca.",
         variant: "destructive",
       });
     }
@@ -213,7 +240,7 @@ export default function AllNotificationsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm text-foreground pt-0 pb-4 px-4">
-                    <p className="truncate">{notification.description}</p>
+                    <p className="block w-full truncate">{notification.description}</p>
                   </CardContent>
                 </Card>
               ))}
