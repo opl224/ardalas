@@ -188,13 +188,13 @@ export default function AllNotificationsPage() {
                 >
                   <CardHeader className="pb-3 pt-4 px-4">
                     <div className="flex justify-between items-start">
-                        <CardTitle className="text-base font-semibold leading-tight">
+                        <CardTitle className="text-base font-semibold leading-tight block truncate">
                             {notification.href ? (
-                                <Link href={notification.href} className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm">
+                                <Link href={notification.href} className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm block truncate">
                                     {notification.title}
                                 </Link>
                             ) : (
-                                notification.title
+                                <span className="block truncate">{notification.title}</span>
                             )}
                         </CardTitle>
                         {!notification.read && (
@@ -213,7 +213,7 @@ export default function AllNotificationsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm text-foreground pt-0 pb-4 px-4">
-                    <p className="line-clamp-2">{notification.description}</p>
+                    <p className="line-clamp-2 truncate">{notification.description}</p>
                   </CardContent>
                 </Card>
               ))}
