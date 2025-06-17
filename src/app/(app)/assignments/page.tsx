@@ -857,7 +857,7 @@ export default function AssignmentsPage() {
                             )}>
                                 {assignment.submissionStatus}
                                 {assignment.submissionStatus === "Sudah Dikerjakan" && assignment.submissionTimestamp && (
-                                    <span className="text-xs text-muted-foreground block"> ({format(assignment.submissionTimestamp.toDate(), "dd MMM, HH:mm")})</span>
+                                    <span className="text-xs text-muted-foreground block"> ({format(assignment.submissionTimestamp.toDate(), "dd MMM, HH:mm", { locale: indonesiaLocale })})</span>
                                 )}
                             </span>
                           </TableCell>
