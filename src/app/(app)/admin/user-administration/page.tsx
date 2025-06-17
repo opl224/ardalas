@@ -634,7 +634,7 @@ export default function UserAdministrationPage() {
           }}>
             <DialogTrigger asChild>
               <Button size="sm" onClick={() => { if(allClasses.length === 0 && !isLoadingClasses) fetchAllClasses();}}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Tambah Pengguna
+                <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Pengguna'}
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
