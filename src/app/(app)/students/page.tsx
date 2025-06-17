@@ -820,26 +820,26 @@ export default function StudentsPage() {
              </div>
           ) : currentTableData.length > 0 ? (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Nama</TableHead>
+                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                    <TableHead className={cn(isMobile ? "px-2" : "")}>Nama</TableHead>
                     { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>NIS</TableHead> }
                     { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>Email</TableHead> }
-                    <TableHead>Kelas</TableHead>
+                    <TableHead className={cn(isMobile ? "px-2" : "")}>Kelas</TableHead>
                     { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>Gender</TableHead> }
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-right w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((student, index) => (
                     <TableRow key={student.id}>
-                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={student.name}>{student.name}</TableCell>
                       { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
                       { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
-                      <TableCell className="truncate" title={student.className}>{student.className || student.classId}</TableCell>
+                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={student.className || student.classId}>{student.className || student.classId}</TableCell>
                       { !isMobile && (authRole === 'admin' || authRole === 'guru') && (
                         <TableCell>
                           {student.gender === "laki-laki" ? (
@@ -851,7 +851,7 @@ export default function StudentsPage() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell className="text-right">
+                      <TableCell className={cn(isMobile ? "text-right px-1" : "text-right")}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}>
@@ -1039,3 +1039,4 @@ export default function StudentsPage() {
     
 
     
+
