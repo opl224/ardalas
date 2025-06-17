@@ -87,6 +87,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import LottieLoader from "@/components/ui/LottieLoader";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 // Minimal interfaces for dropdowns
@@ -180,6 +181,7 @@ export default function LessonsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addLessonForm = useForm<LessonFormValues>({
     resolver: zodResolver(lessonFormSchema),
@@ -808,17 +810,17 @@ export default function LessonsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    {!(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
-                                        {(role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
-                    <TableHead>Hari</TableHead>
-                    <TableHead>Waktu</TableHead>
-                    {canManageLessons && <TableHead>Topik</TableHead>}
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className={cn("w-[50px]", isMobile && "w-10 px-2 text-center")}>No.</TableHead>
+                    <TableHead className={cn(isMobile ? "px-2" : "")}>Mata Pelajaran</TableHead>
+                    {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
+                    {!isMobile && (role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
+                    {!isMobile && <TableHead>Hari</TableHead>}
+                    <TableHead className={cn(isMobile ? "px-2" : "")}>Waktu</TableHead>
+                    {!isMobile && canManageLessons && <TableHead>Topik</TableHead>}
+                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -826,18 +828,22 @@ export default function LessonsPage() {
                     const isActiveNow = isStudentOrParent ? isLessonCurrentlyActive(lesson) : false;
                     return (
                       <TableRow key={lesson.id}>
-                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                        <TableCell className="font-medium">{lesson.subjectName || lesson.subjectId}</TableCell>
-                        {!(isStudentOrParent || role === 'guru') && <TableCell>{lesson.className || lesson.classId}</TableCell>}
-                                                {(role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell>{lesson.teacherName || lesson.teacherId}</TableCell>}
-                        <TableCell>{lesson.dayOfWeek}</TableCell>
-                        <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
-                        {canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
-                        <TableCell className="text-right">
+                        <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                        <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={lesson.subjectName || lesson.subjectId}>{lesson.subjectName || lesson.subjectId}</TableCell>
+                        
+                        {!isMobile && !(isStudentOrParent || role === 'guru') && <TableCell className="truncate" title={lesson.className || lesson.classId}>{lesson.className || lesson.classId}</TableCell>}
+                        {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell className="truncate" title={lesson.teacherName || lesson.teacherId}>{lesson.teacherName || lesson.teacherId}</TableCell>}
+                        {!isMobile && <TableCell>{lesson.dayOfWeek}</TableCell>}
+                        
+                        <TableCell className={cn(isMobile ? "px-2" : "")}>{lesson.startTime} - {lesson.endTime}</TableCell>
+                        
+                        {!isMobile && canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
+                        
+                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                           {isStudentOrParent ? (
                             <Button asChild size="sm" variant={isActiveNow ? "default" : "outline"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
                               <Link href={`/lessons/${lesson.id}`}>
-                                <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                <LogIn className="mr-2 h-4 w-4" /> {isMobile ? "" : "Masuk Kelas"}
                               </Link>
                             </Button>
                           ) : canManageLessons ? (
