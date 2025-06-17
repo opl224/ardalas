@@ -1158,7 +1158,7 @@ export default function AssignmentsPage() {
                     {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
                     {!isMobile && (isAdminRole ) && <TableHead>Guru</TableHead>}
                     
-                    {!isMobile && <TableHead className={cn("text-center")}>Pertemuan</TableHead>}
+                    {!isMobile && <TableHead className={cn("truncate text-center")} title="Pertemuan Ke-">P Ke-</TableHead>}
                     <TableHead className={cn(isMobile ? "w-1/2 px-2" : "")}>Batas Waktu</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
@@ -1179,7 +1179,7 @@ export default function AssignmentsPage() {
                       {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableCell className="truncate" title={assignment.className || assignment.classId}>{assignment.className || assignment.classId}</TableCell>}
                       {!isMobile && (isAdminRole) && <TableCell className="truncate" title={assignment.teacherName || assignment.teacherId}>{assignment.teacherName || assignment.teacherId}</TableCell>}
 
-                      {!isMobile && <TableCell className={cn("truncate text-center")} title={assignment.meetingNumber ? assignment.meetingNumber.toString() : "-"}>{assignment.meetingNumber || "-"}</TableCell>}
+                      {!isMobile && <TableCell className={cn("truncate text-center")} title={assignment.meetingNumber ? `Pertemuan ke-${assignment.meetingNumber.toString()}` : "Tidak ada info pertemuan"}>{assignment.meetingNumber || "-"}</TableCell>}
                       <TableCell className={cn(isMobile ? "px-2 text-xs" : "", isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
                         {format(assignment.dueDate.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
                          {isMobile && <span className="block text-muted-foreground">{format(assignment.dueDate.toDate(), "HH:mm", { locale: indonesiaLocale })}</span>}
@@ -1245,7 +1245,7 @@ export default function AssignmentsPage() {
                                               <Trash2 className="mr-2 h-4 w-4" /> Hapus
                                           </DropdownMenuItem>
                                           </AlertDialogTrigger>
-                                          {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                          {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title || 'ini'}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                                       </AlertDialog>
                                   </>
                               )}
@@ -1393,7 +1393,7 @@ export default function AssignmentsPage() {
         <Dialog open={isSubmitAssignmentDialogOpen} onOpenChange={(isOpen) => { setIsSubmitAssignmentDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForSubmission(null); studentSubmitForm.reset(); }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Kerjakan Tugas: {selectedAssignmentForSubmission.title}</DialogTitle>
+              <DialogTitle>Kerjakan Tugas: {selectedAssignmentForSubmission?.title || 'Tugas Ini'}</DialogTitle>
               <DialogDescription>
                 <div>Mata Pelajaran: {selectedAssignmentForSubmission.subjectName}</div>
                 <div>Batas Waktu: {format(selectedAssignmentForSubmission.dueDate.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</div>
@@ -1433,7 +1433,7 @@ export default function AssignmentsPage() {
         <Dialog open={isViewSubmissionsDialogOpen} onOpenChange={(isOpen) => { setIsViewSubmissionsDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentToViewSubmissions(null); }}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Pengumpulan Tugas: {selectedAssignmentToViewSubmissions.title}</DialogTitle>
+                    <DialogTitle>Pengumpulan Tugas: {selectedAssignmentToViewSubmissions?.title || 'Tugas Ini'}</DialogTitle>
                     <DialogDescription>Daftar siswa yang telah mengumpulkan tugas.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 max-h-[60vh] overflow-y-auto">
@@ -1481,7 +1481,7 @@ export default function AssignmentsPage() {
         <Dialog open={isViewResultDialogOpen} onOpenChange={(isOpen) => { setIsViewResultDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForViewingResult(null); }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Hasil Tugas: {selectedAssignmentForViewingResult.title}</DialogTitle>
+              <DialogTitle>Hasil Tugas: {selectedAssignmentForViewingResult?.title || 'Tugas Ini'}</DialogTitle>
               <DialogDescription>
                 Mata Pelajaran: {selectedAssignmentForViewingResult.subjectName}
                 {selectedAssignmentForViewingResult.result.dateOfAssessment && (
@@ -1529,7 +1529,7 @@ export default function AssignmentsPage() {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-primary" />
-                Detail Tugas: {selectedAssignmentForDetail.title}
+                Detail Tugas: {selectedAssignmentForDetail?.title || 'Tugas Ini'}
               </DialogTitle>
               <DialogDescription>
                 Informasi lengkap mengenai tugas ini.
@@ -1586,6 +1586,7 @@ export default function AssignmentsPage() {
 }
 
     
+
 
 
 
