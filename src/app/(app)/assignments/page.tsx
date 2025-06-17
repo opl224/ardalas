@@ -49,7 +49,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, isPast } from "date-fns";
+import { format, isPast, startOfDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -240,7 +240,20 @@ export default function AssignmentsPage() {
 
   const addAssignmentForm = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentFormSchema),
-    defaultValues: { title: "", subjectId: undefined, classId: undefined, teacherId: undefined, dueDate: new Date(), description: "", fileURL: "", meetingNumber: undefined },
+    defaultValues: { 
+      title: "", 
+      subjectId: undefined, 
+      classId: undefined, 
+      teacherId: undefined, 
+      dueDate: (() => {
+        const todayEndOfDay = new Date();
+        todayEndOfDay.setHours(23, 59, 0, 0);
+        return todayEndOfDay;
+      })(), 
+      description: "", 
+      fileURL: "", 
+      meetingNumber: undefined 
+    },
   });
 
   const editAssignmentForm = useForm<EditAssignmentFormValues>({ resolver: zodResolver(editAssignmentFormSchema) });
@@ -632,7 +645,20 @@ export default function AssignmentsPage() {
       await batch.commit();
 
       setIsAddDialogOpen(false);
-      addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: isTeacherRole ? teacherProfileId || undefined : undefined, description: "", fileURL: "", meetingNumber: undefined });
+      addAssignmentForm.reset({ 
+        dueDate: (() => {
+            const todayEndOfDay = new Date();
+            todayEndOfDay.setHours(23, 59, 0, 0);
+            return todayEndOfDay;
+          })(),
+        title: "", 
+        subjectId: undefined, 
+        classId: undefined, 
+        teacherId: isTeacherRole ? teacherProfileId || undefined : undefined, 
+        description: "", 
+        fileURL: "", 
+        meetingNumber: undefined 
+      });
       fetchAssignments();
     } catch (error: any) {
       console.error("Error adding assignment or notifications:", error);
@@ -890,7 +916,19 @@ export default function AssignmentsPage() {
             {isTeacherOrAdminRole && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
                 setIsAddDialogOpen(isOpen);
-                if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: isTeacherRole ? teacherProfileId || undefined : undefined, description: "", fileURL: "", meetingNumber: undefined }); addAssignmentForm.clearErrors(); }
+                if (!isOpen) { 
+                    addAssignmentForm.reset({ 
+                        dueDate: (() => { const d = new Date(); d.setHours(23,59,0,0); return d; })(), 
+                        title: "", 
+                        subjectId: undefined, 
+                        classId: undefined, 
+                        teacherId: isTeacherRole ? teacherProfileId || undefined : undefined, 
+                        description: "", 
+                        fileURL: "", 
+                        meetingNumber: undefined 
+                    }); 
+                    addAssignmentForm.clearErrors(); 
+                }
                  else if (isAdminRole && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) fetchAdminDropdownData(); 
               }}>
                 <DialogTrigger asChild>
@@ -913,7 +951,58 @@ export default function AssignmentsPage() {
                     )}
 
 
-                    <div><Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP HH:mm", { locale: indonesiaLocale }) : <span>Pilih tanggal & waktu</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addAssignmentForm.watch("dueDate")} onSelect={(date) => addAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /><div className="p-2 border-t"><Input type="time" defaultValue={format(addAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} onChange={(e) => { const timeParts = e.target.value.split(':'); const newDate = new Date(addAssignmentForm.watch("dueDate") || new Date()); newDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1])); addAssignmentForm.setValue("dueDate", newDate, { shouldValidate: true }); }} /></div></PopoverContent></Popover>{addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+                    <div>
+                        <Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP HH:mm", { locale: indonesiaLocale }) : <span>Pilih tanggal & waktu</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={addAssignmentForm.watch("dueDate")}
+                                    onSelect={(date) => {
+                                        if (date) {
+                                            const newDueDate = new Date(date);
+                                            newDueDate.setHours(23, 59, 0, 0);
+                                            addAssignmentForm.setValue("dueDate", newDueDate, { shouldValidate: true });
+                                        } else {
+                                            const todayEndOfDay = new Date();
+                                            todayEndOfDay.setHours(23, 59, 0, 0);
+                                            addAssignmentForm.setValue("dueDate", todayEndOfDay, { shouldValidate: true });
+                                        }
+                                    }}
+                                    initialFocus
+                                />
+                                <div className="p-2 border-t">
+                                    <Input
+                                        type="time"
+                                        defaultValue={format(addAssignmentForm.watch("dueDate") || new Date(), "HH:mm")}
+                                        onChange={(e) => {
+                                            const timeValue = e.target.value;
+                                            if (timeValue) {
+                                                const timeParts = timeValue.split(':');
+                                                if (timeParts.length === 2) {
+                                                    const hours = parseInt(timeParts[0], 10);
+                                                    const minutes = parseInt(timeParts[1], 10);
+                                                    if (!isNaN(hours) && !isNaN(minutes)) {
+                                                        const currentFullDate = addAssignmentForm.watch("dueDate") || new Date();
+                                                        const newDateWithUserTime = new Date(currentFullDate);
+                                                        newDateWithUserTime.setHours(hours, minutes, 0, 0);
+                                                        addAssignmentForm.setValue("dueDate", newDateWithUserTime, { shouldValidate: true });
+                                                    }
+                                                }
+                                            }
+                                        }}
+                                    />
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                        {addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}
+                    </div>
                     <div><Label htmlFor="add-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="add-assignment-meetingNumber" type="number" {...addAssignmentForm.register("meetingNumber")} className="mt-1" placeholder="Contoh: 3" />{addAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
                     <div><Label htmlFor="add-assignment-description">Deskripsi Tugas</Label><Textarea id="add-assignment-description" {...addAssignmentForm.register("description")} className="mt-1" placeholder="Jelaskan detail tugas di sini..." /></div>
                     <div><Label htmlFor="add-assignment-fileURL">URL File Tugas (Opsional)</Label><Input id="add-assignment-fileURL" {...addAssignmentForm.register("fileURL")} className="mt-1" placeholder="https://contoh.com/file_tugas.pdf" />{addAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.fileURL.message}</p>}</div>
@@ -1167,7 +1256,58 @@ export default function AssignmentsPage() {
                     <Input type="hidden" {...editAssignmentForm.register("teacherId", { value: teacherProfileId || ""})} />
                )}
 
-              <div><Label htmlFor="edit-assignment-dueDate">Batas Waktu</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{editAssignmentForm.watch("dueDate") ? format(editAssignmentForm.watch("dueDate"), "PPP HH:mm", { locale: indonesiaLocale }) : <span>Pilih tanggal & waktu</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={editAssignmentForm.watch("dueDate")} onSelect={(date) => editAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /><div className="p-2 border-t"><Input type="time" defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} onChange={(e) => { const timeParts = e.target.value.split(':'); const newDate = new Date(editAssignmentForm.watch("dueDate") || new Date()); newDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1])); editAssignmentForm.setValue("dueDate", newDate, { shouldValidate: true }); }} /></div></PopoverContent></Popover>{editAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+              <div>
+                  <Label htmlFor="edit-assignment-dueDate">Batas Waktu</Label>
+                  <Popover>
+                      <PopoverTrigger asChild>
+                          <Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {editAssignmentForm.watch("dueDate") ? format(editAssignmentForm.watch("dueDate"), "PPP HH:mm", { locale: indonesiaLocale }) : <span>Pilih tanggal & waktu</span>}
+                          </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                          <Calendar
+                              mode="single"
+                              selected={editAssignmentForm.watch("dueDate")}
+                              onSelect={(date) => {
+                                  if (date) {
+                                      const newDueDate = new Date(date);
+                                      newDueDate.setHours(23, 59, 0, 0);
+                                      editAssignmentForm.setValue("dueDate", newDueDate, { shouldValidate: true });
+                                  } else {
+                                      const todayEndOfDay = new Date();
+                                      todayEndOfDay.setHours(23, 59, 0, 0);
+                                      editAssignmentForm.setValue("dueDate", todayEndOfDay, { shouldValidate: true });
+                                  }
+                              }}
+                              initialFocus
+                          />
+                          <div className="p-2 border-t">
+                              <Input
+                                  type="time"
+                                  defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")}
+                                  onChange={(e) => {
+                                      const timeValue = e.target.value;
+                                      if (timeValue) {
+                                          const timeParts = timeValue.split(':');
+                                           if (timeParts.length === 2) {
+                                              const hours = parseInt(timeParts[0], 10);
+                                              const minutes = parseInt(timeParts[1], 10);
+                                               if (!isNaN(hours) && !isNaN(minutes)) {
+                                                  const currentFullDate = editAssignmentForm.watch("dueDate") || new Date();
+                                                  const newDateWithUserTime = new Date(currentFullDate);
+                                                  newDateWithUserTime.setHours(hours, minutes, 0, 0);
+                                                  editAssignmentForm.setValue("dueDate", newDateWithUserTime, { shouldValidate: true });
+                                              }
+                                          }
+                                      }
+                                  }}
+                              />
+                          </div>
+                      </PopoverContent>
+                  </Popover>
+                  {editAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.dueDate.message}</p>}
+              </div>
               <div><Label htmlFor="edit-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="edit-assignment-meetingNumber" type="number" {...editAssignmentForm.register("meetingNumber")} className="mt-1" />{editAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-description">Deskripsi</Label><Textarea id="edit-assignment-description" {...editAssignmentForm.register("description")} className="mt-1" /></div>
               <div><Label htmlFor="edit-assignment-fileURL">URL File</Label><Input id="edit-assignment-fileURL" {...editAssignmentForm.register("fileURL")} className="mt-1" />{editAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.fileURL.message}</p>}</div>
@@ -1315,3 +1455,4 @@ export default function AssignmentsPage() {
 }
 
     
+
