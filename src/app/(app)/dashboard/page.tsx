@@ -65,7 +65,7 @@ interface DashboardStats {
   adminTotalTeachers: number;
   adminTotalSubjects: number;
   adminTotalClasses: number;
-  adminTotalParents: number;
+  adminTotalParents: number; // Added this line
   // Teacher specific
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
@@ -85,7 +85,7 @@ export default function DashboardPage() {
     adminTotalTeachers: 0,
     adminTotalSubjects: 0,
     adminTotalClasses: 0,
-    adminTotalParents: 0,
+    adminTotalParents: 0, // Added this line
     teacherTotalStudentsTaught: 0,
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
@@ -126,21 +126,21 @@ export default function DashboardPage() {
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
           const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
-          const parentUserQuery = query(collection(db, "users"), where("role", "==", "orangtua"));
+          const parentUserQuery = query(collection(db, "users"), where("role", "==", "orangtua")); // Query for parents
           const subjectsQuery = collection(db, "subjects");
           const classesQuery = collection(db, "classes");
 
           const [studentSnap, teacherUserSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
-            getDocs(parentUserSnap),
+            getDocs(parentUserQuery), // Fetch parents
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
 
           newStats.adminTotalStudents = studentSnap.size;
           newStats.adminTotalTeachers = teacherUserSnap.size;
-          newStats.adminTotalParents = parentUserSnap.size;
+          newStats.adminTotalParents = parentUserSnap.size; // Set parent count
           newStats.adminTotalSubjects = subjectSnap.size;
           newStats.adminTotalClasses = classSnap.size;
 
@@ -306,7 +306,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">
-          Selamat Datang{user?.displayName ? \`, \${user.displayName}\` : ''}!
+          Selamat Datang{user?.displayName ? `, ${user.displayName}` : ''}!
         </h1>
         <p className="text-muted-foreground">Platform manajemen informasi sekolah Ardalas.</p>
       </div>
