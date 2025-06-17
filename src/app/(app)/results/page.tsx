@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarDatePicker } from "@/components/calendar-date-picker"; 
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search } from "lucide-react";
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -73,6 +73,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { Form } from "@/components/ui/form";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Pagination,
   PaginationContent,
@@ -997,31 +1003,46 @@ export default function ResultsPage() {
                         </>
                       )}
                       {canManageResults && (
-                        <TableCell className="text-right space-x-2">
-                            <Button variant="outline" size="icon" onClick={() => openEditDialog(result)} aria-label={`Edit hasil ${result.studentName}`}>
-                            <Edit className="h-4 w-4" />
-                            </Button>
-                            <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button variant="destructive" size="icon" onClick={() => openDeleteDialog(result)} aria-label={`Hapus hasil ${result.studentName}`}>
-                                <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </AlertDialogTrigger>
-                            {selectedResult && selectedResult.id === result.id && (
-                                <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                    Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setSelectedResult(null)}>Batal</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteResult(selectedResult.id)}>Ya, Hapus Hasil</AlertDialogAction>
-                                </AlertDialogFooter>
-                                </AlertDialogContent>
-                            )}
-                            </AlertDialog>
+                        <TableCell className="text-right">
+                           <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Aksi untuk hasil ${result.studentName}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditDialog(result)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                <span>Edit</span>
+                              </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    onClick={() => openDeleteDialog(result)}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Hapus</span>
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedResult && selectedResult.id === result.id && (
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => setSelectedResult(null)}>Batal</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteResult(selectedResult.id)}>Ya, Hapus Hasil</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       )}
                     </TableRow>
