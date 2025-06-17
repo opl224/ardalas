@@ -87,9 +87,10 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
+import { CalendarDatePicker } from "@/components/calendar-date-picker";
 // import { CalendarDatePicker } from "@/components/calendar-date-picker";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+// import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+// import { Calendar } from "@/components/ui/calendar";
 
 
 interface ClassMin {
@@ -578,38 +579,19 @@ export default function StudentsPage() {
           <div>
             <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
             <Controller
-              name="dateOfBirth"
               control={formInstance.control}
+              name="dateOfBirth"
               render={({ field }) => (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal mt-1",
-                        !field.value && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {field.value ? format(field.value, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
-                      initialFocus
-                      captionLayout="dropdown-buttons"
-                      fromYear={1990}
-                      toYear={new Date().getFullYear()}
-                      locale={indonesiaLocale}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <CalendarDatePicker
+                  id={`${formType}-student-dateOfBirth-picker`}
+                  date={{ from: field.value, to: field.value }}
+                  onDateSelect={(range) => field.onChange(range.from)}
+                  numberOfMonths={1}
+                  closeOnSelect={true}
+                  yearsRange={30} 
+                  className="mt-1 w-full"
+                  variant="outline" 
+                />
               )}
             />
             {formInstance.formState.errors.dateOfBirth && (
