@@ -736,7 +736,7 @@ export default function StudentsPage() {
             >
               <DialogTrigger asChild>
                 <Button size="sm" disabled={(authRole === 'admin' || authRole === 'guru') && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Murid
+                  <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
                 </Button>
               </DialogTrigger>
               <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
