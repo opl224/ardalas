@@ -46,7 +46,7 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Guru", href: "/teachers", icon: Users, roles: ["admin"] },
       { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru"] }, 
-      { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin"] },
+      { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin", "guru"] },
     ],
   },
   {
@@ -86,3 +86,4 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
+
