@@ -81,6 +81,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface AuthUserMin {
   id: string; // Firebase Auth UID
@@ -89,12 +90,12 @@ interface AuthUserMin {
 }
 
 interface Subject {
-  id: string; 
+  id: string;
   name: string;
   description?: string;
   teacherUid?: string; // UID of the responsible teacher from Auth
   teacherName?: string; // Denormalized name of the responsible teacher
-  createdAt?: Timestamp; 
+  createdAt?: Timestamp;
 }
 
 const subjectFormSchema = z.object({
@@ -116,13 +117,14 @@ export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [authGuruUsers, setAuthGuruUsers] = useState<AuthUserMin[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true); 
+  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const { user, role, loading: authLoading } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const { isMobile } = useSidebar();
 
   const { toast } = useToast();
 
@@ -150,7 +152,7 @@ export default function SubjectsPage() {
       const q = query(usersCollectionRef, where("role", "==", "guru"), orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: AuthUserMin[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.data().uid, 
+        id: docSnap.data().uid,
         name: docSnap.data().name,
         email: docSnap.data().email,
       }));
@@ -181,7 +183,7 @@ export default function SubjectsPage() {
         setIsLoadingSubjects(false);
         return;
       }
-      
+
       const querySnapshot = await getDocs(q);
       const fetchedSubjects: Subject[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
@@ -207,7 +209,7 @@ export default function SubjectsPage() {
     if (role === "admin" && !authLoading) {
       fetchAuthGuruUsers();
     } else {
-        setIsLoadingAuthUsers(false); 
+        setIsLoadingAuthUsers(false);
     }
   }, [role, authLoading]);
 
@@ -246,11 +248,11 @@ export default function SubjectsPage() {
         teacherName: selectedTeacher?.name || null,
         createdAt: serverTimestamp(),
       });
-      
+
       toast({ title: "Subjek Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
       addSubjectForm.reset();
-      fetchSubjects(); 
+      fetchSubjects();
     } catch (error: any) {
       console.error("Error adding subject:", error);
       toast({
@@ -273,7 +275,7 @@ export default function SubjectsPage() {
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
       });
-      
+
       toast({ title: "Subjek Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditDialogOpen(false);
       setSelectedSubject(null);
@@ -292,7 +294,7 @@ export default function SubjectsPage() {
     try {
       await deleteDoc(doc(db, "subjects", subjectId));
       toast({ title: "Subjek Dihapus", description: `${subjectName || 'Subjek'} berhasil dihapus.` });
-      setSelectedSubject(null); 
+      setSelectedSubject(null);
       fetchSubjects();
     } catch (error) {
       console.error("Error deleting subject:", error);
@@ -311,10 +313,10 @@ export default function SubjectsPage() {
     setSelectedSubject(subject);
     setIsEditDialogOpen(true);
   };
-  
+
   const openDeleteDialog = (subject: Subject) => {
      if (role !== "admin") return;
-    setSelectedSubject(subject); 
+    setSelectedSubject(subject);
   };
 
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => (
@@ -374,8 +376,8 @@ export default function SubjectsPage() {
   const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingAuthUsers);
 
   const displayedSubjects = useMemo(() => {
-    if (role !== 'admin') return subjects; 
-  
+    if (role !== 'admin') return subjects;
+
     return subjects.filter(subject => {
       const lowerSearchTerm = searchTerm.toLowerCase();
       const nameMatch = subject.name.toLowerCase().includes(lowerSearchTerm);
@@ -512,25 +514,25 @@ export default function SubjectsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className="w-full">
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className="min-w-[200px]">Nama Subjek</TableHead>
-                    <TableHead className="min-w-[250px]">Deskripsi</TableHead>
-                    {(role === "admin" || role === "guru") && <TableHead className="min-w-[180px]">Guru Penanggung Jawab</TableHead>}
-                    {role === "admin" && <TableHead className="text-right min-w-[100px]">Aksi</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                    <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Nama Subjek</TableHead>
+                    {!isMobile && <TableHead className="min-w-[250px]">Deskripsi</TableHead>}
+                    <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Guru Penanggung Jawab</TableHead>
+                    {role === "admin" && <TableHead className={cn("text-right min-w-[100px]", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((subject, index) => (
                     <TableRow key={subject.id}>
-                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium">{subject.name}</TableCell>
-                      <TableCell className="truncate max-w-sm" title={subject.description || "-"}>{subject.description || "-"}</TableCell>
-                      {(role === "admin" || role === "guru") && <TableCell>{subject.teacherName || subject.teacherUid || "-"}</TableCell>}
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className={cn("font-medium truncate", isMobile && "px-2")} title={subject.name}>{subject.name}</TableCell>
+                      {!isMobile && <TableCell className="truncate max-w-sm" title={subject.description || "-"}>{subject.description || "-"}</TableCell>}
+                      <TableCell className={cn("truncate", isMobile && "px-2")} title={subject.teacherName || subject.teacherUid || "-"}>{subject.teacherName || subject.teacherUid || "-"}</TableCell>
                       {role === "admin" && (
-                        <TableCell className="text-right">
+                        <TableCell className={cn("text-right", isMobile && "px-1")}>
                            <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${subject.name}`}>
@@ -552,7 +554,7 @@ export default function SubjectsPage() {
                                     Hapus
                                   </DropdownMenuItem>
                                 </AlertDialogTrigger>
-                                {selectedSubject && selectedSubject.id === subject.id && ( 
+                                {selectedSubject && selectedSubject.id === subject.id && (
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
@@ -582,16 +584,16 @@ export default function SubjectsPage() {
                 <Pagination className="mt-6">
                     <PaginationContent>
                         <PaginationItem>
-                        <PaginationPrevious 
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                        <PaginationPrevious
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                             aria-disabled={currentPage === 1}
                             className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
                         />
                         </PaginationItem>
                         {renderPageNumbers()}
                         <PaginationItem>
-                        <PaginationNext 
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                        <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                             aria-disabled={currentPage === totalPages}
                             className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
                         />
