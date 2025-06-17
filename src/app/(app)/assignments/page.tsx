@@ -943,12 +943,12 @@ export default function AssignmentsPage() {
              <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
                <span className={cn(isMobile && "block")}>Daftar Tugas</span>
               {!isLoading && (
-                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs block" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
                   {`(${filteredAssignments.length} tugas)`}
                 </span>
               )}
               {isLoading && (
-                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs block" : "")}>
                   (Memuat...)
                 </span>
               )}
@@ -1137,7 +1137,7 @@ export default function AssignmentsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn("truncate", isMobile ? "w-auto px-2" : "min-w-[180px]")}>Judul Tugas</TableHead>
+                    {!isMobile && <TableHead className="min-w-[180px]">Judul Tugas</TableHead>}
                     <TableHead className={cn("truncate", isMobile ? "w-auto px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
@@ -1158,7 +1158,7 @@ export default function AssignmentsPage() {
                   {currentTableData.map((assignment, index) => (
                     <TableRow key={assignment.id}>
                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={assignment.title}>{assignment.title}</TableCell>
+                      {!isMobile && <TableCell className="font-medium truncate" title={assignment.title}>{assignment.title}</TableCell>}
                       <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={assignment.subjectName || assignment.subjectId}>{assignment.subjectName || assignment.subjectId}</TableCell>
                       
                       {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableCell className="truncate" title={assignment.teacherName || assignment.teacherId}>{assignment.teacherName || assignment.teacherId}</TableCell>}
@@ -1515,4 +1515,5 @@ export default function AssignmentsPage() {
 }
 
     
+
 
