@@ -874,48 +874,18 @@ export default function ResultsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-col md:flex-row items-center justify-between space-y-2 md:space-y-0 pb-4">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <BarChart3 className="h-6 w-6 text-primary" />
             <span>Daftar Hasil Belajar</span>
           </CardTitle>
-          <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-            { (role === "admin" || role === "guru") && (
-              <>
-                <div className="relative w-full sm:w-auto flex-grow">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Cari siswa, kelas, mapel, asesmen..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 w-full"
-                  />
-                </div>
-                <Select
-                  value={selectedAssessmentTypeFilter}
-                  onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
-
-                >
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                      <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                      <SelectValue placeholder="Filter Tipe Asesmen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="all">Semua Tipe</SelectItem>
-                      {ASSESSMENT_TYPES.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </>
-            )}
             {canManageResults && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
                   setIsAddDialogOpen(isOpen);
                   if (!isOpen) { addResultForm.reset({ classId: undefined, studentId: undefined, subjectId: undefined, assessmentType: undefined, dateOfAssessment: new Date(), score: 0, assessmentTitle: "", feedback: "", meetingNumber: undefined, assignmentId: undefined }); addResultForm.clearErrors(); setFilteredStudents([]); setFilteredAssignments([]);}
               }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="w-full sm:w-auto" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
+                  <Button size="sm" onClick={() => {if(classes.length === 0 && students.length === 0 && subjects.length === 0 && (role === 'admin' || role === 'guru')) fetchDropdownData();}}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Tambah Hasil
                   </Button>
                 </DialogTrigger>
@@ -942,9 +912,36 @@ export default function ResultsPage() {
                 </DialogContent>
               </Dialog>
             )}
-          </div>
         </CardHeader>
         <CardContent>
+         { (role === "admin" || role === "guru") && (
+            <div className="my-4 flex flex-col sm:flex-row items-center gap-2 w-full">
+                <div className="relative w-full sm:w-auto flex-grow">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari siswa, kelas, mapel, asesmen..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-full"
+                  />
+                </div>
+                <Select
+                  value={selectedAssessmentTypeFilter}
+                  onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+                >
+                  <SelectTrigger className="w-full sm:w-[200px]">
+                      <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Filter Tipe Asesmen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">Semua Tipe</SelectItem>
+                      {ASSESSMENT_TYPES.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+            </div>
+            )}
           {isLoadingResults ? (
             <div className="space-y-2 mt-4">{[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
           ) : currentTableData.length > 0 ? (
@@ -954,21 +951,27 @@ export default function ResultsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile && "px-2")}>{(role === 'siswa' || role === 'orangtua') ? 'Judul Asesmen' : 'Siswa'}</TableHead>
+                    <TableHead className={cn(isMobile && "px-2")}>
+                        {(role === 'siswa' || role === 'orangtua') ? 'Judul Asesmen' : 'Siswa'}
+                    </TableHead>
                     {isMobile ? (
-                         <TableHead className="w-16 px-1 text-center">Nilai</TableHead>
+                        <>
+                            <TableHead className="px-2">Mapel</TableHead>
+                            <TableHead className="w-16 px-1 text-center">Nilai</TableHead>
+                        </>
                     ) : (
                       <>
-                        {canManageResults && <TableHead>Kelas</TableHead>}
-                        {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
                         {(role === 'siswa' || role === 'orangtua') ? (
                           <>
+                            <TableHead>Mapel</TableHead>
                             <TableHead>Link Tugas</TableHead>
                             <TableHead>Feedback Guru</TableHead>
                             <TableHead>Nilai</TableHead>
                           </>
-                        ) : (
+                        ) : ( 
                           <>
+                            {canManageResults && <TableHead>Kelas</TableHead>}
+                            {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
                             <TableHead>Asesmen</TableHead>
                             <TableHead>Nilai</TableHead>
                             <TableHead>Feedback Guru</TableHead>
@@ -983,22 +986,32 @@ export default function ResultsPage() {
                 <TableBody>
                   {currentTableData.map((result, index) => (
                     <TableRow key={result.id}>
-                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                       <TableCell className={cn("font-medium truncate", isMobile && "px-2")} title={(role === 'siswa' || role === 'orangtua') ? result.assessmentTitle : result.studentName}>
-                        {(role === 'siswa' || role === 'orangtua')
-                          ? `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : ''}`
-                          : result.studentName
-                        }
-                      </TableCell>
-
                       {isMobile ? (
-                        <TableCell className="text-center px-1">{result.score}</TableCell>
+                        <>
+                          <TableCell className="px-2 text-center">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                          <TableCell className="font-medium truncate px-2" title={(role === 'siswa' || role === 'orangtua') ? result.assessmentTitle : result.studentName}>
+                            {(role === 'siswa' || role === 'orangtua')
+                              ? `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : ''}`
+                              : result.studentName
+                            }
+                          </TableCell>
+                          <TableCell className="truncate px-2" title={result.subjectName || undefined}>
+                            {result.subjectName || "-"}
+                          </TableCell>
+                          <TableCell className="text-center px-1">{result.score}</TableCell>
+                        </>
                       ) : (
                         <>
-                          {canManageResults && <TableCell className="truncate" title={result.className}>{result.className}</TableCell>}
-                          {(role === 'admin' || role === 'guru') && <TableCell className="truncate" title={result.subjectName}>{result.subjectName}</TableCell>}
+                          <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                          <TableCell className="font-medium truncate" title={(role === 'siswa' || role === 'orangtua') ? result.assessmentTitle : result.studentName}>
+                            {(role === 'siswa' || role === 'orangtua')
+                              ? `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : ''}`
+                              : result.studentName
+                            }
+                          </TableCell>
                           {(role === 'siswa' || role === 'orangtua') ? (
                             <>
+                              <TableCell className="truncate" title={result.subjectName || undefined}>{result.subjectName || "-"}</TableCell>
                               <TableCell>
                                 {result.studentSubmissionLink ? (
                                   <Button variant="link" asChild className="p-0 h-auto text-sm">
@@ -1013,6 +1026,8 @@ export default function ResultsPage() {
                             </>
                           ) : (
                             <>
+                              {canManageResults && <TableCell className="truncate" title={result.className}>{result.className}</TableCell>}
+                              {(role === 'admin' || role === 'guru') && <TableCell className="truncate" title={result.subjectName}>{result.subjectName}</TableCell>}
                               <TableCell className="truncate" title={result.assessmentTitle}>
                                 {result.assessmentTitle} ({result.assessmentType})
                                 {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
