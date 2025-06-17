@@ -243,9 +243,12 @@ export default function ResultsPage() {
         q = query(resultsCollectionRef, where("studentId", "==", user.uid), orderBy("dateOfAssessment", "desc"));
       } else if (role === 'orangtua' && user.linkedStudentId) {
         q = query(resultsCollectionRef, where("studentId", "==", user.linkedStudentId), orderBy("dateOfAssessment", "desc"));
-      } else if (role === 'admin' || role === 'guru') {
+      } else if (role === 'guru' && user.uid) {
+        q = query(resultsCollectionRef, where("recordedById", "==", user.uid), orderBy("dateOfAssessment", "desc"), orderBy("createdAt", "desc"));
+      } else if (role === 'admin') {
         q = query(resultsCollectionRef, orderBy("dateOfAssessment", "desc"), orderBy("createdAt", "desc"));
       }
+
 
       if (!q) {
         setResults([]);
@@ -1018,9 +1021,8 @@ export default function ResultsPage() {
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <DropdownMenuItem
-                                    onSelect={(e) => e.preventDefault()}
+                                    onSelect={(e) => {e.preventDefault(); openDeleteDialog(result);}}
                                     className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                    onClick={() => openDeleteDialog(result)}
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     <span>Hapus</span>
