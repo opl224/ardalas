@@ -4,7 +4,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck } from "lucide-react";
+import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
@@ -65,6 +65,7 @@ interface DashboardStats {
   adminTotalTeachers: number;
   adminTotalSubjects: number;
   adminTotalClasses: number;
+  adminTotalParents: number; 
   // Teacher specific
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
@@ -84,6 +85,7 @@ export default function DashboardPage() {
     adminTotalTeachers: 0,
     adminTotalSubjects: 0,
     adminTotalClasses: 0,
+    adminTotalParents: 0,
     teacherTotalStudentsTaught: 0,
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
@@ -103,7 +105,7 @@ export default function DashboardPage() {
         setLoadingStats(false);
         setLoadingAnnouncements(false);
         setStats({
-            adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
+            adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0, adminTotalParents: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
             parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
         });
@@ -115,7 +117,7 @@ export default function DashboardPage() {
       setLoadingAnnouncements(true);
 
       const newStats: DashboardStats = {
-        adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
+        adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0, adminTotalParents: 0,
         teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
         parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
       };
@@ -124,18 +126,21 @@ export default function DashboardPage() {
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
           const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
+          const parentUserQuery = query(collection(db, "users"), where("role", "==", "orangtua"));
           const subjectsQuery = collection(db, "subjects");
           const classesQuery = collection(db, "classes");
 
-          const [studentSnap, teacherUserSnap, subjectSnap, classSnap] = await Promise.all([
+          const [studentSnap, teacherUserSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
+            getDocs(parentUserQuery),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
 
           newStats.adminTotalStudents = studentSnap.size;
           newStats.adminTotalTeachers = teacherUserSnap.size;
+          newStats.adminTotalParents = parentUserSnap.size;
           newStats.adminTotalSubjects = subjectSnap.size;
           newStats.adminTotalClasses = classSnap.size;
 
@@ -216,7 +221,7 @@ export default function DashboardPage() {
       } catch (error) {
         console.error("Error fetching stats: ", error);
         setStats({ // Reset to default on error
-            adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0,
+            adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0, adminTotalParents: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
             parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
         });
@@ -323,9 +328,10 @@ export default function DashboardPage() {
       {role === 'admin' && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/admin/user-administration" />
-            <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/admin/user-administration" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
+            <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
+            <StatCard title="Total Orang Tua" value={stats.adminTotalParents} icon={UserCircle} loading={loadingStats} href="/parents" />
             <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
             <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
           </div>
