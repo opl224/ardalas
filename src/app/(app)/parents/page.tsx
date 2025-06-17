@@ -140,7 +140,7 @@ const NO_AUTH_USER_SELECTED = "_NO_AUTH_USER_";
 const ITEMS_PER_PAGE = 10;
 
 export default function ParentsPage() {
-  const { user, role, loading: authLoading } = useAuth();
+  const { user: authUser, role: authRole, loading: authLoading } = useAuth();
   const [parents, setParents] = useState<Parent[]>([]);
   const [studentsForDialog, setStudentsForDialog] = useState<StudentForDialog[]>([]);
   const [authOrangtuaUsers, setAuthOrangtuaUsers] = useState<AuthUserMin[]>([]);
@@ -177,7 +177,7 @@ export default function ParentsPage() {
   });
 
   const fetchPageData = async () => {
-    if (authLoading && role !== 'admin') return;
+    if (authLoading && (authRole !== 'admin' && authRole !== 'guru')) return;
     setIsLoadingData(true);
     try {
       const promises = [];
@@ -189,7 +189,7 @@ export default function ParentsPage() {
       const authOrangtuaQueryInstance = query(usersCollectionRef, where("role", "==", "orangtua"), orderBy("name", "asc"));
       promises.push(getDocs(authOrangtuaQueryInstance));
 
-      if (role === 'admin') {
+      if (authRole === 'admin' || authRole === 'guru') {
         const classesCollectionRef = collection(db, "classes");
         const classesQueryInstance = query(classesCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(classesQueryInstance));
@@ -220,7 +220,7 @@ export default function ParentsPage() {
       })));
 
 
-      if (role === 'admin' && classesSnapshot) {
+      if ((authRole === 'admin' || authRole === 'guru') && classesSnapshot) {
         setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
       }
 
@@ -252,7 +252,7 @@ export default function ParentsPage() {
 
   useEffect(() => {
     fetchPageData();
-  }, [authLoading, role]);
+  }, [authLoading, authRole]);
 
   useEffect(() => {
     if (selectedParent && isEditDialogOpen) {
@@ -270,6 +270,10 @@ export default function ParentsPage() {
   }, [selectedParent, isEditDialogOpen, editParentForm]);
 
   const handleAddParentSubmit: SubmitHandler<ParentFormValues> = async (data) => {
+    if (authRole !== 'admin' && authRole !== 'guru') {
+      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menambahkan data.", variant: "destructive" });
+      return;
+    }
     addParentForm.clearErrors();
     const selectedStudent = studentsForDialog.find(s => s.id === data.studentId);
     if (!selectedStudent) {
@@ -305,6 +309,10 @@ export default function ParentsPage() {
   };
 
   const handleEditParentSubmit: SubmitHandler<EditParentFormValues> = async (data) => {
+    if (authRole !== 'admin' && authRole !== 'guru') {
+      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
+      return;
+    }
     if (!selectedParent) return;
     editParentForm.clearErrors();
     const selectedStudent = studentsForDialog.find(s => s.id === data.studentId);
@@ -340,6 +348,10 @@ export default function ParentsPage() {
   };
 
   const handleDeleteParent = async (parentId: string, parentName?: string) => {
+    if (authRole !== 'admin' && authRole !== 'guru') {
+      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
+      return;
+    }
     try {
       await deleteDoc(doc(db, "parents", parentId));
       toast({ title: "Data Orang Tua Dihapus", description: `${parentName || 'Data'} berhasil dihapus.` });
@@ -360,25 +372,33 @@ export default function ParentsPage() {
   };
 
   const openEditDialog = (parent: Parent) => {
+    if (authRole !== 'admin' && authRole !== 'guru') {
+      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
+      return;
+    }
     setSelectedParent(parent);
     setIsEditDialogOpen(true);
   };
 
   const openDeleteDialog = (parent: Parent) => {
+    if (authRole !== 'admin' && authRole !== 'guru') {
+      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
+      return;
+    }
     setSelectedParent(parent);
   };
 
   const displayedParents = useMemo(() => {
     let filtered = parents;
 
-    if (role === 'admin' && selectedClassFilter !== "all") {
+    if ((authRole === 'admin' || authRole === 'guru') && selectedClassFilter !== "all") {
       const studentUidsInSelectedClass = studentsForDialog
         .filter(student => student.classId === selectedClassFilter)
         .map(student => student.id);
       filtered = filtered.filter(parent => studentUidsInSelectedClass.includes(parent.studentId));
     }
 
-    if (role === 'admin' && searchTerm) {
+    if ((authRole === 'admin' || authRole === 'guru') && searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(parent =>
         parent.name.toLowerCase().includes(lowerSearchTerm) ||
@@ -389,7 +409,7 @@ export default function ParentsPage() {
       );
     }
     return filtered;
-  }, [parents, studentsForDialog, searchTerm, selectedClassFilter, role]);
+  }, [parents, studentsForDialog, searchTerm, selectedClassFilter, authRole]);
 
   const totalPages = Math.ceil(displayedParents.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -592,7 +612,7 @@ export default function ParentsPage() {
             <UserCircle className="h-6 w-6 text-primary" />
             <span>Daftar Orang Tua {isLoadingData ? '' : `(${displayedParents.length})`}</span>
           </CardTitle>
-          {role === 'admin' && (
+          {(authRole === 'admin' || authRole === 'guru') && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) {
@@ -629,7 +649,7 @@ export default function ParentsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {role === 'admin' && (
+          {(authRole === 'admin' || authRole === 'guru') && (
             <div className="my-4 flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -676,7 +696,7 @@ export default function ParentsPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Nama Anak</TableHead>
                     <TableHead>UID Akun Tertaut</TableHead>
-                    {role === 'admin' && <TableHead className="text-center w-16">Aksi</TableHead>}
+                    {(authRole === 'admin' || authRole === 'guru') && <TableHead className="text-center w-16">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -705,7 +725,7 @@ export default function ParentsPage() {
                           <span className="text-muted-foreground italic">Belum tertaut</span>
                         )}
                       </TableCell>
-                      {role === 'admin' && (
+                      {(authRole === 'admin' || authRole === 'guru') && (
                         <TableCell className="text-center">
                            <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -834,7 +854,7 @@ export default function ParentsPage() {
       </Dialog>
 
 
-      {role === 'admin' && (
+      {(authRole === 'admin' || authRole === 'guru') && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
             setIsEditDialogOpen(isOpen);
             if (!isOpen) {
