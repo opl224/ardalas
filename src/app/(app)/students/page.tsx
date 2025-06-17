@@ -207,8 +207,6 @@ export default function StudentsPage() {
         const qParents = query(parentsCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qParents));
       } else {
-        // For student/parent, classes are still needed if student filter by className (though not used for student page directly)
-        // or if linked parent info needs class name.
         const classesCollectionRef = collection(db, "classes");
         const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qClasses));
@@ -814,11 +812,11 @@ export default function StudentsPage() {
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama</TableHead>
-                    { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableHead>NIS</TableHead> }
-                    { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableHead>Email</TableHead> }
+                    { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>NIS</TableHead> }
+                    { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>Email</TableHead> }
                     <TableHead>Kelas</TableHead>
-                    { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableHead>Gender</TableHead> }
-                    {(authRole === 'admin' || authRole === 'guru') && <TableHead className="text-right">Aksi</TableHead>}
+                    { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>Gender</TableHead> }
+                    <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -826,10 +824,10 @@ export default function StudentsPage() {
                     <TableRow key={student.id}>
                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
-                      { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
-                      { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
+                      { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
+                      { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
                       <TableCell className="truncate" title={student.className}>{student.className || student.classId}</TableCell>
-                      { (authRole === 'admin' || authRole === 'guru' || !isMobile) && (
+                      { !isMobile && (authRole === 'admin' || authRole === 'guru') && (
                         <TableCell>
                           {student.gender === "laki-laki" ? (
                             <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
@@ -840,55 +838,57 @@ export default function StudentsPage() {
                           )}
                         </TableCell>
                       )}
-                      {(authRole === 'admin' || authRole === 'guru') && (
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openViewStudentDialog(student)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Lihat Detail
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(student)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem
-                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }}
-                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Hapus
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                {selectedStudent && selectedStudent.id === student.id && ( 
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
-                                        Ya, Hapus Data
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                )}
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      )}
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openViewStudentDialog(student)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Lihat Detail
+                            </DropdownMenuItem>
+                            {(authRole === 'admin' || authRole === 'guru') && (
+                              <>
+                                <DropdownMenuItem onClick={() => openEditDialog(student)}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem
+                                      onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }}
+                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Hapus
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  {selectedStudent && selectedStudent.id === student.id && ( 
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
+                                          Ya, Hapus Data
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  )}
+                                </AlertDialog>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
