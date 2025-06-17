@@ -719,7 +719,19 @@ export default function StudentsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-6 w-6 text-primary" />
-            <span>Daftar Murid {isLoadingStudents ? '' : `(${displayedStudents.length} siswa)`}</span>
+            <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+              <span>Daftar Murid</span>
+              {!isLoadingStudents && (
+                <span className="text-base font-normal text-muted-foreground sm:text-xl sm:font-semibold sm:text-foreground">
+                  {`(${displayedStudents.length} siswa)`}
+                </span>
+              )}
+              {isLoadingStudents && (
+                <span className="text-base font-normal text-muted-foreground">
+                  (Memuat...)
+                </span>
+              )}
+            </div>
           </CardTitle>
           { (authRole === 'admin' || authRole === 'guru') && ( 
             <Dialog 
@@ -1021,6 +1033,8 @@ export default function StudentsPage() {
     </div>
   );
 }
+    
+
     
 
     
