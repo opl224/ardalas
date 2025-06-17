@@ -88,6 +88,7 @@ import {
 import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { CalendarDatePicker } from "@/components/calendar-date-picker";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface ClassMin {
@@ -159,6 +160,7 @@ export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addStudentForm = useForm<StudentFormValues>({
     resolver: zodResolver(studentFormSchema),
@@ -739,20 +741,26 @@ export default function StudentsPage() {
                   <PlusCircle className="mr-2 h-4 w-4" /> Tambah Murid
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
+              <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Tambah Murid Baru</DialogTitle>
                   <DialogDescription>
                     Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  {renderStudentFormFields(addStudentForm, 'add')}
-                  <DialogFooter>
+                <form 
+                  id="addStudentDialogForm"
+                  onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} 
+                  className="flex flex-col overflow-hidden flex-1"
+                >
+                  <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                    {renderStudentFormFields(addStudentForm, 'add')}
+                  </div>
+                  <DialogFooter className="pt-4 border-t mt-auto">
                     <DialogClose asChild>
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
+                    <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
                       {(addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) && <LottieLoader width={16} height={16} className="mr-2" />}
                       {(addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) ? "Menyimpan..." : "Simpan Murid"}
                     </Button>
@@ -806,10 +814,10 @@ export default function StudentsPage() {
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Nama</TableHead>
-                    { (authRole === 'admin' || authRole === 'guru') && <TableHead>NIS</TableHead> }
-                    { (authRole === 'admin' || authRole === 'guru') && <TableHead>Email</TableHead> }
+                    { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableHead>NIS</TableHead> }
+                    { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableHead>Email</TableHead> }
                     <TableHead>Kelas</TableHead>
-                    <TableHead>Gender</TableHead>
+                    { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableHead>Gender</TableHead> }
                     {(authRole === 'admin' || authRole === 'guru') && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -818,18 +826,20 @@ export default function StudentsPage() {
                     <TableRow key={student.id}>
                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
-                      { (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
-                      { (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
+                      { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
+                      { (authRole === 'admin' || authRole === 'guru' || !isMobile) && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
                       <TableCell className="truncate" title={student.className}>{student.className || student.classId}</TableCell>
-                      <TableCell>
-                        {student.gender === "laki-laki" ? (
-                          <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
-                        ) : student.gender === "perempuan" ? (
-                          <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
+                      { (authRole === 'admin' || authRole === 'guru' || !isMobile) && (
+                        <TableCell>
+                          {student.gender === "laki-laki" ? (
+                            <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
+                          ) : student.gender === "perempuan" ? (
+                            <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                      )}
                       {(authRole === 'admin' || authRole === 'guru') && (
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -920,13 +930,13 @@ export default function StudentsPage() {
           setIsViewStudentDialogOpen(isOpen);
           if (!isOpen) { setSelectedStudentForView(null); }
       }}>
-        <DialogContent className="sm:max-w-xl"> 
+        <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl"> 
             <DialogHeader>
                 <DialogTitle>Detail Murid: {selectedStudentForView?.name}</DialogTitle>
                 <DialogDescription>Informasi lengkap mengenai murid.</DialogDescription>
             </DialogHeader>
             {selectedStudentForView && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm overflow-y-auto flex-1 pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{selectedStudentForView.nis || "-"}</p></div>
 
@@ -962,7 +972,7 @@ export default function StudentsPage() {
                     )}
                 </div>
             )}
-            <DialogFooter>
+            <DialogFooter className="pt-4 border-t mt-auto">
                 <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
             </DialogFooter>
         </DialogContent>
@@ -977,7 +987,7 @@ export default function StudentsPage() {
               editStudentForm.clearErrors();
             }
         }}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Edit Data Murid</DialogTitle>
               <DialogDescription>
@@ -985,14 +995,20 @@ export default function StudentsPage() {
               </DialogDescription>
             </DialogHeader>
             {selectedStudent && (
-              <form onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+              <form 
+                id="editStudentDialogForm"
+                onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)} 
+                className="flex flex-col overflow-hidden flex-1"
+              >
                 <Input type="hidden" {...editStudentForm.register("id")} />
-                {renderStudentFormFields(editStudentForm, 'edit')}
-                <DialogFooter>
+                <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                    {renderStudentFormFields(editStudentForm, 'edit')}
+                </div>
+                <DialogFooter className="pt-4 border-t mt-auto">
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button>
                    </DialogClose>
-                  <Button type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
+                  <Button form="editStudentDialogForm" type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
                     {(editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) && <LottieLoader width={16} height={16} className="mr-2" />}
                     {(editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
