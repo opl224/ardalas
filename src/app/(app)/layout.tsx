@@ -49,8 +49,12 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4 p-4">
-            <LottieLoader width={150} height={150} />
-            <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
+            <LottieLoader width={150} height={150} onAnimationLoaded={() => setLottieAuthLoadingLoaded(true)} />
+            {lottieAuthLoadingLoaded ? (
+              <h1 className="text-2xl font-semibold">Memuat Ardalas...</h1>
+            ) : (
+              <div style={{ height: "2rem" }} aria-hidden="true" />
+            )}
         </div>
       </div>
     );
