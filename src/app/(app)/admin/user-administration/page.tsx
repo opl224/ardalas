@@ -30,7 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, 
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,15 +97,15 @@ interface ClassMin {
 }
 
 interface User {
-  id: string; 
-  uid: string; 
+  id: string;
+  uid: string;
   name: string;
   email: string;
   role: Role;
-  assignedClassIds?: string[]; 
-  classId?: string; 
-  className?: string; 
-  createdAt?: Timestamp; 
+  assignedClassIds?: string[];
+  classId?: string;
+  className?: string;
+  createdAt?: Timestamp;
 }
 
 const baseUserSchema = z.object({
@@ -138,7 +138,7 @@ const addUserFormSchema = baseUserSchema.extend({
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 const editUserFormSchema = baseUserSchema.extend({
-  id: z.string(), 
+  id: z.string(),
 }).refine(data => {
     if (data.role === 'guru') {
       return data.assignedClassIds && data.assignedClassIds.length > 0;
@@ -220,8 +220,8 @@ export default function UserAdministrationPage() {
       const q = query(usersCollectionRef, orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: User[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id, 
-        uid: docSnap.data().uid, 
+        id: docSnap.id,
+        uid: docSnap.data().uid,
         name: docSnap.data().name,
         email: docSnap.data().email,
         role: docSnap.data().role,
@@ -274,7 +274,7 @@ export default function UserAdministrationPage() {
   useEffect(() => {
     if (selectedUser && isEditUserDialogOpen) {
       editUserForm.reset({
-        id: selectedUser.id, 
+        id: selectedUser.id,
         name: selectedUser.name,
         email: selectedUser.email,
         role: selectedUser.role,
@@ -300,7 +300,7 @@ export default function UserAdministrationPage() {
         classId?: string;
         className?: string;
       } = {
-        uid: newAuthUser.uid, 
+        uid: newAuthUser.uid,
         name: data.name,
         email: data.email,
         role: data.role,
@@ -310,7 +310,7 @@ export default function UserAdministrationPage() {
       if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
         userData.assignedClassIds = data.assignedClassIds;
       } else {
-        delete userData.assignedClassIds; 
+        delete userData.assignedClassIds;
       }
 
       if (data.role === 'siswa' && data.classId) {
@@ -321,9 +321,9 @@ export default function UserAdministrationPage() {
         delete userData.classId;
         delete userData.className;
       }
-      
+
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
-      
+
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddUserDialogOpen(false);
       addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined });
@@ -331,25 +331,25 @@ export default function UserAdministrationPage() {
       fetchUsers();
     } catch (error) {
       const firebaseError = error as FirebaseError;
-      console.error("Error adding user:", firebaseError); 
+      console.error("Error adding user:", firebaseError);
 
       if (firebaseError.code === "auth/email-already-in-use") {
         const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
         addUserForm.setError("email", { type: "manual", message: specificMessage });
-        toast({ 
-            title: "Gagal Menambahkan Pengguna: Email Sudah Terdaftar", 
-            description: specificMessage + " Gunakan email lain atau periksa apakah pengguna sudah ada di daftar.", 
-            variant: "destructive" 
+        toast({
+            title: "Gagal Menambahkan Pengguna: Email Sudah Terdaftar",
+            description: specificMessage + " Gunakan email lain atau periksa apakah pengguna sudah ada di daftar.",
+            variant: "destructive"
         });
       } else {
         let generalErrorMessage = "Gagal menambahkan pengguna. Silakan coba lagi.";
         if (firebaseError.message) {
             generalErrorMessage = firebaseError.message;
         }
-        toast({ 
-            title: "Gagal Menambahkan Pengguna", 
-            description: generalErrorMessage, 
-            variant: "destructive" 
+        toast({
+            title: "Gagal Menambahkan Pengguna",
+            description: generalErrorMessage,
+            variant: "destructive"
         });
       }
     }
@@ -359,17 +359,17 @@ export default function UserAdministrationPage() {
     if (!selectedUser) return;
     editUserForm.clearErrors();
     try {
-      const userDocRef = doc(db, "users", data.id); 
+      const userDocRef = doc(db, "users", data.id);
       const updateData: any = {
         name: data.name,
-        email: data.email, 
+        email: data.email,
         role: data.role,
       };
 
       if (data.role === 'guru') {
         updateData.assignedClassIds = data.assignedClassIds || [];
-        updateData.classId = deleteField(); 
-        updateData.className = deleteField(); 
+        updateData.classId = deleteField();
+        updateData.className = deleteField();
       } else {
         updateData.assignedClassIds = deleteField();
       }
@@ -378,14 +378,14 @@ export default function UserAdministrationPage() {
         const selectedClass = allClasses.find(c => c.id === data.classId);
         updateData.classId = data.classId;
         updateData.className = selectedClass?.name || "";
-        updateData.assignedClassIds = deleteField(); 
-      } else if (data.role !== 'guru') { 
+        updateData.assignedClassIds = deleteField();
+      } else if (data.role !== 'guru') {
         updateData.classId = deleteField();
         updateData.className = deleteField();
       }
-      
+
       await updateDoc(userDocRef, updateData);
-      
+
       toast({ title: "Pengguna Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditUserDialogOpen(false);
       setSelectedUser(null);
@@ -417,11 +417,11 @@ export default function UserAdministrationPage() {
     setSelectedUser(user);
     setIsViewUserDialogOpen(true);
   };
-  
+
   const openDeleteDialog = (user: User) => {
     setSelectedUser(user);
   };
-  
+
   const renderAssignedClassesForTeacher = (assignedIds?: string[]) => {
     if (!assignedIds || assignedIds.length === 0) return "-";
     return assignedIds.map(id => allClasses.find(c => c.id === id)?.name || id).join(", ");
@@ -429,7 +429,7 @@ export default function UserAdministrationPage() {
 
   const renderClassAssignmentField = (formInstance: ReturnType<typeof useForm<AddUserFormValues | EditUserFormValues>>, currentRole: Role | undefined) => {
     const noClassesAvailable = !isLoadingClasses && allClasses.length === 0;
-    
+
     if (currentRole === 'guru') {
       const selectedClasses = formInstance.watch("assignedClassIds") || [];
       const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
@@ -472,7 +472,7 @@ export default function UserAdministrationPage() {
                           {allClasses.map((cls) => (
                             <CommandItem
                               key={cls.id}
-                              value={cls.name} 
+                              value={cls.name}
                               onSelect={() => {
                                 const currentValue = field.value || [];
                                 const isSelected = currentValue.includes(cls.id);
@@ -567,7 +567,7 @@ export default function UserAdministrationPage() {
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
-    const maxPagesToShow = 5; 
+    const maxPagesToShow = 5;
     let startPage, endPage;
 
     if (totalPages <= maxPagesToShow) {
@@ -626,10 +626,10 @@ export default function UserAdministrationPage() {
           </CardTitle>
           <Dialog open={isAddUserDialogOpen} onOpenChange={(isOpen) => {
             setIsAddUserDialogOpen(isOpen);
-            if (!isOpen) { 
-                addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined }); 
-                setShowPassword(false); 
-                addUserForm.clearErrors(); 
+            if (!isOpen) {
+                addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined });
+                setShowPassword(false);
+                addUserForm.clearErrors();
             }
           }}>
             <DialogTrigger asChild>
@@ -672,9 +672,9 @@ export default function UserAdministrationPage() {
                     name="role"
                     control={addUserForm.control}
                     render={({ field }) => (
-                        <Select onValueChange={(value) => { 
-                            field.onChange(value as Role); 
-                            addUserForm.trigger(["assignedClassIds", "classId"]); 
+                        <Select onValueChange={(value) => {
+                            field.onChange(value as Role);
+                            addUserForm.trigger(["assignedClassIds", "classId"]);
                         }} defaultValue={field.value}>
                             <SelectTrigger id="role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
                             <SelectContent>
@@ -685,7 +685,7 @@ export default function UserAdministrationPage() {
                   />
                   {addUserForm.formState.errors.role && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.role.message}</p>}
                 </div>
-                
+
                 {renderClassAssignmentField(addUserForm, watchAddUserRole)}
 
                 <DialogFooter>
@@ -711,14 +711,14 @@ export default function UserAdministrationPage() {
             <div className="flex items-center">
             <Popover open={isRoleFilterPopoverOpen} onOpenChange={setIsRoleFilterPopoverOpen}>
                 <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full sm:w-auto justify-start"> {/* sm:w-auto for better mobile stacking */}
+                    <Button variant="outline" className="w-full sm:w-auto justify-start">
                     <FilterIcon className="mr-2 h-4 w-4" />
                     {roleFilter.length > 0
                         ? roleFilter.map(r => roleDisplayNames[r]).join(', ')
                         : "Filter Peran"}
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"> {/* Use trigger width */}
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                     <Command>
                     <CommandInput placeholder="Filter peran..." />
                     <CommandList>
@@ -728,8 +728,8 @@ export default function UserAdministrationPage() {
                             <CommandItem
                             key={roleItem}
                             onSelect={() => {
-                                setRoleFilter(prev => 
-                                prev.includes(roleItem) 
+                                setRoleFilter(prev =>
+                                prev.includes(roleItem)
                                     ? prev.filter(r => r !== roleItem)
                                     : [...prev, roleItem]
                                 );
@@ -787,7 +787,7 @@ export default function UserAdministrationPage() {
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
                       {!isMobile && (
                         <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
-                          {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : 
+                          {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) :
                            user.role === 'siswa' ? (user.className || user.classId || '-') :
                            "-"}
                         </TableCell>
@@ -813,7 +813,7 @@ export default function UserAdministrationPage() {
                               <AlertDialogTrigger asChild>
                                 <DropdownMenuItem
                                   onSelect={(e) => {
-                                    e.preventDefault(); 
+                                    e.preventDefault();
                                     openDeleteDialog(user);
                                   }}
                                   className="text-destructive focus:bg-destructive/10 focus:text-destructive"
@@ -825,7 +825,7 @@ export default function UserAdministrationPage() {
                               {selectedUser && selectedUser.id === user.id && (
                                 <AlertDialogContent>
                                   <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
-                                  <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={()={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
+                                  <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                               )}
                             </AlertDialog>
@@ -841,16 +841,16 @@ export default function UserAdministrationPage() {
                 <Pagination className="mt-6">
                     <PaginationContent>
                         <PaginationItem>
-                        <PaginationPrevious 
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                        <PaginationPrevious
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                             aria-disabled={currentPage === 1}
                             className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
                         />
                         </PaginationItem>
                         {renderPageNumbers()}
                         <PaginationItem>
-                        <PaginationNext 
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                        <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                             aria-disabled={currentPage === totalPages}
                             className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
                         />
@@ -864,7 +864,7 @@ export default function UserAdministrationPage() {
                 ? "Tidak ada pengguna yang cocok dengan filter atau pencarian Anda."
                 : "Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur \"Tambah Pengguna\"."
               }
-            </div> 
+            </div>
           )}
         </CardContent>
       </Card>
@@ -939,9 +939,9 @@ export default function UserAdministrationPage() {
                     name="role"
                     control={editUserForm.control}
                     render={({ field }) => (
-                        <Select onValueChange={(value) => { 
-                            field.onChange(value as Role); 
-                            editUserForm.trigger(["assignedClassIds", "classId"]); 
+                        <Select onValueChange={(value) => {
+                            field.onChange(value as Role);
+                            editUserForm.trigger(["assignedClassIds", "classId"]);
                         }} value={field.value}>
                             <SelectTrigger id="edit-role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
                             <SelectContent>
@@ -967,10 +967,3 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
-    
-
-    
-
-
-
-
