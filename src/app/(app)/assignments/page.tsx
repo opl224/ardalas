@@ -90,6 +90,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface SubjectMin { id: string; name: string; }
@@ -197,12 +198,10 @@ export default function AssignmentsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const [allAssignments, setAllAssignments] = useState<AssignmentData[]>([]); 
   
-  // For Admin: all subjects, classes, teachers for forms & table filters
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
 
-  // For Guru: specific data for filters and context
   const [teacherProfileId, setTeacherProfileId] = useState<string | null>(null);
   const [teacherUniqueClassCount, setTeacherUniqueClassCount] = useState<number | null>(null);
   const [teacherTaughtClassesForFilter, setTeacherTaughtClassesForFilter] = useState<ClassMin[]>([]);
@@ -237,6 +236,7 @@ export default function AssignmentsPage() {
 
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addAssignmentForm = useForm<AssignmentFormValues>({
     resolver: zodResolver(assignmentFormSchema),
@@ -400,8 +400,7 @@ export default function AssignmentsPage() {
         }
       } else if (isTeacherRole) {
           if (!teacherProfileId) {
-            // Wait for teacherProfileId to be fetched
-            setIsLoading(false); // Or keep loading until teacherProfileId is available
+            setIsLoading(false); 
             return; 
           }
           finalAssignmentsQuery = query(assignmentsQueryRef, where("teacherId", "==", teacherProfileId), orderBy("dueDate", "desc"));
@@ -534,9 +533,7 @@ export default function AssignmentsPage() {
       setAllAssignments([]);
       return;
     }
-    // For teachers, fetchAssignments depends on teacherProfileId
     if (isTeacherRole && isLoadingTeacherSpecificData) {
-        // Wait for teacher specific data (including teacherProfileId) to load
         return;
     }
 
@@ -564,7 +561,7 @@ export default function AssignmentsPage() {
   const getDenormalizedNames = (data: AssignmentFormValues | EditAssignmentFormValues) => {
     const subject = (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).find(s => s.id === data.subjectId);
     const aClass = (isAdminRole ? classes : teacherTaughtClassesForFilter).find(c => c.id === data.classId);
-    const teacher = teachers.find(t => t.id === data.teacherId); // Admin uses full teacher list
+    const teacher = teachers.find(t => t.id === data.teacherId); 
     return { subjectName: subject?.name, className: aClass?.name, teacherName: teacher?.name };
   };
 
@@ -580,7 +577,7 @@ export default function AssignmentsPage() {
       denormalizedNames = {
         subjectName: subject?.name,
         className: aClass?.name,
-        teacherName: user.displayName || "Guru", // Use logged-in teacher's name
+        teacherName: user.displayName || "Guru", 
       };
     } else {
       denormalizedNames = getDenormalizedNames(data);
@@ -600,7 +597,7 @@ export default function AssignmentsPage() {
     try {
       const assignmentData:any = {
         ...data,
-        teacherId: finalTeacherId, // Use correct teacherId
+        teacherId: finalTeacherId, 
         dueDate: Timestamp.fromDate(data.dueDate),
         subjectName,
         className,
@@ -707,7 +704,6 @@ export default function AssignmentsPage() {
       await updateDoc(assignmentDocRef, updateData);
       toast({ title: "Tugas Diperbarui" });
       
-      // Create notifications for update
       const batch = writeBatch(db);
       let descriptionText = `Batas waktu: ${format(data.dueDate, "dd MMM yyyy, HH:mm", {locale: indonesiaLocale})}`;
       if(data.meetingNumber) {
@@ -720,7 +716,7 @@ export default function AssignmentsPage() {
         href: `/assignments`, 
         read: false,
         createdAt: serverTimestamp(),
-        type: "new_assignment", // Re-use same type, title indicates update
+        type: "new_assignment", 
       };
 
       const usersRef = collection(db, "users");
@@ -847,6 +843,9 @@ export default function AssignmentsPage() {
                 if (meetingNumberFilter && assignment.meetingNumber?.toString() !== meetingNumberFilter) {
                     matchesFilters = false;
                 }
+                 if (selectedSubjectFilter !== "all" && assignment.subjectId !== selectedSubjectFilter) {
+                     matchesFilters = false;
+                 }
             } else if (teacherUniqueClassCount && teacherUniqueClassCount > 1) {
                  const matchesClass = selectedClassFilter === "all" || assignment.classId === selectedClassFilter;
                  const matchesSubject = selectedSubjectFilter === "all" || assignment.subjectId === selectedSubjectFilter;
@@ -941,7 +940,19 @@ export default function AssignmentsPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <ClipboardCheck className="h-6 w-6 text-primary" />
-            <span>Daftar Tugas</span>
+             <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+               <span className={cn(isMobile && "block")}>Daftar Tugas</span>
+              {!isLoading && (
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
+                  {`(${filteredAssignments.length} tugas)`}
+                </span>
+              )}
+              {isLoading && (
+                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
+                  (Memuat...)
+                </span>
+              )}
+            </div>
           </CardTitle>
           <div className="flex items-center gap-2">
             {isTeacherOrAdminRole && (
@@ -964,7 +975,7 @@ export default function AssignmentsPage() {
               }}>
                 <DialogTrigger asChild>
                    <Button size="sm" onClick={() => { if (isAdminRole && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) fetchAdminDropdownData();}}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Tambah Tugas
+                    <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Tugas'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-lg">
@@ -1056,16 +1067,32 @@ export default function AssignmentsPage() {
                 />
             </div>
             {isTeacherRole && teacherUniqueClassCount === 1 ? (
-                <div className="sm:col-span-2">
-                    <Label htmlFor="meetingNumberFilter" className="sr-only">Filter Pertemuan Ke-</Label>
-                    <Input
-                        id="meetingNumberFilter"
-                        type="number"
-                        placeholder="Filter Pertemuan Ke- (mis: 1)"
-                        value={meetingNumberFilter}
-                        onChange={(e) => setMeetingNumberFilter(e.target.value)}
-                        className="w-full"
-                    />
+                <div className="sm:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <Select
+                        value={selectedSubjectFilter}
+                        onValueChange={setSelectedSubjectFilter}
+                        disabled={isLoading || teacherTaughtSubjectsForFilter.length === 0}
+                    >
+                        <SelectTrigger className="w-full">
+                        <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
+                        <SelectValue placeholder="Filter Mata Pelajaran" />
+                        </SelectTrigger>
+                        <SelectContent>
+                        <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
+                        {teacherTaughtSubjectsForFilter.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    <div>
+                        <Label htmlFor="meetingNumberFilter" className="sr-only">Filter Pertemuan Ke-</Label>
+                        <Input
+                            id="meetingNumberFilter"
+                            type="number"
+                            placeholder="Filter Pertemuan Ke-"
+                            value={meetingNumberFilter}
+                            onChange={(e) => setMeetingNumberFilter(e.target.value)}
+                            className="w-full"
+                        />
+                    </div>
                 </div>
             ) : (isTeacherOrAdminRole && (teacherUniqueClassCount === null || teacherUniqueClassCount > 1 || isAdminRole)) ? (
                 <>
@@ -1075,7 +1102,7 @@ export default function AssignmentsPage() {
                     disabled={isLoading || (isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0}
                 >
                     <SelectTrigger className="w-full">
-                    <FilterIcon className="mr-2 h-4 w-4" />
+                    <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Kelas" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1089,7 +1116,7 @@ export default function AssignmentsPage() {
                     disabled={isLoading || (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0}
                 >
                     <SelectTrigger className="w-full">
-                    <FilterIcon className="mr-2 h-4 w-4" />
+                    <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
                     <SelectValue placeholder="Filter Mata Pelajaran" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1106,42 +1133,44 @@ export default function AssignmentsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    {isTeacherOrAdminRole && <TableHead className="w-[50px]">No.</TableHead>}
-                    <TableHead>Judul Tugas</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    {(isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
-                    {(isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
-                    {(isAdminRole ) && <TableHead>Guru</TableHead>}
-                    <TableHead>Pertemuan</TableHead>
-                    <TableHead>Batas Waktu</TableHead>
-                    {(isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
-                    {(isStudentRole || isParentRole) && <TableHead>Status</TableHead>}
-                    {isTeacherOrAdminRole && <TableHead>Pengumpulan</TableHead>}
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                    <TableHead className={cn("truncate", isMobile ? "w-auto px-2" : "min-w-[180px]")}>Judul Tugas</TableHead>
+                    <TableHead className={cn("truncate", isMobile ? "w-auto px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
+                    
+                    {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
+                    {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
+                    {!isMobile && (isAdminRole ) && <TableHead>Guru</TableHead>}
+                    
+                    <TableHead className={cn(isMobile ? "w-auto px-2 text-center" : "")}>Pertemuan</TableHead>
+                    <TableHead className={cn(isMobile ? "w-auto px-2" : "")}>Batas Waktu</TableHead>
+                    
+                    {!isMobile && (isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
+                    {!isMobile && (isStudentRole || isParentRole) && <TableHead>Status</TableHead>}
+                    {!isMobile && isTeacherOrAdminRole && <TableHead>Pengumpulan</TableHead>}
+                    
+                    <TableHead className={cn("text-right", isMobile ? "w-16 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((assignment, index) => (
                     <TableRow key={assignment.id}>
-                      {isTeacherOrAdminRole && <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>}
-                      <TableCell className="font-medium">{assignment.title}</TableCell>
-                      <TableCell>{assignment.subjectName || assignment.subjectId}</TableCell>
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={assignment.title}>{assignment.title}</TableCell>
+                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={assignment.subjectName || assignment.subjectId}>{assignment.subjectName || assignment.subjectId}</TableCell>
                       
-                      {(isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
-                      
-                      {(isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableCell>{assignment.className || assignment.classId}</TableCell>}
-                      
-                      {(isAdminRole) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableCell className="truncate" title={assignment.teacherName || assignment.teacherId}>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableCell className="truncate" title={assignment.className || assignment.classId}>{assignment.className || assignment.classId}</TableCell>}
+                      {!isMobile && (isAdminRole) && <TableCell className="truncate" title={assignment.teacherName || assignment.teacherId}>{assignment.teacherName || assignment.teacherId}</TableCell>}
 
-                      <TableCell>{assignment.meetingNumber || "-"}</TableCell>
-                      <TableCell className={cn(isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
-                        {format(assignment.dueDate.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{assignment.meetingNumber || "-"}</TableCell>
+                      <TableCell className={cn(isMobile ? "px-2 text-xs" : "", isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
+                        {format(assignment.dueDate.toDate(), isMobile ? "dd/MM/yy, HH:mm" : "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
                       </TableCell>
 
-                      {(isStudentRole || isParentRole) && (
+                      {!isMobile && (isStudentRole || isParentRole) && (
                         <>
                           <TableCell>
                             {assignment.fileURL ? (
@@ -1167,7 +1196,7 @@ export default function AssignmentsPage() {
                         </>
                       )}
 
-                      {isTeacherOrAdminRole && (
+                      {!isMobile && isTeacherOrAdminRole && (
                         <TableCell>
                           {assignment.submissionCount !== undefined && assignment.totalStudentsInClass !== undefined
                             ? `${assignment.submissionCount}/${assignment.totalStudentsInClass} siswa`
@@ -1175,7 +1204,7 @@ export default function AssignmentsPage() {
                         </TableCell>
                       )}
 
-                      <TableCell className="text-right space-x-2">
+                      <TableCell className={cn("text-right space-x-2", isMobile ? "px-1" : "")}>
                         {isTeacherOrAdminRole && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -1213,24 +1242,24 @@ export default function AssignmentsPage() {
                         {isStudentRole && (
                           <div className="flex justify-end space-x-2">
                            {assignment.submissionStatus === "Sudah Dikerjakan" ? (
-                             <Button variant="outline" size="icon" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} aria-label="Lihat atau Edit Pengumpulan">
-                               <FilePenLine className="h-4 w-4" />
+                             <Button variant="outline" size={isMobile ? "icon" : "sm"} onClick={() => handleOpenSubmitAssignmentDialog(assignment)} aria-label="Lihat atau Edit Pengumpulan">
+                               <FilePenLine className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Edit"}
                              </Button>
                            ) : (
-                             <Button size="sm" onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
-                                <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
+                             <Button size={isMobile ? "icon" : "sm"} onClick={() => handleOpenSubmitAssignmentDialog(assignment)} disabled={isPast(assignment.dueDate.toDate()) && assignment.submissionStatus !== "Sudah Dikerjakan"}>
+                                <Send className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Kerjakan"}
                              </Button>
                            )}
                            {assignment.result && (
-                             <Button variant="secondary" size="sm" onClick={() => handleOpenViewResultDialog(assignment)}>
-                                <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
+                             <Button variant="secondary" size={isMobile ? "icon" : "sm"} onClick={() => handleOpenViewResultDialog(assignment)}>
+                                <BarChart3 className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Hasil"}
                              </Button>
                            )}
                           </div>
                         )}
                          {isParentRole && assignment.result && (
-                             <Button variant="secondary" size="sm" onClick={() => handleOpenViewResultDialog(assignment)}>
-                                <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Anak
+                             <Button variant="secondary" size={isMobile ? "icon" : "sm"} onClick={() => handleOpenViewResultDialog(assignment)}>
+                                <BarChart3 className={cn(isMobile ? "h-4 w-4" : "mr-2 h-4 w-4")} /> {!isMobile && "Hasil Anak"}
                              </Button>
                            )}
                       </TableCell>
@@ -1303,10 +1332,9 @@ export default function AssignmentsPage() {
                               onSelect={(date) => {
                                   if (date) {
                                       const newDueDate = new Date(date);
-                                      newDueDate.setHours(23, 59, 0, 0); // Set time to 23:59 when date is selected
+                                      newDueDate.setHours(23, 59, 0, 0); 
                                       editAssignmentForm.setValue("dueDate", newDueDate, { shouldValidate: true });
                                   } else {
-                                      // Handle case where date might be cleared, set to a sensible default like today 23:59
                                       const todayEndOfDay = new Date();
                                       todayEndOfDay.setHours(23, 59, 0, 0);
                                       editAssignmentForm.setValue("dueDate", todayEndOfDay, { shouldValidate: true });
@@ -1317,7 +1345,7 @@ export default function AssignmentsPage() {
                           <div className="p-2 border-t">
                               <Input
                                   type="time"
-                                  defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} // Ensure default time is also formatted
+                                  defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} 
                                   onChange={(e) => {
                                       const timeValue = e.target.value;
                                       if (timeValue) {
@@ -1326,9 +1354,9 @@ export default function AssignmentsPage() {
                                               const hours = parseInt(timeParts[0], 10);
                                               const minutes = parseInt(timeParts[1], 10);
                                                if (!isNaN(hours) && !isNaN(minutes)) {
-                                                  const currentFullDate = editAssignmentForm.watch("dueDate") || new Date(); // Use current date from form or new Date
+                                                  const currentFullDate = editAssignmentForm.watch("dueDate") || new Date(); 
                                                   const newDateWithUserTime = new Date(currentFullDate);
-                                                  newDateWithUserTime.setHours(hours, minutes, 0, 0); // Set specific time, seconds and ms to 0
+                                                  newDateWithUserTime.setHours(hours, minutes, 0, 0); 
                                                   editAssignmentForm.setValue("dueDate", newDateWithUserTime, { shouldValidate: true });
                                               }
                                           }
@@ -1487,3 +1515,4 @@ export default function AssignmentsPage() {
 }
 
     
+
