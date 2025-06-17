@@ -133,7 +133,7 @@ export default function DashboardPage() {
           const [studentSnap, teacherUserSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
-            getDocs(parentUserQuery),
+            getDocs(parentUserSnap),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
@@ -194,7 +194,7 @@ export default function DashboardPage() {
                     newStats.teacherTotalStudentsTaught = 0;
                 }
             } else {
-                 console.warn(`No teacher profile found in 'teachers' collection linked to Auth UID: ${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.`);
+                 console.warn(\`No teacher profile found in 'teachers' collection linked to Auth UID: \${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.\`);
             }
         } else if (role === 'orangtua' && user.uid && user.linkedStudentClassId) {
             const classId = user.linkedStudentClassId;
@@ -301,26 +301,12 @@ export default function DashboardPage() {
 
   }, [user, role, authLoading]);
 
-  const quickLinks = [
-    { title: "Lihat Pengumuman", href: "/announcements", icon: Megaphone, description: "Info terbaru dari sekolah." },
-    { title: "Jadwal Pelajaran", href: "/lessons", icon: BookCopy, description: "Lihat jadwal pelajaran." },
-    { title: "Acara Sekolah", href: "/events", icon: CalendarDays, description: "Jadwal kegiatan penting." },
-  ];
-
-  if (role === 'siswa') {
-    quickLinks.push({ title: "Tugas Saya", href: "/assignments", icon: ClipboardCheck, description: "Lihat dan kerjakan tugas." });
-    quickLinks.push({ title: "Nilai Saya", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajarmu." });
-  } else if (role === 'orangtua') {
-    quickLinks.push({ title: "Tugas Anak", href: "/assignments", icon: ClipboardCheck, description: "Lihat tugas anak Anda." });
-    quickLinks.push({ title: "Nilai Anak", href: "/my-grades", icon: GraduationCap, description: "Periksa hasil belajar anak." });
-  }
-
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">
-          Selamat Datang{user?.displayName ? `, ${user.displayName}` : ''}!
+          Selamat Datang{user?.displayName ? \`, \${user.displayName}\` : ''}!
         </h1>
         <p className="text-muted-foreground">Platform manajemen informasi sekolah Ardalas.</p>
       </div>
@@ -383,10 +369,10 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-xs text-muted-foreground pt-1">
                       {loadingStats ? <Skeleton className="h-4 w-24" /> :
-                       `(${stats.parentChildClassStudentCount || 0} siswa)`
+                       \`(\${stats.parentChildClassStudentCount || 0} siswa)\`
                       }
                     </div>
-                    {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={`/classes`}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
+                    {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                 </CardContent>
             </Card>
              <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
@@ -395,29 +381,6 @@ export default function DashboardPage() {
           </div>
         </section>
       )}
-
-
-      <section>
-        <h2 className="text-2xl font-semibold mb-4 font-headline">Akses Cepat</h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {quickLinks.slice(0, (role === 'siswa' || role === 'orangtua') ? 5 : (role === 'guru' ? 3 : 3)).map((link) => (
-            <Card key={link.title} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg font-medium">{link.title}</CardTitle>
-                <link.icon className="h-6 w-6 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">{link.description}</p>
-                <Button variant="outline" size="sm" asChild className="border-primary text-primary hover:bg-primary/10">
-                  <Link href={link.href}>
-                    Lihat Detail <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
 
       <section>
         <div className="flex items-center justify-between mb-4">
@@ -449,7 +412,7 @@ export default function DashboardPage() {
                 <CardContent>
                   <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-2">{announcement.content}</p>
                   <Button variant="outline" size="sm" asChild className="mt-3 border-primary text-primary hover:bg-primary/10">
-                    <Link href={`/announcements`}>
+                    <Link href={'/announcements'}>
                       Baca Selengkapnya
                     </Link>
                   </Button>
