@@ -67,7 +67,8 @@ import {
   where,
   documentId,
   getDoc,
-  writeBatch
+  writeBatch,
+  limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -194,10 +195,21 @@ const ITEMS_PER_PAGE = 10;
 
 export default function AssignmentsPage() {
   const { user, role, loading: authLoading } = useAuth();
-  const [allAssignments, setAllAssignments] = useState<AssignmentData[]>([]); // Renamed from 'assignments'
+  const [allAssignments, setAllAssignments] = useState<AssignmentData[]>([]); 
+  
+  // For Admin: all subjects, classes, teachers for forms & table filters
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
-  const [teachers, setTeachers] = useState<TeacherMin[]>([]);
+  const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
+
+  // For Guru: specific data for filters and context
+  const [teacherProfileId, setTeacherProfileId] = useState<string | null>(null);
+  const [teacherUniqueClassCount, setTeacherUniqueClassCount] = useState<number | null>(null);
+  const [teacherTaughtClassesForFilter, setTeacherTaughtClassesForFilter] = useState<ClassMin[]>([]);
+  const [teacherTaughtSubjectsForFilter, setTeacherTaughtSubjectsForFilter] = useState<SubjectMin[]>([]);
+  const [isLoadingTeacherSpecificData, setIsLoadingTeacherSpecificData] = useState(false);
+  const [meetingNumberFilter, setMeetingNumberFilter] = useState<string>("");
+
 
   const [studentSubmissions, setStudentSubmissions] = useState<Map<string, AssignmentSubmission>>(new Map());
   const [submissionsForCurrentAssignment, setSubmissionsForCurrentAssignment] = useState<AssignmentSubmission[]>([]);
@@ -239,11 +251,13 @@ export default function AssignmentsPage() {
   });
 
   const isStudentRole = role === "siswa";
-  const isTeacherOrAdminRole = role === "guru" || role === "admin";
+  const isTeacherRole = role === "guru";
+  const isAdminRole = role === "admin";
   const isParentRole = role === "orangtua";
+  const isTeacherOrAdminRole = isTeacherRole || isAdminRole;
 
-  const fetchDropdownData = async () => {
-    if (!isTeacherOrAdminRole) return;
+  const fetchAdminDropdownData = async () => {
+    if (!isAdminRole) return;
     try {
       const [subjectsSnapshot, classesSnapshot, teachersSnapshot, usersSnapshot] = await Promise.all([
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
@@ -262,10 +276,83 @@ export default function AssignmentsPage() {
 
       setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
-      console.error("Error fetching dropdown data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
+      console.error("Error fetching admin dropdown data: ", error);
+      toast({ title: "Gagal Memuat Data Pendukung Admin", variant: "destructive" });
     }
   };
+  
+ useEffect(() => {
+    const fetchTeacherSpecificData = async () => {
+      if (!user || !isTeacherRole || !user.uid) {
+        setIsLoadingTeacherSpecificData(false);
+        return;
+      }
+      setIsLoadingTeacherSpecificData(true);
+      try {
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+        if (teacherProfileSnapshot.empty) {
+          toast({ title: "Profil Guru Tidak Ditemukan", variant: "warning" });
+          setTeacherProfileId(null);
+          setTeacherUniqueClassCount(0);
+          setTeacherTaughtClassesForFilter([]);
+          setTeacherTaughtSubjectsForFilter([]);
+          return;
+        }
+        const currentTeacherProfileId = teacherProfileSnapshot.docs[0].id;
+        setTeacherProfileId(currentTeacherProfileId);
+
+        const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", currentTeacherProfileId));
+        const lessonsSnapshot = await getDocs(lessonsQuery);
+        
+        const uniqueClassIds = new Set<string>();
+        const uniqueSubjectIds = new Set<string>();
+        lessonsSnapshot.docs.forEach(doc => {
+          uniqueClassIds.add(doc.data().classId);
+          uniqueSubjectIds.add(doc.data().subjectId);
+        });
+        setTeacherUniqueClassCount(uniqueClassIds.size);
+
+        if (uniqueClassIds.size > 0) {
+          const classChunks = [];
+          const classIdsArray = Array.from(uniqueClassIds);
+          for (let i = 0; i < classIdsArray.length; i += 30) { classChunks.push(classIdsArray.slice(i, i + 30)); }
+          const classPromises = classChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))));
+          const classSnapshots = await Promise.all(classPromises);
+          const fetchedClasses: ClassMin[] = [];
+          classSnapshots.forEach(snap => snap.docs.forEach(d => fetchedClasses.push({ id: d.id, name: d.data().name })));
+          setTeacherTaughtClassesForFilter(fetchedClasses.sort((a, b) => a.name.localeCompare(b.name)));
+        } else {
+          setTeacherTaughtClassesForFilter([]);
+        }
+
+        if (uniqueSubjectIds.size > 0) {
+          const subjectChunks = [];
+          const subjectIdsArray = Array.from(uniqueSubjectIds);
+          for (let i = 0; i < subjectIdsArray.length; i += 30) { subjectChunks.push(subjectIdsArray.slice(i, i + 30)); }
+          const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db, "subjects"), where(documentId(), "in", chunk))));
+          const subjectSnapshots = await Promise.all(subjectPromises);
+          const fetchedSubjects : SubjectMin[] = [];
+          subjectSnapshots.forEach(snap => snap.docs.forEach(d => fetchedSubjects.push({ id: d.id, name: d.data().name })));
+          setTeacherTaughtSubjectsForFilter(fetchedSubjects.sort((a, b) => a.name.localeCompare(b.name)));
+        } else {
+          setTeacherTaughtSubjectsForFilter([]);
+        }
+
+      } catch (error) {
+        console.error("Error fetching teacher specific data:", error);
+        toast({ title: "Gagal Memuat Data Guru", variant: "destructive" });
+      } finally {
+        setIsLoadingTeacherSpecificData(false);
+      }
+    };
+
+    if (isTeacherRole) {
+      fetchTeacherSpecificData();
+    }
+  }, [user, isTeacherRole, toast]);
+
 
   const fetchAssignments = async () => {
     setIsLoading(true);
@@ -276,33 +363,43 @@ export default function AssignmentsPage() {
           return;
       }
 
-      if (isTeacherOrAdminRole) {
-        await fetchDropdownData();
+      if (isAdminRole) {
+        await fetchAdminDropdownData();
       }
 
-      let assignmentsQuery = query(collection(db, "assignments"), orderBy("dueDate", "desc"));
+      let assignmentsQueryRef = collection(db, "assignments");
+      let finalAssignmentsQuery;
       let studentToQueryId: string | null = null;
 
       if (isStudentRole && user.uid) {
         studentToQueryId = user.uid;
         if (user.classId && user.classId.trim() !== "") {
-          assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.classId), orderBy("dueDate", "desc"));
+          finalAssignmentsQuery = query(assignmentsQueryRef, where("classId", "==", user.classId), orderBy("dueDate", "desc"));
         } else {
           setAllAssignments([]); setIsLoading(false); return;
         }
       } else if (isParentRole && user.linkedStudentId) {
         studentToQueryId = user.linkedStudentId;
          if (user.linkedStudentClassId && user.linkedStudentClassId.trim() !== "") {
-          assignmentsQuery = query(collection(db, "assignments"), where("classId", "==", user.linkedStudentClassId), orderBy("dueDate", "desc"));
+          finalAssignmentsQuery = query(assignmentsQueryRef, where("classId", "==", user.linkedStudentClassId), orderBy("dueDate", "desc"));
         } else {
           setAllAssignments([]); setIsLoading(false); return;
         }
-      } else if (!isTeacherOrAdminRole && !isStudentRole && !isParentRole) {
+      } else if (isTeacherRole) {
+          if (!teacherProfileId) {
+            // Wait for teacherProfileId to be fetched
+            setIsLoading(false); // Or keep loading until teacherProfileId is available
+            return; 
+          }
+          finalAssignmentsQuery = query(assignmentsQueryRef, where("teacherId", "==", teacherProfileId), orderBy("dueDate", "desc"));
+      } else if (isAdminRole) {
+        finalAssignmentsQuery = query(assignmentsQueryRef, orderBy("dueDate", "desc"));
+      } else {
          setAllAssignments([]); setIsLoading(false); return;
       }
 
 
-      const querySnapshot = await getDocs(assignmentsQuery);
+      const querySnapshot = await getDocs(finalAssignmentsQuery);
       let fetchedAssignments: AssignmentData[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
@@ -424,10 +521,15 @@ export default function AssignmentsPage() {
       setAllAssignments([]);
       return;
     }
+    // For teachers, fetchAssignments depends on teacherProfileId
+    if (isTeacherRole && isLoadingTeacherSpecificData) {
+        // Wait for teacher specific data (including teacherProfileId) to load
+        return;
+    }
 
     fetchAssignments();
 
-  }, [authLoading, user, role]);
+  }, [authLoading, user, role, teacherProfileId, isLoadingTeacherSpecificData]);
 
 
   useEffect(() => {
@@ -447,15 +549,32 @@ export default function AssignmentsPage() {
   }, [selectedAssignment, isEditDialogOpen, editAssignmentForm]);
 
   const getDenormalizedNames = (data: AssignmentFormValues | EditAssignmentFormValues) => {
-    const subject = subjects.find(s => s.id === data.subjectId);
-    const aClass = classes.find(c => c.id === data.classId);
-    const teacher = teachers.find(t => t.id === data.teacherId);
+    const subject = (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).find(s => s.id === data.subjectId);
+    const aClass = (isAdminRole ? classes : teacherTaughtClassesForFilter).find(c => c.id === data.classId);
+    const teacher = teachers.find(t => t.id === data.teacherId); // Admin uses full teacher list
     return { subjectName: subject?.name, className: aClass?.name, teacherName: teacher?.name };
   };
 
   const handleAddAssignmentSubmit: SubmitHandler<AssignmentFormValues> = async (data) => {
     addAssignmentForm.clearErrors();
-    const { subjectName, className, teacherName } = getDenormalizedNames(data);
+    let denormalizedNames;
+    let finalTeacherId = data.teacherId;
+
+    if (isTeacherRole && teacherProfileId && user) {
+      finalTeacherId = teacherProfileId;
+      const subject = teacherTaughtSubjectsForFilter.find(s => s.id === data.subjectId);
+      const aClass = teacherTaughtClassesForFilter.find(c => c.id === data.classId);
+      denormalizedNames = {
+        subjectName: subject?.name,
+        className: aClass?.name,
+        teacherName: user.displayName || "Guru", // Use logged-in teacher's name
+      };
+    } else {
+      denormalizedNames = getDenormalizedNames(data);
+    }
+
+    const { subjectName, className, teacherName } = denormalizedNames;
+
     if (!subjectName || !className || !teacherName) {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek, kelas, dan guru valid.", variant: "destructive"});
       return;
@@ -468,6 +587,7 @@ export default function AssignmentsPage() {
     try {
       const assignmentData:any = {
         ...data,
+        teacherId: finalTeacherId, // Use correct teacherId
         dueDate: Timestamp.fromDate(data.dueDate),
         subjectName,
         className,
@@ -512,7 +632,7 @@ export default function AssignmentsPage() {
       await batch.commit();
 
       setIsAddDialogOpen(false);
-      addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined });
+      addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: isTeacherRole ? teacherProfileId || undefined : undefined, description: "", fileURL: "", meetingNumber: undefined });
       fetchAssignments();
     } catch (error: any) {
       console.error("Error adding assignment or notifications:", error);
@@ -522,7 +642,24 @@ export default function AssignmentsPage() {
   const handleEditAssignmentSubmit: SubmitHandler<EditAssignmentFormValues> = async (data) => {
     if (!selectedAssignment) return;
     editAssignmentForm.clearErrors();
-    const { subjectName, className, teacherName } = getDenormalizedNames(data);
+
+    let denormalizedNames;
+    let finalTeacherId = data.teacherId;
+
+    if (isTeacherRole && teacherProfileId && user) {
+      finalTeacherId = teacherProfileId; // Should already be set if teacher is editing their own
+      const subject = teacherTaughtSubjectsForFilter.find(s => s.id === data.subjectId);
+      const aClass = teacherTaughtClassesForFilter.find(c => c.id === data.classId);
+      denormalizedNames = {
+        subjectName: subject?.name,
+        className: aClass?.name,
+        teacherName: user.displayName || "Guru",
+      };
+    } else {
+      denormalizedNames = getDenormalizedNames(data);
+    }
+    const { subjectName, className, teacherName } = denormalizedNames;
+
     if (!subjectName || !className || !teacherName) {
       toast({title: "Data Tidak Lengkap", variant: "destructive"});
       return;
@@ -531,6 +668,7 @@ export default function AssignmentsPage() {
       const assignmentDocRef = doc(db, "assignments", data.id);
       const updateData: any = {
           ...data,
+          teacherId: finalTeacherId,
           dueDate: Timestamp.fromDate(data.dueDate),
           subjectName,
           className,
@@ -642,21 +780,38 @@ export default function AssignmentsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedClassFilter, selectedSubjectFilter]);
+  }, [searchTerm, selectedClassFilter, selectedSubjectFilter, meetingNumberFilter]);
 
   const filteredAssignments = useMemo(() => {
     return allAssignments.filter(assignment => {
-      const matchesClass = selectedClassFilter === "all" || assignment.classId === selectedClassFilter;
-      const matchesSubject = selectedSubjectFilter === "all" || assignment.subjectId === selectedSubjectFilter;
+        let matchesFilters = true;
+        if (isTeacherRole) {
+            if (teacherUniqueClassCount === 1) {
+                if (meetingNumberFilter && assignment.meetingNumber?.toString() !== meetingNumberFilter) {
+                    matchesFilters = false;
+                }
+            } else if (teacherUniqueClassCount && teacherUniqueClassCount > 1) {
+                 const matchesClass = selectedClassFilter === "all" || assignment.classId === selectedClassFilter;
+                 const matchesSubject = selectedSubjectFilter === "all" || assignment.subjectId === selectedSubjectFilter;
+                 if (!(matchesClass && matchesSubject)) matchesFilters = false;
+            }
+        } else if (isAdminRole) {
+             const matchesClass = selectedClassFilter === "all" || assignment.classId === selectedClassFilter;
+             const matchesSubject = selectedSubjectFilter === "all" || assignment.subjectId === selectedSubjectFilter;
+             if (!(matchesClass && matchesSubject)) matchesFilters = false;
+        }
+
+
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === "" ||
         assignment.title.toLowerCase().includes(searchLower) ||
         (assignment.subjectName && assignment.subjectName.toLowerCase().includes(searchLower)) ||
         (assignment.className && assignment.className.toLowerCase().includes(searchLower)) ||
         (assignment.teacherName && assignment.teacherName.toLowerCase().includes(searchLower));
-      return matchesClass && matchesSubject && matchesSearch;
+        
+      return matchesFilters && matchesSearch;
     });
-  }, [allAssignments, searchTerm, selectedClassFilter, selectedSubjectFilter]);
+  }, [allAssignments, searchTerm, selectedClassFilter, selectedSubjectFilter, isTeacherRole, teacherUniqueClassCount, meetingNumberFilter]);
 
   const totalPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -713,7 +868,7 @@ export default function AssignmentsPage() {
   };
 
 
-  if (authLoading || (!user && !authLoading)) {
+  if (authLoading || isLoadingTeacherSpecificData && isTeacherRole || (!user && !authLoading)) {
     return <div className="space-y-6"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
@@ -735,10 +890,11 @@ export default function AssignmentsPage() {
             {isTeacherOrAdminRole && (
               <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
                 setIsAddDialogOpen(isOpen);
-                if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: undefined, description: "", fileURL: "", meetingNumber: undefined }); addAssignmentForm.clearErrors(); }
+                if (!isOpen) { addAssignmentForm.reset({ dueDate: new Date(), title: "", subjectId: undefined, classId: undefined, teacherId: isTeacherRole ? teacherProfileId || undefined : undefined, description: "", fileURL: "", meetingNumber: undefined }); addAssignmentForm.clearErrors(); }
+                 else if (isAdminRole && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) fetchAdminDropdownData(); 
               }}>
                 <DialogTrigger asChild>
-                  <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchDropdownData(); }}>
+                   <Button size="sm" onClick={() => { if (isAdminRole && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) fetchAdminDropdownData();}}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Tambah Tugas
                   </Button>
                 </DialogTrigger>
@@ -746,10 +902,18 @@ export default function AssignmentsPage() {
                   <DialogHeader><DialogTitle>Tambah Tugas Baru</DialogTitle><DialogDescription>Isi detail tugas.</DialogDescription></DialogHeader>
                   <form onSubmit={addAssignmentForm.handleSubmit(handleAddAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div><Label htmlFor="add-assignment-title">Judul Tugas</Label><Input id="add-assignment-title" {...addAssignmentForm.register("title")} className="mt-1" />{addAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.title.message}</p>}</div>
-                    <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
-                    <div><Label htmlFor="add-assignment-classId">Kelas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
-                    <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
-                    <div><Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addAssignmentForm.watch("dueDate")} onSelect={(date) => addAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent></Popover>{addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-classId">Kelas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{(isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{(isAdminRole ? classes : teacherTaughtClassesForFilter).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
+                    
+                    {isAdminRole && (
+                        <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas</Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
+                    )}
+                    {isTeacherRole && (
+                        <Input type="hidden" {...addAssignmentForm.register("teacherId", { value: teacherProfileId || ""})} />
+                    )}
+
+
+                    <div><Label htmlFor="add-assignment-dueDate">Batas Waktu Pengumpulan</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{addAssignmentForm.watch("dueDate") ? format(addAssignmentForm.watch("dueDate"), "PPP HH:mm", { locale: indonesiaLocale }) : <span>Pilih tanggal & waktu</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={addAssignmentForm.watch("dueDate")} onSelect={(date) => addAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /><div className="p-2 border-t"><Input type="time" defaultValue={format(addAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} onChange={(e) => { const timeParts = e.target.value.split(':'); const newDate = new Date(addAssignmentForm.watch("dueDate") || new Date()); newDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1])); addAssignmentForm.setValue("dueDate", newDate, { shouldValidate: true }); }} /></div></PopoverContent></Popover>{addAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.dueDate.message}</p>}</div>
                     <div><Label htmlFor="add-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="add-assignment-meetingNumber" type="number" {...addAssignmentForm.register("meetingNumber")} className="mt-1" placeholder="Contoh: 3" />{addAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
                     <div><Label htmlFor="add-assignment-description">Deskripsi Tugas</Label><Textarea id="add-assignment-description" {...addAssignmentForm.register("description")} className="mt-1" placeholder="Jelaskan detail tugas di sini..." /></div>
                     <div><Label htmlFor="add-assignment-fileURL">URL File Tugas (Opsional)</Label><Input id="add-assignment-fileURL" {...addAssignmentForm.register("fileURL")} className="mt-1" placeholder="https://contoh.com/file_tugas.pdf" />{addAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.fileURL.message}</p>}</div>
@@ -761,47 +925,62 @@ export default function AssignmentsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isTeacherOrAdminRole && (
-            <div className="my-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="relative sm:col-span-1">
+         <div className="my-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="relative sm:col-span-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari tugas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-full"
+                placeholder="Cari tugas..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 w-full"
                 />
-              </div>
-              <Select
-                value={selectedClassFilter}
-                onValueChange={setSelectedClassFilter}
-                disabled={isLoading || classes.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <FilterIcon className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter Kelas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Kelas</SelectItem>
-                  {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select
-                value={selectedSubjectFilter}
-                onValueChange={setSelectedSubjectFilter}
-                disabled={isLoading || subjects.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <FilterIcon className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter Mata Pelajaran" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
-                  {subjects.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
             </div>
-          )}
+            {isTeacherRole && teacherUniqueClassCount === 1 ? (
+                <div className="sm:col-span-2">
+                    <Label htmlFor="meetingNumberFilter" className="sr-only">Filter Pertemuan Ke-</Label>
+                    <Input
+                        id="meetingNumberFilter"
+                        type="number"
+                        placeholder="Filter Pertemuan Ke- (mis: 1)"
+                        value={meetingNumberFilter}
+                        onChange={(e) => setMeetingNumberFilter(e.target.value)}
+                        className="w-full"
+                    />
+                </div>
+            ) : (isTeacherOrAdminRole && (teacherUniqueClassCount === null || teacherUniqueClassCount > 1 || isAdminRole)) ? (
+                <>
+                <Select
+                    value={selectedClassFilter}
+                    onValueChange={setSelectedClassFilter}
+                    disabled={isLoading || (isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0}
+                >
+                    <SelectTrigger className="w-full">
+                    <FilterIcon className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Filter Kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="all">Semua Kelas</SelectItem>
+                    {(isAdminRole ? classes : teacherTaughtClassesForFilter).map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                <Select
+                    value={selectedSubjectFilter}
+                    onValueChange={setSelectedSubjectFilter}
+                    disabled={isLoading || (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0}
+                >
+                    <SelectTrigger className="w-full">
+                    <FilterIcon className="mr-2 h-4 w-4" />
+                    <SelectValue placeholder="Filter Mata Pelajaran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
+                    {(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                </>
+            ) : null}
+         </div>
+
           {isLoading ? (
             <div className="space-y-2 mt-4">{[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
           ) : currentTableData.length > 0 ? (
@@ -813,9 +992,9 @@ export default function AssignmentsPage() {
                     {isTeacherOrAdminRole && <TableHead className="w-[50px]">No.</TableHead>}
                     <TableHead>Judul Tugas</TableHead>
                     <TableHead>Mata Pelajaran</TableHead>
-                    {(isStudentRole || isParentRole) && <TableHead>Guru</TableHead>}
-                    {!isStudentRole && !isParentRole && <TableHead>Kelas</TableHead>}
-                    {!isStudentRole && !isParentRole && <TableHead>Guru</TableHead>}
+                    {(isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
+                    {(isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
+                    {(isAdminRole ) && <TableHead>Guru</TableHead>}
                     <TableHead>Pertemuan</TableHead>
                     <TableHead>Batas Waktu</TableHead>
                     {(isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
@@ -830,9 +1009,13 @@ export default function AssignmentsPage() {
                       {isTeacherOrAdminRole && <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>}
                       <TableCell className="font-medium">{assignment.title}</TableCell>
                       <TableCell>{assignment.subjectName || assignment.subjectId}</TableCell>
-                      {(isStudentRole || isParentRole) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
-                      {!isStudentRole && !isParentRole && <TableCell>{assignment.className || assignment.classId}</TableCell>}
-                      {!isStudentRole && !isParentRole && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      
+                      {(isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+                      
+                      {(isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableCell>{assignment.className || assignment.classId}</TableCell>}
+                      
+                      {(isAdminRole) && <TableCell>{assignment.teacherName || assignment.teacherId}</TableCell>}
+
                       <TableCell>{assignment.meetingNumber || "-"}</TableCell>
                       <TableCell className={cn(isStudentRole && isPast(assignment.dueDate.toDate()) && assignment.submissionStatus === "Belum Dikerjakan" && "text-destructive font-semibold")}>
                         {format(assignment.dueDate.toDate(), "dd MMM yyyy, HH:mm", { locale: indonesiaLocale })}
@@ -959,7 +1142,7 @@ export default function AssignmentsPage() {
             )}
             </>
           ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {(searchTerm || selectedClassFilter !== "all" || selectedSubjectFilter !== "all")
+                {(searchTerm || (isAdminRole && (selectedClassFilter !== "all" || selectedSubjectFilter !== "all")) || (isTeacherRole && teacherUniqueClassCount ===1 && meetingNumberFilter) || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1 && (selectedClassFilter !== "all" || selectedSubjectFilter !== "all")))
                   ? "Tidak ada tugas yang cocok dengan filter atau pencarian Anda."
                   : "Belum ada tugas."
                 }
@@ -974,10 +1157,17 @@ export default function AssignmentsPage() {
             <form onSubmit={editAssignmentForm.handleSubmit(handleEditAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Input type="hidden" {...editAssignmentForm.register("id")} />
               <div><Label htmlFor="edit-assignment-title">Judul Tugas</Label><Input id="edit-assignment-title" {...editAssignmentForm.register("title")} className="mt-1" />{editAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.title.message}</p>}</div>
-              <div><Label htmlFor="edit-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => editAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("subjectId")}><SelectTrigger id="edit-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.subjectId.message}</p>}</div>
-              <div><Label htmlFor="edit-assignment-classId">Kelas</Label><Select onValueChange={(value) => editAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("classId")}><SelectTrigger id="edit-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.classId.message}</p>}</div>
-              <div><Label htmlFor="edit-assignment-teacherId">Guru</Label><Select onValueChange={(value) => editAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("teacherId")}><SelectTrigger id="edit-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.teacherId.message}</p>}</div>
-              <div><Label htmlFor="edit-assignment-dueDate">Batas Waktu</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{editAssignmentForm.watch("dueDate") ? format(editAssignmentForm.watch("dueDate"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={editAssignmentForm.watch("dueDate")} onSelect={(date) => editAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /></PopoverContent></Popover>{editAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.dueDate.message}</p>}</div>
+              <div><Label htmlFor="edit-assignment-subjectId">Mata Pelajaran</Label><Select onValueChange={(value) => editAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("subjectId")}><SelectTrigger id="edit-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.subjectId.message}</p>}</div>
+              <div><Label htmlFor="edit-assignment-classId">Kelas</Label><Select onValueChange={(value) => editAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("classId")}><SelectTrigger id="edit-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{(isAdminRole ? classes : teacherTaughtClassesForFilter).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.classId.message}</p>}</div>
+              
+              {isAdminRole && (
+                <div><Label htmlFor="edit-assignment-teacherId">Guru</Label><Select onValueChange={(value) => editAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("teacherId")}><SelectTrigger id="edit-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.teacherId.message}</p>}</div>
+              )}
+               {isTeacherRole && (
+                    <Input type="hidden" {...editAssignmentForm.register("teacherId", { value: teacherProfileId || ""})} />
+               )}
+
+              <div><Label htmlFor="edit-assignment-dueDate">Batas Waktu</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className="w-full justify-start text-left font-normal mt-1"><CalendarIcon className="mr-2 h-4 w-4" />{editAssignmentForm.watch("dueDate") ? format(editAssignmentForm.watch("dueDate"), "PPP HH:mm", { locale: indonesiaLocale }) : <span>Pilih tanggal & waktu</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={editAssignmentForm.watch("dueDate")} onSelect={(date) => editAssignmentForm.setValue("dueDate", date || new Date(), { shouldValidate: true })} initialFocus /><div className="p-2 border-t"><Input type="time" defaultValue={format(editAssignmentForm.watch("dueDate") || new Date(), "HH:mm")} onChange={(e) => { const timeParts = e.target.value.split(':'); const newDate = new Date(editAssignmentForm.watch("dueDate") || new Date()); newDate.setHours(parseInt(timeParts[0]), parseInt(timeParts[1])); editAssignmentForm.setValue("dueDate", newDate, { shouldValidate: true }); }} /></div></PopoverContent></Popover>{editAssignmentForm.formState.errors.dueDate && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.dueDate.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-meetingNumber">Pertemuan Ke- (Opsional)</Label><Input id="edit-assignment-meetingNumber" type="number" {...editAssignmentForm.register("meetingNumber")} className="mt-1" />{editAssignmentForm.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.meetingNumber.message}</p>}</div>
               <div><Label htmlFor="edit-assignment-description">Deskripsi</Label><Textarea id="edit-assignment-description" {...editAssignmentForm.register("description")} className="mt-1" /></div>
               <div><Label htmlFor="edit-assignment-fileURL">URL File</Label><Input id="edit-assignment-fileURL" {...editAssignmentForm.register("fileURL")} className="mt-1" />{editAssignmentForm.formState.errors.fileURL && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.fileURL.message}</p>}</div>
