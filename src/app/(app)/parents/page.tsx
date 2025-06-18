@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/select";
 import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon, MoreVertical, Eye } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
-import Image from "next/image"; 
+import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode, useCallback } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -64,7 +64,7 @@ import {
   orderBy,
   where,
   documentId,
-  limit // Added limit here
+  limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -208,12 +208,12 @@ export default function ParentsPage() {
 
       // Fetch students (all for admin, filtered for guru if responsibleClassIdsForGuru is set)
       const usersCollectionRef = collection(db, "users");
-      
+
       if (authRole === 'admin') {
         const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
         fetchedStudentsForDialog = studentsSnapshot.docs.map(docSnap => ({
-            id: docSnap.data().uid, 
+            id: docSnap.data().uid,
             name: docSnap.data().name,
             classId: docSnap.data().classId,
         }));
@@ -225,17 +225,17 @@ export default function ParentsPage() {
           for (let i = 0; i < responsibleClassIdsForGuru.length; i += 30) {
               studentClassIdChunks.push(responsibleClassIdsForGuru.slice(i, i + 30));
           }
-          const studentPromises = studentClassIdChunks.map(chunk => 
+          const studentPromises = studentClassIdChunks.map(chunk =>
               getDocs(query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", chunk), orderBy("name", "asc")))
           );
           const studentSnapshots = await Promise.all(studentPromises);
           fetchedStudentsForDialog = studentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
-              id: docSnap.data().uid, 
+              id: docSnap.data().uid,
               name: docSnap.data().name,
               classId: docSnap.data().classId,
           })));
         }
-      } else { 
+      } else {
          const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
          const studentsSnapshot = await getDocs(studentsQuery);
          fetchedStudentsForDialog = studentsSnapshot.docs.map(docSnap => ({
@@ -262,7 +262,10 @@ export default function ParentsPage() {
       if (authRole === 'admin') {
         parentsQuery = query(parentsCollectionRef, orderBy("name", "asc"));
       } else if (authRole === 'guru') {
-        const studentUidsOfTeacher = fetchedStudentsForDialog.map(s => s.id);
+        const studentUidsOfTeacher = fetchedStudentsForDialog
+          .map(s => s.id)
+          .filter((uid): uid is string => typeof uid === 'string' && uid.length > 0); // Ensure UIDs are valid strings
+
         if (studentUidsOfTeacher.length === 0) {
           setParents([]);
           setIsLoadingData(false);
@@ -272,9 +275,12 @@ export default function ParentsPage() {
         for (let i = 0; i < studentUidsOfTeacher.length; i += 30) {
             studentUidChunks.push(studentUidsOfTeacher.slice(i, i + 30));
         }
-        const parentPromises = studentUidChunks.map(chunk => 
-            getDocs(query(parentsCollectionRef, where("studentId", "in", chunk), orderBy("name", "asc")))
-        );
+        const parentPromises = studentUidChunks.map(chunk => {
+            if (chunk.length > 0) { // Ensure chunk is not empty before querying
+                return getDocs(query(parentsCollectionRef, where("studentId", "in", chunk), orderBy("name", "asc")));
+            }
+            return Promise.resolve({ docs: [] }); // Return an empty snapshot if chunk is empty
+        });
         const parentSnapshots = await Promise.all(parentPromises);
         const fetchedParentsForGuru = parentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
             id: docSnap.id,
@@ -285,7 +291,7 @@ export default function ParentsPage() {
       } else {
         setParents([]); // Non-admin/guru don't see this management page
       }
-      
+
       if (parentsQuery) { // Only if admin query was set
         const parentsSnapshot = await getDocs(parentsQuery);
         setParents(parentsSnapshot.docs.map(docSnap => ({
