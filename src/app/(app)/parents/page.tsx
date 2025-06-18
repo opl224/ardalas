@@ -63,7 +63,8 @@ import {
   query,
   orderBy,
   where,
-  documentId
+  documentId,
+  limit // Added limit here
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -185,6 +186,7 @@ export default function ParentsPage() {
     try {
       let responsibleClassIdsForGuru: string[] | null = null;
       let classesForDropdown: ClassMin[] = [];
+      let fetchedStudentsForDialog: StudentForDialog[] = [];
 
       // Fetch classes for dropdown and determine responsible classes for guru
       if (authRole === 'admin') {
@@ -206,41 +208,43 @@ export default function ParentsPage() {
 
       // Fetch students (all for admin, filtered for guru if responsibleClassIdsForGuru is set)
       const usersCollectionRef = collection(db, "users");
-      let studentsQuery;
+      
       if (authRole === 'admin') {
-        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
-      } else if (authRole === 'guru' && responsibleClassIdsForGuru) {
-        if (responsibleClassIdsForGuru.length === 0) {
-          setStudentsForDialog([]);
-          setParents([]);
-          setIsLoadingData(false);
-          return; // No classes, so no students, no parents
-        }
-        // Firestore 'in' query limit is 30. Chunk if necessary.
-        const studentClassIdChunks: string[][] = [];
-        for (let i = 0; i < responsibleClassIdsForGuru.length; i += 30) {
-            studentClassIdChunks.push(responsibleClassIdsForGuru.slice(i, i + 30));
-        }
-        const studentPromises = studentClassIdChunks.map(chunk => 
-            getDocs(query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", chunk), orderBy("name", "asc")))
-        );
-        const studentSnapshots = await Promise.all(studentPromises);
-        const fetchedStudentsForGuru = studentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
-            id: docSnap.data().uid, // studentId in 'parents' collection is the auth UID from 'users'
+        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        fetchedStudentsForDialog = studentsSnapshot.docs.map(docSnap => ({
+            id: docSnap.data().uid, 
             name: docSnap.data().name,
             classId: docSnap.data().classId,
-        })));
-        setStudentsForDialog(fetchedStudentsForGuru);
-
-      } else { // Other roles or no specific filter
-        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
-        const studentsSnapshot = await getDocs(studentsQuery);
-        setStudentsForDialog(studentsSnapshot.docs.map(docSnap => ({
+        }));
+      } else if (authRole === 'guru' && responsibleClassIdsForGuru) {
+        if (responsibleClassIdsForGuru.length === 0) {
+          fetchedStudentsForDialog = [];
+        } else {
+          const studentClassIdChunks: string[][] = [];
+          for (let i = 0; i < responsibleClassIdsForGuru.length; i += 30) {
+              studentClassIdChunks.push(responsibleClassIdsForGuru.slice(i, i + 30));
+          }
+          const studentPromises = studentClassIdChunks.map(chunk => 
+              getDocs(query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", chunk), orderBy("name", "asc")))
+          );
+          const studentSnapshots = await Promise.all(studentPromises);
+          fetchedStudentsForDialog = studentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
+              id: docSnap.data().uid, 
+              name: docSnap.data().name,
+              classId: docSnap.data().classId,
+          })));
+        }
+      } else { 
+         const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+         const studentsSnapshot = await getDocs(studentsQuery);
+         fetchedStudentsForDialog = studentsSnapshot.docs.map(docSnap => ({
             id: docSnap.data().uid,
             name: docSnap.data().name,
             classId: docSnap.data().classId,
-        })));
+        }));
       }
+      setStudentsForDialog(fetchedStudentsForDialog);
 
 
       // Fetch auth users with 'orangtua' role (for linking)
@@ -258,13 +262,12 @@ export default function ParentsPage() {
       if (authRole === 'admin') {
         parentsQuery = query(parentsCollectionRef, orderBy("name", "asc"));
       } else if (authRole === 'guru') {
-        const studentUidsOfTeacher = studentsForDialog.filter(s => responsibleClassIdsForGuru?.includes(s.classId || "")).map(s => s.id);
+        const studentUidsOfTeacher = fetchedStudentsForDialog.map(s => s.id);
         if (studentUidsOfTeacher.length === 0) {
           setParents([]);
           setIsLoadingData(false);
           return;
         }
-         // Firestore 'in' query limit is 30. Chunk if necessary.
         const studentUidChunks: string[][] = [];
         for (let i = 0; i < studentUidsOfTeacher.length; i += 30) {
             studentUidChunks.push(studentUidsOfTeacher.slice(i, i + 30));
@@ -961,6 +964,4 @@ export default function ParentsPage() {
     </div>
   );
 }
-
-
 
