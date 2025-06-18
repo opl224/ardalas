@@ -878,7 +878,7 @@ export default function StudentsPage() {
                       </>
                     )}
                     {authRole === 'siswa' && <TableHead className={cn(isMobile && "px-2 w-1/4")}>No. Absen</TableHead>}
-                     <TableHead className={cn(isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2" : isMobile && authRole === 'siswa' ? "px-2" : "", "w-1/4")}>Kelas</TableHead>
+                     <TableHead className={cn(isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2" : isMobile && authRole === 'siswa' ? "px-2" : "", "w-2/5")}>Kelas</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && (
                       <>
                         {!isMobile && <TableHead>Gender</TableHead>}
