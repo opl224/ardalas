@@ -119,7 +119,7 @@ const NO_TEACHER_VALUE = "_NONE_";
 const ITEMS_PER_PAGE = 10;
 
 export default function ClassesPage() {
-  const { user, role, loading: authLoading } = useAuth(); 
+  const { user, role: authRole, loading: authLoading } = useAuth(); 
   const [allRawClasses, setAllRawClasses] = useState<ClassData[]>([]);
   const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
   const [isLoading, setIsLoading] = useState(true);
@@ -176,14 +176,14 @@ export default function ClassesPage() {
       const classesCollectionRef = collection(db, "classes");
       let q;
 
-      if (role === "admin") {
+      if (authRole === "admin") {
         if (teachers.length === 0) { 
           await fetchTeachersForDropdown();
         }
         q = query(classesCollectionRef, orderBy("name", "asc"));
         const querySnapshot = await getDocs(q);
         setAllRawClasses(querySnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as ClassData)));
-      } else if (role === "guru" && user?.uid) {
+      } else if (authRole === "guru" && user?.uid) {
          if (teachers.length === 0) { 
           await fetchTeachersForDropdown();
         }
@@ -198,7 +198,7 @@ export default function ClassesPage() {
         } else {
           setAllRawClasses([]);
         }
-      } else if (role === "orangtua" && user?.linkedStudentClassId) {
+      } else if (authRole === "orangtua" && user?.linkedStudentClassId) {
         const classDocRef = doc(db, "classes", user.linkedStudentClassId);
         const classDocSnap = await getDoc(classDocRef);
         if (classDocSnap.exists()) {
@@ -225,20 +225,20 @@ export default function ClassesPage() {
 
   useEffect(() => {
     fetchClasses();
-  }, [role, user, authLoading]); 
+  }, [authRole, user, authLoading]); 
 
   useEffect(() => {
-    if (selectedClass && isEditDialogOpen && role === "admin") {
+    if (selectedClass && isEditDialogOpen && authRole === "admin") {
       editClassForm.reset({
         id: selectedClass.id,
         name: selectedClass.name,
         teacherId: selectedClass.teacherId || undefined, 
       });
     }
-  }, [selectedClass, isEditDialogOpen, editClassForm, role]);
+  }, [selectedClass, isEditDialogOpen, editClassForm, authRole]);
 
   const handleAddClassSubmit: SubmitHandler<ClassFormValues> = async (data) => {
-    if (role !== "admin") return; 
+    if (authRole !== "admin") return; 
     addClassForm.clearErrors();
     const selectedTeacher = data.teacherId ? teachers.find(t => t.id === data.teacherId) : undefined;
     
@@ -266,7 +266,7 @@ export default function ClassesPage() {
   };
 
   const handleEditClassSubmit: SubmitHandler<EditClassFormValues> = async (data) => {
-    if (role !== "admin" || !selectedClass) return;
+    if (authRole !== "admin" || !selectedClass) return;
     editClassForm.clearErrors();
     const selectedTeacher = data.teacherId ? teachers.find(t => t.id === data.teacherId) : undefined;
 
@@ -293,7 +293,7 @@ export default function ClassesPage() {
   };
 
   const handleDeleteClass = async (classId: string, className?: string) => {
-    if (role !== "admin") return;
+    if (authRole !== "admin") return;
     try {
       await deleteDoc(doc(db, "classes", classId));
       toast({ title: "Data Kelas Dihapus", description: `${className || 'Kelas'} berhasil dihapus.` });
@@ -310,13 +310,13 @@ export default function ClassesPage() {
   };
 
   const openEditDialog = (classItem: ClassData) => {
-    if (role !== "admin") return;
+    if (authRole !== "admin") return;
     setSelectedClass(classItem);
     setIsEditDialogOpen(true);
   };
   
   const openDeleteDialog = (classItem: ClassData) => {
-    if (role !== "admin") return;
+    if (authRole !== "admin") return;
     setSelectedClass(classItem); 
   };
 
@@ -358,8 +358,8 @@ export default function ClassesPage() {
     fetchStudentsForClass(classItem.id);
   };
 
-  const pageTitle = role === "orangtua" ? `Kelas Anak Saya (${user?.linkedStudentName || 'Siswa'})` : "Manajemen Kelas";
-  const pageDescription = role === "orangtua" 
+  const pageTitle = authRole === "orangtua" ? `Kelas Anak Saya (${user?.linkedStudentName || 'Siswa'})` : "Manajemen Kelas";
+  const pageDescription = authRole === "orangtua" 
     ? "Informasi mengenai kelas anak Anda."
     : "Kelola daftar kelas, wali kelas, dan siswa per kelas.";
 
@@ -450,9 +450,9 @@ export default function ClassesPage() {
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <School className="h-6 w-6 text-primary" />
-            <span>{role === "orangtua" ? "Detail Kelas Anak" : "Daftar Kelas"}</span>
+            <span>{authRole === "orangtua" ? "Detail Kelas Anak" : "Daftar Kelas"}</span>
           </CardTitle>
-          {role === "admin" && (
+          {authRole === "admin" && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) {
@@ -517,7 +517,7 @@ export default function ClassesPage() {
           )}
         </CardHeader>
         <CardContent>
-          {(role === 'admin' || role === 'guru') && (
+          {(authRole === 'admin' || authRole === 'guru') && (
              <div className="my-4 flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -571,7 +571,7 @@ export default function ClassesPage() {
                       <TableCell className="font-medium">{classItem.name}</TableCell>
                       <TableCell>{classItem.teacherName || "-"}</TableCell>
                       <TableCell className="text-right">
-                        {role === "guru" ? (
+                        {authRole === "guru" || authRole === "orangtua" ? (
                            <Button
                             variant="outline"
                             size="icon"
@@ -592,7 +592,7 @@ export default function ClassesPage() {
                                 <Eye className="mr-2 h-4 w-4" />
                                 Lihat Siswa
                               </DropdownMenuItem>
-                              {role === "admin" && (
+                              {authRole === "admin" && (
                                 <>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem onClick={() => openEditDialog(classItem)}>
@@ -662,16 +662,16 @@ export default function ClassesPage() {
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {searchTerm || selectedClassNameFilter !== "all" ? 'Tidak ada kelas yang cocok dengan filter atau pencarian Anda.' :
-                 role === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
-                 role === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
-                 role === 'orangtua' && !user?.linkedStudentClassId ? (
+                 authRole === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
+                 authRole === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
+                 authRole === 'orangtua' && !user?.linkedStudentClassId ? (
                    <div className="flex flex-col items-center">
                      <AlertCircle className="w-10 h-10 mb-2 text-destructive" />
                      <span className="font-semibold">Data Kelas Anak Tidak Ditemukan.</span>
                      <span>Pastikan anak sudah terdaftar di kelas dan akun orang tua sudah ditautkan dengan benar.</span>
                    </div>
                  ) :
-                 role === 'orangtua' ? 'Data kelas anak Anda tidak ditemukan.' :
+                 authRole === 'orangtua' ? 'Data kelas anak Anda tidak ditemukan.' :
                  'Tidak ada data kelas untuk ditampilkan.'
                 }
             </div>
@@ -679,7 +679,7 @@ export default function ClassesPage() {
         </CardContent>
       </Card>
 
-      {role === "admin" && (
+      {authRole === "admin" && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
             setIsEditDialogOpen(isOpen);
             if (!isOpen) {
@@ -767,7 +767,7 @@ export default function ClassesPage() {
                   <TableRow>
                     <TableHead className="w-10">No.</TableHead>
                     <TableHead>Nama Siswa</TableHead>
-                    <TableHead>NIS</TableHead>
+                    {authRole !== 'orangtua' && <TableHead>NIS</TableHead>}
                     <TableHead>No. Absen</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -776,7 +776,7 @@ export default function ClassesPage() {
                     <TableRow key={student.id}>
                       <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>{student.nis}</TableCell>
+                      {authRole !== 'orangtua' && <TableCell>{student.nis}</TableCell>}
                       <TableCell>{student.attendanceNumber ?? "-"}</TableCell>
                     </TableRow>
                   ))}
@@ -798,4 +798,3 @@ export default function ClassesPage() {
   );
 }
     
-
