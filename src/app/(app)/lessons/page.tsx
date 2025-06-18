@@ -841,7 +841,13 @@ export default function LessonsPage() {
                         
                         <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                           {isStudentOrParent ? (
-                            <Button asChild size="sm" variant={isActiveNow ? "default" : "outline"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
+                            <Button 
+                              asChild 
+                              size="sm" 
+                              variant={(role === "orangtua" || !isActiveNow) ? "outline" : "default"} 
+                              disabled={role === "orangtua" || !isActiveNow}
+                              className={cn(role !== "orangtua" && isActiveNow && "border-primary text-primary hover:bg-primary/10")}
+                            >
                               <Link href={`/lessons/${lesson.id}`}>
                                 <LogIn className="mr-2 h-4 w-4" /> {isMobile ? "" : "Masuk Kelas"}
                               </Link>
@@ -1030,3 +1036,4 @@ export default function LessonsPage() {
     </div>
   );
 }
+
