@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -825,11 +824,21 @@ export default function StudentsPage() {
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
                     <TableHead className={cn(isMobile ? "px-2" : "")}>Nama</TableHead>
-                    { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>NIS</TableHead> }
-                    { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>Email</TableHead> }
-                    <TableHead className={cn(isMobile ? "px-2" : "")}>Kelas</TableHead>
-                    { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableHead>Gender</TableHead> }
-                    <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-right w-16")}>Aksi</TableHead>
+                    {(authRole === 'admin' || authRole === 'guru') && (
+                      <>
+                        {!isMobile && <TableHead>NIS</TableHead>}
+                        {!isMobile && <TableHead>Email</TableHead>}
+                      </>
+                    )}
+                    {authRole === 'siswa' && <TableHead className={cn(isMobile && "px-2")}>No. Absen</TableHead>}
+                     <TableHead className={cn(isMobile ? "px-2" : "")}>Kelas</TableHead>
+                    {(authRole === 'admin' || authRole === 'guru') && (
+                      <>
+                        {!isMobile && <TableHead>Gender</TableHead>}
+                        <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-center w-16")}>Aksi</TableHead>
+                      </>
+                    )}
+                    {authRole === 'siswa' && <TableHead className={cn("text-right px-1 w-12", isMobile && "w-auto text-left")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -837,10 +846,21 @@ export default function StudentsPage() {
                     <TableRow key={student.id}>
                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={student.name}>{student.name}</TableCell>
-                      { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell> }
-                      { !isMobile && (authRole === 'admin' || authRole === 'guru') && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell> }
+                      
+                      {(authRole === 'admin' || authRole === 'guru') && (
+                        <>
+                          {!isMobile && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>}
+                          {!isMobile && <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>}
+                        </>
+                      )}
+
+                      {authRole === 'siswa' && (
+                        <TableCell className={cn(isMobile && "px-2")}>{student.attendanceNumber ?? "-"}</TableCell>
+                      )}
+
                       <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={student.className || student.classId}>{student.className || student.classId}</TableCell>
-                      { !isMobile && (authRole === 'admin' || authRole === 'guru') && (
+                      
+                      {(authRole === 'admin' || authRole === 'guru') && !isMobile && (
                         <TableCell>
                           {student.gender === "laki-laki" ? (
                             <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
@@ -851,57 +871,63 @@ export default function StudentsPage() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell className={cn(isMobile ? "text-right px-1" : "text-right")}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openViewStudentDialog(student)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Lihat Detail
-                            </DropdownMenuItem>
-                            {(authRole === 'admin' || authRole === 'guru') && (
-                              <>
-                                <DropdownMenuItem onClick={() => openEditDialog(student)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem
-                                      onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }}
-                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Hapus
-                                    </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  {selectedStudent && selectedStudent.id === student.id && ( 
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
-                                          Ya, Hapus Data
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  )}
-                                </AlertDialog>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+
+                      {(authRole === 'admin' || authRole === 'guru') ? (
+                        <TableCell className={cn(isMobile ? "text-right px-1" : "text-center")}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openViewStudentDialog(student)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Lihat Detail
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(student)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Hapus
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedStudent && selectedStudent.id === student.id && ( 
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
+                                        Ya, Hapus Data
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      ) : authRole === 'siswa' ? (
+                        <TableCell className={cn("text-right", isMobile ? "px-1 text-left" : "")}>
+                           <Button variant="outline" size={isMobile ? "xs" : "icon"} onClick={() => openViewStudentDialog(student)} aria-label={`Lihat detail ${student.name}`}>
+                                <Eye className="h-4 w-4" />
+                                {isMobile && <span className="ml-1">Detail</span>}
+                           </Button>
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1039,4 +1065,5 @@ export default function StudentsPage() {
     
 
     
+
 
