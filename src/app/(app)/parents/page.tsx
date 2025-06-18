@@ -44,8 +44,8 @@ import {
 } from "@/components/ui/select";
 import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon, MoreVertical, Eye } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
-import Image from "next/image"; // Added Image import
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import Image from "next/image"; 
+import { useState, useEffect, useMemo, type ReactNode, useCallback } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -90,13 +90,13 @@ import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface StudentForDialog {
-  id: string;
+  id: string; // This is Auth UID of student
   name: string;
   classId?: string;
 }
 
 interface AuthUserMin {
-  id: string;
+  id: string; // This is Auth UID
   name: string;
   email: string;
 }
@@ -107,15 +107,15 @@ interface ClassMin {
 }
 
 interface Parent {
-  id: string;
+  id: string; // Firestore document ID of the parent profile
   name: string;
   email?: string;
   phone?: string;
   address?: string;
   gender?: "laki-laki" | "perempuan";
-  studentId: string;
-  studentName: string;
-  uid?: string;
+  studentId: string; // Auth UID of the linked student
+  studentName: string; // Denormalized name of the student
+  uid?: string; // Auth UID of the parent user (if linked from 'users' collection)
   createdAt?: Timestamp;
 }
 
@@ -127,8 +127,8 @@ const parentFormSchema = z.object({
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   address: z.string().trim().optional(),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
-  studentId: z.string({ required_error: "Pilih murid terkait (UID)." }),
-  authUserId: z.string().optional(),
+  studentId: z.string({ required_error: "Pilih murid terkait (UID)." }), // Student's Auth UID
+  authUserId: z.string().optional(), // Parent's Auth UID
 });
 type ParentFormValues = z.infer<typeof parentFormSchema>;
 
@@ -145,13 +145,14 @@ export default function ParentsPage() {
   const [parents, setParents] = useState<Parent[]>([]);
   const [studentsForDialog, setStudentsForDialog] = useState<StudentForDialog[]>([]);
   const [authOrangtuaUsers, setAuthOrangtuaUsers] = useState<AuthUserMin[]>([]);
-  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
+  const [allClassesForFilter, setAllClassesForFilter] = useState<ClassMin[]>([]); // For filter dropdown
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewParentDialogOpen, setIsViewParentDialogOpen] = useState(false);
   const [selectedParent, setSelectedParent] = useState<Parent | null>(null);
   const [selectedParentForView, setSelectedParentForView] = useState<Parent | null>(null);
+  const [teacherResponsibleClassIds, setTeacherResponsibleClassIds] = useState<string[] | null>(null);
 
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -178,83 +179,133 @@ export default function ParentsPage() {
     resolver: zodResolver(editParentFormSchema),
   });
 
-  const fetchPageData = async () => {
-    if (authLoading && (authRole !== 'admin' && authRole !== 'guru')) return;
+  const fetchPageData = useCallback(async () => {
+    if (authLoading) return;
     setIsLoadingData(true);
     try {
-      const promises = [];
+      let responsibleClassIdsForGuru: string[] | null = null;
+      let classesForDropdown: ClassMin[] = [];
 
+      // Fetch classes for dropdown and determine responsible classes for guru
+      if (authRole === 'admin') {
+        const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
+        classesForDropdown = classesSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name }));
+      } else if (authRole === 'guru' && authUser?.uid) {
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+        if (!teacherProfileSnapshot.empty) {
+          const teacherDocId = teacherProfileSnapshot.docs[0].id;
+          const responsibleClassesQuery = query(collection(db, "classes"), where("teacherId", "==", teacherDocId), orderBy("name", "asc"));
+          const responsibleClassesSnapshot = await getDocs(responsibleClassesQuery);
+          classesForDropdown = responsibleClassesSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name }));
+          responsibleClassIdsForGuru = classesForDropdown.map(c => c.id);
+        }
+      }
+      setAllClassesForFilter(classesForDropdown);
+      setTeacherResponsibleClassIds(responsibleClassIdsForGuru);
+
+      // Fetch students (all for admin, filtered for guru if responsibleClassIdsForGuru is set)
       const usersCollectionRef = collection(db, "users");
-      const studentsQueryInstance = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
-      promises.push(getDocs(studentsQueryInstance));
+      let studentsQuery;
+      if (authRole === 'admin') {
+        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+      } else if (authRole === 'guru' && responsibleClassIdsForGuru) {
+        if (responsibleClassIdsForGuru.length === 0) {
+          setStudentsForDialog([]);
+          setParents([]);
+          setIsLoadingData(false);
+          return; // No classes, so no students, no parents
+        }
+        // Firestore 'in' query limit is 30. Chunk if necessary.
+        const studentClassIdChunks: string[][] = [];
+        for (let i = 0; i < responsibleClassIdsForGuru.length; i += 30) {
+            studentClassIdChunks.push(responsibleClassIdsForGuru.slice(i, i + 30));
+        }
+        const studentPromises = studentClassIdChunks.map(chunk => 
+            getDocs(query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", chunk), orderBy("name", "asc")))
+        );
+        const studentSnapshots = await Promise.all(studentPromises);
+        const fetchedStudentsForGuru = studentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
+            id: docSnap.data().uid, // studentId in 'parents' collection is the auth UID from 'users'
+            name: docSnap.data().name,
+            classId: docSnap.data().classId,
+        })));
+        setStudentsForDialog(fetchedStudentsForGuru);
 
-      const authOrangtuaQueryInstance = query(usersCollectionRef, where("role", "==", "orangtua"), orderBy("name", "asc"));
-      promises.push(getDocs(authOrangtuaQueryInstance));
-
-      if (authRole === 'admin' || authRole === 'guru') {
-        const classesCollectionRef = collection(db, "classes");
-        const classesQueryInstance = query(classesCollectionRef, orderBy("name", "asc"));
-        promises.push(getDocs(classesQueryInstance));
-      } else {
-        promises.push(Promise.resolve(null));
+      } else { // Other roles or no specific filter
+        studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        setStudentsForDialog(studentsSnapshot.docs.map(docSnap => ({
+            id: docSnap.data().uid,
+            name: docSnap.data().name,
+            classId: docSnap.data().classId,
+        })));
       }
 
-      const parentsCollectionRef = collection(db, "parents");
-      const parentsQueryInstance = query(parentsCollectionRef, orderBy("name", "asc"));
-      promises.push(getDocs(parentsQueryInstance));
 
-      const [studentsSnapshot, authOrangtuaSnapshot, classesSnapshot, parentsSnapshot] = await Promise.all(promises);
-
-      const fetchedStudentsRaw = (studentsSnapshot as any).docs.map((docSnap: any) => ({
-        id: docSnap.data().uid,
-        name: docSnap.data().name,
-        classId: docSnap.data().classId,
-      }));
-      const validFetchedStudents = fetchedStudentsRaw.filter(
-        (student: any) => student.id && typeof student.id === 'string'
-      );
-      setStudentsForDialog(validFetchedStudents);
-
-      setAuthOrangtuaUsers((authOrangtuaSnapshot as any).docs.map((docSnap: any) => ({
+      // Fetch auth users with 'orangtua' role (for linking)
+      const authOrangtuaQueryInstance = query(usersCollectionRef, where("role", "==", "orangtua"), orderBy("name", "asc"));
+      const authOrangtuaSnapshot = await getDocs(authOrangtuaQueryInstance);
+      setAuthOrangtuaUsers(authOrangtuaSnapshot.docs.map(docSnap => ({
         id: docSnap.data().uid,
         name: docSnap.data().name,
         email: docSnap.data().email,
       })));
 
+      // Fetch parents
+      const parentsCollectionRef = collection(db, "parents");
+      let parentsQuery;
+      if (authRole === 'admin') {
+        parentsQuery = query(parentsCollectionRef, orderBy("name", "asc"));
+      } else if (authRole === 'guru') {
+        const studentUidsOfTeacher = studentsForDialog.filter(s => responsibleClassIdsForGuru?.includes(s.classId || "")).map(s => s.id);
+        if (studentUidsOfTeacher.length === 0) {
+          setParents([]);
+          setIsLoadingData(false);
+          return;
+        }
+         // Firestore 'in' query limit is 30. Chunk if necessary.
+        const studentUidChunks: string[][] = [];
+        for (let i = 0; i < studentUidsOfTeacher.length; i += 30) {
+            studentUidChunks.push(studentUidsOfTeacher.slice(i, i + 30));
+        }
+        const parentPromises = studentUidChunks.map(chunk => 
+            getDocs(query(parentsCollectionRef, where("studentId", "in", chunk), orderBy("name", "asc")))
+        );
+        const parentSnapshots = await Promise.all(parentPromises);
+        const fetchedParentsForGuru = parentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+        } as Parent)));
+        setParents(fetchedParentsForGuru);
 
-      if ((authRole === 'admin' || authRole === 'guru') && classesSnapshot) {
-        setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
+      } else {
+        setParents([]); // Non-admin/guru don't see this management page
+      }
+      
+      if (parentsQuery) { // Only if admin query was set
+        const parentsSnapshot = await getDocs(parentsQuery);
+        setParents(parentsSnapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+        } as Parent)));
       }
 
-      const fetchedParents: Parent[] = (parentsSnapshot as any).docs.map((docSnap: any) => ({
-        id: docSnap.id,
-        name: docSnap.data().name,
-        email: docSnap.data().email,
-        phone: docSnap.data().phone,
-        address: docSnap.data().address,
-        gender: docSnap.data().gender,
-        studentId: docSnap.data().studentId,
-        studentName: docSnap.data().studentName,
-        uid: docSnap.data().uid,
-        createdAt: docSnap.data().createdAt,
-      }));
-      setParents(fetchedParents);
-
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching page data: ", error);
-      toast({
-        title: "Gagal Memuat Data",
-        description: "Terjadi kesalahan saat mengambil data.",
-        variant: "destructive",
-      });
+       if (error.code === 'failed-precondition' && error.message.includes('query requires an index')) {
+         toast({ title: "Indeks Firestore Diperlukan", description: "Operasi ini memerlukan indeks kustom di Firestore. Hubungi administrator.", variant: "destructive", duration: 10000 });
+      } else {
+        toast({ title: "Gagal Memuat Data", variant: "destructive" });
+      }
     } finally {
       setIsLoadingData(false);
     }
-  };
+  }, [authLoading, authRole, authUser, toast]);
 
   useEffect(() => {
     fetchPageData();
-  }, [authLoading, authRole]);
+  }, [fetchPageData]);
 
   useEffect(() => {
     if (selectedParent && isEditDialogOpen) {
@@ -677,7 +728,7 @@ export default function ParentsPage() {
               <Select
                 value={selectedClassFilter}
                 onValueChange={setSelectedClassFilter}
-                disabled={isLoadingData || allClasses.length === 0}
+                disabled={isLoadingData || allClassesForFilter.length === 0}
               >
                 <SelectTrigger className="w-full sm:w-[200px]">
                   <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -686,8 +737,8 @@ export default function ParentsPage() {
                 <SelectContent>
                   <SelectItem value="all">Semua Kelas</SelectItem>
                   {isLoadingData && <SelectItem key="loading-classes-filter" value="loading-classes" disabled>Memuat kelas...</SelectItem>}
-                  {!isLoadingData && allClasses.length === 0 && <SelectItem key="no-classes-filter" value="no-classes" disabled>Tidak ada kelas</SelectItem>}
-                  {allClasses.map((cls) => (
+                  {!isLoadingData && allClassesForFilter.length === 0 && <SelectItem key="no-classes-filter" value="no-classes" disabled>Tidak ada kelas</SelectItem>}
+                  {allClassesForFilter.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -823,6 +874,8 @@ export default function ParentsPage() {
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || selectedClassFilter !== "all"
                 ? "Tidak ada data orang tua yang cocok dengan filter atau pencarian Anda."
+                : (teacherResponsibleClassIds && teacherResponsibleClassIds.length === 0 && authRole === 'guru' )
+                ? "Anda tidak menjadi wali kelas untuk kelas manapun, atau kelas yang Anda asuh belum memiliki murid yang terdata orang tuanya."
                 : "Tidak ada data orang tua untuk ditampilkan. Klik \"Tambah Orang Tua\" untuk membuat data baru."
               }
             </div>
@@ -908,5 +961,6 @@ export default function ParentsPage() {
     </div>
   );
 }
+
 
 

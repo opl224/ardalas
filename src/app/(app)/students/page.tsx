@@ -40,11 +40,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"; 
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon } from "lucide-react"; 
+} from "@/components/ui/select";
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect, useMemo, type ReactNode } from "react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form"; 
+import { useState, useEffect, useMemo, type ReactNode, useCallback } from "react";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -65,7 +65,7 @@ import {
   limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/context/AuthContext"; 
+import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import { format, startOfDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -102,19 +102,19 @@ interface ParentMin {
 }
 
 interface Student {
-  id: string; 
+  id: string;
   name: string;
-  nis?: string; 
-  email?: string; 
-  classId: string; 
-  className?: string; 
+  nis?: string;
+  email?: string;
+  classId: string;
+  className?: string;
   dateOfBirth?: Timestamp;
   gender?: "laki-laki" | "perempuan";
   address?: string;
   linkedParentId?: string;
-  parentName?: string; 
+  parentName?: string;
   attendanceNumber?: number;
-  createdAt?: Timestamp; 
+  createdAt?: Timestamp;
 }
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
@@ -123,7 +123,7 @@ const baseStudentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
-  classId: z.string({ required_error: "Pilih kelas." }), 
+  classId: z.string({ required_error: "Pilih kelas." }),
   dateOfBirth: z.date().optional(),
   gender: z.enum(GENDERS).optional(),
   address: z.string().optional(),
@@ -142,19 +142,19 @@ type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 const ITEMS_PER_PAGE = 10;
 
 export default function StudentsPage() {
-  const { user: authUser, role: authRole, loading: authLoading } = useAuth(); 
+  const { user: authUser, role: authRole, loading: authLoading } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
-  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
+  const [allClassesForFilter, setAllClassesForFilter] = useState<ClassMin[]>([]); // Used for filter dropdown
   const [allParents, setAllParents] = useState<ParentMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
-  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
-  const [isLoadingParents, setIsLoadingParents] = useState(true);
+  const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedStudentForView, setSelectedStudentForView] = useState<Student | null>(null);
-  
+  const [teacherResponsibleClassIds, setTeacherResponsibleClassIds] = useState<string[] | null>(null);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -179,7 +179,7 @@ export default function StudentsPage() {
 
   const editStudentForm = useForm<EditStudentFormValues>({
     resolver: zodResolver(editStudentFormSchema),
-    defaultValues: { 
+    defaultValues: {
       name: "",
       nis: "",
       email: "",
@@ -192,100 +192,141 @@ export default function StudentsPage() {
     }
   });
 
-  const fetchPageInitialData = async () => {
-    setIsLoadingClasses(true);
-    setIsLoadingParents(true);
+  const fetchInitialDropdownAndTeacherData = useCallback(async () => {
+    if (authLoading) return;
+    setIsLoadingInitialData(true);
     try {
       const promises = [];
-      
       if (authRole === 'admin' || authRole === 'guru') {
-        const classesCollectionRef = collection(db, "classes");
-        const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
-        promises.push(getDocs(qClasses));
-
         const parentsCollectionRef = collection(db, "parents");
         const qParents = query(parentsCollectionRef, orderBy("name", "asc"));
         promises.push(getDocs(qParents));
       } else {
-        const classesCollectionRef = collection(db, "classes");
-        const qClasses = query(classesCollectionRef, orderBy("name", "asc"));
-        promises.push(getDocs(qClasses));
-        promises.push(Promise.resolve(null)); 
+        promises.push(Promise.resolve(null));
       }
-      
-      const [classesSnapshot, parentsSnapshot] = await Promise.all(promises);
 
-      if (classesSnapshot) {
-        setAllClasses((classesSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
-      } else {
-        setAllClasses([]);
-      }
-      setIsLoadingClasses(false);
-      
+      const [parentsSnapshot] = await Promise.all(promises);
+
       if (parentsSnapshot) {
-        setAllParents((parentsSnapshot as any).docs.map((docSnap: any) => ({ id: docSnap.id, name: docSnap.data().name })));
-      } else {
-        setAllParents([]);
+        setAllParents(parentsSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
       }
-      setIsLoadingParents(false);
 
+      if (authRole === 'admin') {
+        const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
+        setAllClassesForFilter(classesSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
+        setTeacherResponsibleClassIds(null); // Admin sees all
+      } else if (authRole === 'guru' && authUser?.uid) {
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+        if (!teacherProfileSnapshot.empty) {
+          const teacherDocId = teacherProfileSnapshot.docs[0].id;
+          const responsibleClassesQuery = query(collection(db, "classes"), where("teacherId", "==", teacherDocId), orderBy("name", "asc"));
+          const responsibleClassesSnapshot = await getDocs(responsibleClassesQuery);
+          const responsibleClasses = responsibleClassesSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name }));
+          setAllClassesForFilter(responsibleClasses);
+          setTeacherResponsibleClassIds(responsibleClasses.map(c => c.id));
+        } else {
+          setAllClassesForFilter([]);
+          setTeacherResponsibleClassIds([]); // No classes if profile not found
+        }
+      } else if (authRole === 'siswa') {
+        // Siswa might need class list if they could filter, but not for current design
+        const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
+        setAllClassesForFilter(classesSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
+        setTeacherResponsibleClassIds(null);
+      } else {
+        setAllClassesForFilter([]);
+        setTeacherResponsibleClassIds(null);
+      }
     } catch (error) {
-      console.error("Error fetching initial page data: ", error);
+      console.error("Error fetching initial dropdown/teacher data: ", error);
       toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
-      setAllClasses([]);
-      setAllParents([]);
-      setIsLoadingClasses(false);
-      setIsLoadingParents(false);
+    } finally {
+      setIsLoadingInitialData(false);
     }
-  };
+  }, [authRole, authUser, authLoading, toast]);
 
 
-  const fetchStudents = async () => {
-    if (authLoading) return;
+  const fetchStudents = useCallback(async () => {
+    if (authLoading || isLoadingInitialData) return; // Wait for initial data if needed
     setIsLoadingStudents(true);
     try {
       const usersCollectionRef = collection(db, "users");
-      let finalFetchedStudents: Student[] = [];
+      let q;
 
       if (authRole === 'siswa' && authUser?.classId) {
-        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("attendanceNumber", "asc"), orderBy("name", "asc"));
-        const querySnapshot = await getDocs(studentsQuery);
-        finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        } as Student));
-      } else if (authRole === 'admin' || authRole === 'guru') { 
-        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
-        const querySnapshot = await getDocs(studentsQuery);
-        finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        } as Student));
+        q = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("attendanceNumber", "asc"), orderBy("name", "asc"));
+      } else if (authRole === 'admin') {
+        if (selectedClassFilter === "all") {
+          q = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
+        } else {
+          q = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", selectedClassFilter), orderBy("name", "asc"));
+        }
+      } else if (authRole === 'guru') {
+        if (teacherResponsibleClassIds === null) { // Still loading teacher classes
+          setIsLoadingStudents(false);
+          return;
+        }
+        if (teacherResponsibleClassIds.length === 0) {
+          setStudents([]);
+          setIsLoadingStudents(false);
+          return;
+        }
+        const classIdsToQuery = selectedClassFilter === "all" ? teacherResponsibleClassIds : [selectedClassFilter].filter(id => teacherResponsibleClassIds.includes(id));
+
+        if (classIdsToQuery.length === 0 && selectedClassFilter !== "all") { // Guru selected a class they are not responsible for
+            setStudents([]);
+            setIsLoadingStudents(false);
+            return;
+        }
+        if (classIdsToQuery.length === 0 && selectedClassFilter === "all" && teacherResponsibleClassIds.length > 0) {
+            // This case should not happen if teacherResponsibleClassIds are correctly populated
+            setStudents([]);
+            setIsLoadingStudents(false);
+            return;
+        }
+         if (classIdsToQuery.length > 0) {
+          q = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "in", classIdsToQuery), orderBy("name", "asc"));
+        } else {
+          setStudents([]);
+          setIsLoadingStudents(false);
+          return;
+        }
+
+      } else {
+        setStudents([]);
+        setIsLoadingStudents(false);
+        return;
       }
+
+      const querySnapshot = await getDocs(q);
+      const finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as Student));
       setStudents(finalFetchedStudents);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching students: ", error);
-      toast({ title: "Gagal Memuat Data Murid", variant: "destructive" });
+      if (error.code === 'failed-precondition' && error.message.includes('query requires an index')) {
+         toast({ title: "Indeks Firestore Diperlukan", description: "Operasi ini memerlukan indeks kustom di Firestore. Hubungi administrator.", variant: "destructive", duration: 10000 });
+      } else {
+        toast({ title: "Gagal Memuat Data Murid", variant: "destructive" });
+      }
       setStudents([]);
     } finally {
       setIsLoadingStudents(false);
     }
-  };
-  
-  useEffect(() => {
-    const initializePageData = async () => {
-      if (!authLoading) {
-        await fetchPageInitialData();
-      }
-    };
-    initializePageData();
-  }, [authRole, authUser, authLoading]);
+  }, [authRole, authUser, authLoading, isLoadingInitialData, teacherResponsibleClassIds, selectedClassFilter, toast]);
 
   useEffect(() => {
-    if (!authLoading && !isLoadingClasses && !isLoadingParents) { 
+    fetchInitialDropdownAndTeacherData();
+  }, [fetchInitialDropdownAndTeacherData]);
+
+  useEffect(() => {
+    if (!isLoadingInitialData) {
         fetchStudents();
     }
-  }, [authLoading, isLoadingClasses, isLoadingParents, allClasses]);
+  }, [fetchStudents, isLoadingInitialData, selectedClassFilter]);
 
 
   useEffect(() => {
@@ -304,12 +345,10 @@ export default function StudentsPage() {
       });
     }
   }, [selectedStudent, isEditStudentDialogOpen, editStudentForm]);
-  
+
   const displayedStudents = useMemo(() => {
     let filtered = students;
-    if ((authRole === 'admin' || authRole === 'guru') && selectedClassFilter !== "all") {
-      filtered = filtered.filter(student => student.classId === selectedClassFilter);
-    }
+    // Filtering by selectedClassFilter is handled in fetchStudents for admin/guru
     if ((authRole === 'admin' || authRole === 'guru') && searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(student =>
@@ -318,8 +357,15 @@ export default function StudentsPage() {
         (student.email && student.email.toLowerCase().includes(lowerSearchTerm))
       );
     }
-    return filtered;
-  }, [students, searchTerm, selectedClassFilter, authRole]);
+    return filtered.sort((a, b) => {
+      if (a.attendanceNumber != null && b.attendanceNumber != null) {
+        return a.attendanceNumber - b.attendanceNumber;
+      }
+      if (a.attendanceNumber != null) return -1;
+      if (b.attendanceNumber != null) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [students, searchTerm, authRole]);
 
   const totalPages = Math.ceil(displayedStudents.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -381,13 +427,13 @@ export default function StudentsPage() {
 
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
-    if (authRole !== 'admin' && authRole !== 'guru') { 
+    if (authRole !== 'admin' && authRole !== 'guru') {
         toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menambahkan murid.", variant: "destructive"});
         return;
     }
     addStudentForm.clearErrors();
-    
-    const selectedClassObj = allClasses.find(c => c.id === data.classId);
+
+    const selectedClassObj = allClassesForFilter.find(c => c.id === data.classId);
     if (!selectedClassObj) {
         toast({ title: "Kelas tidak valid", description: "Silakan pilih kelas yang valid untuk murid.", variant: "destructive" });
         return;
@@ -399,9 +445,9 @@ export default function StudentsPage() {
         name: data.name,
         nis: data.nis,
         email: data.email || null,
-        classId: selectedClassObj.id, 
-        className: selectedClassObj.name, 
-        role: 'siswa', 
+        classId: selectedClassObj.id,
+        className: selectedClassObj.name,
+        role: 'siswa',
         createdAt: serverTimestamp(),
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
@@ -415,7 +461,7 @@ export default function StudentsPage() {
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
       addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
-      fetchStudents(); 
+      fetchStudents();
     } catch (error: any) {
       console.error("Error adding student:", error);
       let errorMessage = "Gagal menambahkan murid.";
@@ -432,25 +478,25 @@ export default function StudentsPage() {
 
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
-     if (authRole !== 'admin' && authRole !== 'guru') { 
+     if (authRole !== 'admin' && authRole !== 'guru') {
         toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat mengedit murid.", variant: "destructive"});
         return;
     }
     editStudentForm.clearErrors();
-    const selectedClass = allClasses.find(c => c.id === data.classId);
+    const selectedClass = allClassesForFilter.find(c => c.id === data.classId);
     if (!selectedClass) {
         toast({ title: "Kelas tidak valid", variant: "destructive" });
         return;
     }
     const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
     try {
-      const studentDocRef = doc(db, "users", selectedStudent.id); 
+      const studentDocRef = doc(db, "users", selectedStudent.id);
       const updateData: any = {
         name: data.name,
         nis: data.nis,
         email: data.email || null,
         classId: data.classId,
-        className: selectedClass.name, 
+        className: selectedClass.name,
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
         address: data.address || null,
@@ -458,9 +504,9 @@ export default function StudentsPage() {
         parentName: selectedParent?.name || null,
         attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
-      
+
       await updateDoc(studentDocRef, updateData);
-      
+
       toast({ title: "Data Murid Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditStudentDialogOpen(false);
       setSelectedStudent(null);
@@ -482,7 +528,7 @@ export default function StudentsPage() {
     try {
       await deleteDoc(doc(db, "users", studentId));
       toast({ title: "Data Murid Dihapus dari Profil", description: `${studentName || 'Murid'} berhasil dihapus dari daftar profil.` });
-      setSelectedStudent(null); 
+      setSelectedStudent(null);
       fetchStudents();
     } catch (error) {
       console.error("Error deleting student:", error);
@@ -503,21 +549,21 @@ export default function StudentsPage() {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit murid.", variant: "destructive"});
         return;
     }
-    if ((allClasses.length === 0 && !isLoadingClasses) || (allParents.length === 0 && !isLoadingParents)) {
-      fetchPageInitialData();
+    if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) {
+      fetchInitialDropdownAndTeacherData();
     }
     setSelectedStudent(student);
     setIsEditStudentDialogOpen(true);
   };
-  
+
   const openDeleteDialog = (student: Student) => {
      if (authRole !== 'admin' && authRole !== 'guru') {
         toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus murid.", variant: "destructive"});
         return;
     }
-    setSelectedStudent(student); 
+    setSelectedStudent(student);
   };
-  
+
   const renderStudentFormFields = (formInstance: typeof addStudentForm | typeof editStudentForm, formType: 'add' | 'edit') => (
     <>
       <div>
@@ -547,21 +593,21 @@ export default function StudentsPage() {
           name="classId"
           control={formInstance.control}
           render={({ field }) => (
-            <Select 
-              onValueChange={field.onChange} 
-              value={field.value || undefined} 
-              disabled={isLoadingClasses}
+            <Select
+              onValueChange={field.onChange}
+              value={field.value || undefined}
+              disabled={isLoadingInitialData}
             >
               <SelectTrigger id={`${formType}-student-classId`} className="mt-1">
-                <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : "Pilih kelas"} />
+                <SelectValue placeholder={isLoadingInitialData ? "Memuat kelas..." : "Pilih kelas"} />
               </SelectTrigger>
               <SelectContent>
-                {isLoadingClasses ? (
+                {isLoadingInitialData ? (
                   <SelectItem value="loading" disabled>Memuat kelas...</SelectItem>
-                ) : allClasses.length === 0 ? (
+                ) : allClassesForFilter.length === 0 ? (
                   <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia</SelectItem>
                 ) : (
-                  allClasses.map((classItem) => (
+                  allClassesForFilter.map((classItem) => (
                     <SelectItem key={classItem.id} value={classItem.id}>
                       {classItem.name}
                     </SelectItem>
@@ -585,13 +631,13 @@ export default function StudentsPage() {
               render={({ field }) => (
                 <CalendarDatePicker
                   id={`${formType}-student-dateOfBirth-picker`}
-                  date={{ from: field.value, to: field.value }}
-                  onDateSelect={(range) => field.onChange(range.from)}
+                  date={field.value ? { from: field.value, to: field.value } : undefined}
+                  onDateSelect={(range) => field.onChange(range?.from)}
                   numberOfMonths={1}
                   closeOnSelect={true}
-                  yearsRange={30} 
+                  yearsRange={30}
                   className="mt-1 w-full"
-                  variant="outline" 
+                  variant="outline"
                 />
               )}
             />
@@ -647,13 +693,13 @@ export default function StudentsPage() {
                 <Select
                   onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
                   value={field.value || "_NONE_"}
-                  disabled={isLoadingParents}
+                  disabled={isLoadingInitialData}
                 >
                   <SelectTrigger id={`${formType}-student-linkedParentId`} className="mt-1">
-                    <SelectValue placeholder={isLoadingParents ? "Memuat orang tua..." : "Pilih orang tua"} />
+                    <SelectValue placeholder={isLoadingInitialData ? "Memuat orang tua..." : "Pilih orang tua"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {isLoadingParents ? (
+                    {isLoadingInitialData ? (
                       <SelectItem value="loading_parents" disabled>Memuat orang tua...</SelectItem>
                     ) : (
                       <>
@@ -691,21 +737,22 @@ export default function StudentsPage() {
 
   const pageTitle = (authRole === 'admin' || authRole === 'guru')
     ? "Manajemen Murid"
-    : (authRole === 'siswa' && authUser?.className 
-      ? `Daftar Siswa Kelas ${authUser.className}` 
-      : "Daftar Murid"); 
-  
+    : (authRole === 'siswa' && authUser?.className
+      ? `Daftar Siswa Kelas ${authUser.className}`
+      : "Daftar Murid");
+
   const pageDescription = (authRole === 'admin' || authRole === 'guru')
     ? "Kelola data murid, absensi, nilai, dan informasi terkait."
     : (authRole === 'siswa' && authUser?.className
       ? `Daftar teman sekelas Anda.`
       : "Informasi murid.");
 
-  const showClassFilter = ((authRole === 'admin' || authRole === 'guru') && allClasses.length > 0);
-  const isLoadingCombined = isLoadingStudents || authLoading || ((authRole === 'admin' || authRole === 'guru') && (isLoadingClasses || isLoadingParents));
+  const showClassFilter = ((authRole === 'admin' || authRole === 'guru') && allClassesForFilter.length > 0);
+  const isLoadingCombined = isLoadingStudents || authLoading || isLoadingInitialData;
 
   const getNoStudentsMessage = () => {
     if (authRole === 'siswa') return "Tidak ada siswa lain di kelas Anda.";
+    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini, atau kelas yang Anda asuh belum memiliki murid.";
     return "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.";
   };
 
@@ -733,21 +780,21 @@ export default function StudentsPage() {
               )}
             </div>
           </CardTitle>
-          { (authRole === 'admin' || authRole === 'guru') && ( 
-            <Dialog 
-              open={isAddStudentDialogOpen} 
+          { (authRole === 'admin' || authRole === 'guru') && (
+            <Dialog
+              open={isAddStudentDialogOpen}
               onOpenChange={(isOpen) => {
                 setIsAddStudentDialogOpen(isOpen);
                 if (!isOpen) {
                   addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
                   addStudentForm.clearErrors();
                 } else {
-                   if ((allClasses.length === 0 && !isLoadingClasses) || (allParents.length === 0 && !isLoadingParents)) fetchPageInitialData();
+                   if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) fetchInitialDropdownAndTeacherData();
                 }
               }}
             >
               <DialogTrigger asChild>
-                 <Button size="sm" disabled={(authRole === 'admin' || authRole === 'guru') && !allClasses.length && !isLoadingClasses && !isLoadingParents}>
+                 <Button size="sm" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
                   <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
                 </Button>
               </DialogTrigger>
@@ -758,9 +805,9 @@ export default function StudentsPage() {
                     Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
                   </DialogDescription>
                 </DialogHeader>
-                <form 
+                <form
                   id="addStudentDialogForm"
-                  onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} 
+                  onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)}
                   className="flex flex-col overflow-hidden flex-1"
                 >
                   <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
@@ -770,9 +817,9 @@ export default function StudentsPage() {
                     <DialogClose asChild>
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
-                    <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
-                      {(addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) && <LottieLoader width={16} height={16} className="mr-2" />}
-                      {(addStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) ? "Menyimpan..." : "Simpan Murid"}
+                    <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingInitialData}>
+                      {(addStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                      {(addStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Murid"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -796,7 +843,7 @@ export default function StudentsPage() {
                 <Select
                   value={selectedClassFilter}
                   onValueChange={setSelectedClassFilter}
-                  disabled={isLoadingClasses}
+                  disabled={isLoadingInitialData || allClassesForFilter.length === 0}
                 >
                   <SelectTrigger className="w-full sm:w-[200px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -804,7 +851,7 @@ export default function StudentsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Kelas</SelectItem>
-                    {allClasses.map((cls) => (
+                    {allClassesForFilter.map((cls) => (
                       <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -831,7 +878,7 @@ export default function StudentsPage() {
                       </>
                     )}
                     {authRole === 'siswa' && <TableHead className={cn(isMobile && "px-2 w-1/4")}>No. Absen</TableHead>}
-                     <TableHead className={cn(isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2 text-left" : isMobile && authRole === 'siswa' ? "px-2" : "", "")}>Kelas</TableHead>
+                     <TableHead className={cn(isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2" : isMobile && authRole === 'siswa' ? "px-2" : "", "w-1/4")}>Kelas</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && (
                       <>
                         {!isMobile && <TableHead>Gender</TableHead>}
@@ -845,7 +892,7 @@ export default function StudentsPage() {
                     <TableRow key={student.id}>
                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={student.name}>{student.name}</TableCell>
-                      
+
                       {(authRole === 'admin' || authRole === 'guru') && (
                         <>
                           {!isMobile && <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>}
@@ -858,7 +905,7 @@ export default function StudentsPage() {
                       )}
 
                       <TableCell className={cn("truncate", isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2" : isMobile && authRole === 'siswa' ? "px-2" : "")} title={student.className || student.classId}>{student.className || student.classId}</TableCell>
-                      
+
                       {(authRole === 'admin' || authRole === 'guru') && !isMobile && (
                         <TableCell>
                           {student.gender === "laki-laki" ? (
@@ -899,7 +946,7 @@ export default function StudentsPage() {
                                     Hapus
                                   </DropdownMenuItem>
                                 </AlertDialogTrigger>
-                                {selectedStudent && selectedStudent.id === student.id && ( 
+                                {selectedStudent && selectedStudent.id === student.id && (
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
@@ -928,16 +975,16 @@ export default function StudentsPage() {
                 <Pagination className="mt-6">
                   <PaginationContent>
                     <PaginationItem>
-                      <PaginationPrevious 
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                      <PaginationPrevious
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                         aria-disabled={currentPage === 1}
                         className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
                       />
                     </PaginationItem>
                     {renderPageNumbers()}
                     <PaginationItem>
-                      <PaginationNext 
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                      <PaginationNext
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                         aria-disabled={currentPage === totalPages}
                         className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
                       />
@@ -961,7 +1008,7 @@ export default function StudentsPage() {
           setIsViewStudentDialogOpen(isOpen);
           if (!isOpen) { setSelectedStudentForView(null); }
       }}>
-        <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl"> 
+        <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl">
             <DialogHeader>
                 <DialogTitle>Detail Murid: {selectedStudentForView?.name}</DialogTitle>
                 <DialogDescription>Informasi lengkap mengenai murid.</DialogDescription>
@@ -973,7 +1020,7 @@ export default function StudentsPage() {
 
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedStudentForView.email || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedStudentForView.className || selectedStudentForView.classId}</p></div>
-                    
+
                     <div>
                         <Label className="text-muted-foreground">Tanggal Lahir:</Label>
                         <p className="font-medium">
@@ -981,9 +1028,9 @@ export default function StudentsPage() {
                         </p>
                     </div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedStudentForView.gender || "-"}</p></div>
-                    
+
                     <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedStudentForView.address || "-"}</p></div>
-                    
+
                     <div>
                         <Label className="text-muted-foreground">Nomor Absen:</Label>
                         <p className="font-medium">{selectedStudentForView.attendanceNumber != null ? selectedStudentForView.attendanceNumber : "-"}</p>
@@ -994,7 +1041,7 @@ export default function StudentsPage() {
                             {selectedStudentForView.parentName || (selectedStudentForView.linkedParentId ? `${selectedStudentForView.linkedParentId} (Nama tidak tersedia)` : "-")}
                         </p>
                     </div>
-                    
+
                     {selectedStudentForView.createdAt && (
                        <div className="sm:col-span-2">
                           <Label className="text-muted-foreground">Tanggal Daftar Profil:</Label>
@@ -1010,7 +1057,7 @@ export default function StudentsPage() {
       </Dialog>
 
 
-      { (authRole === 'admin' || authRole === 'guru') && ( 
+      { (authRole === 'admin' || authRole === 'guru') && (
         <Dialog open={isEditStudentDialogOpen} onOpenChange={(isOpen) => {
             setIsEditStudentDialogOpen(isOpen);
             if (!isOpen) {
@@ -1026,9 +1073,9 @@ export default function StudentsPage() {
               </DialogDescription>
             </DialogHeader>
             {selectedStudent && (
-              <form 
+              <form
                 id="editStudentDialogForm"
-                onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)} 
+                onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)}
                 className="flex flex-col overflow-hidden flex-1"
               >
                 <Input type="hidden" {...editStudentForm.register("id")} />
@@ -1039,9 +1086,9 @@ export default function StudentsPage() {
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button>
                    </DialogClose>
-                  <Button form="editStudentDialogForm" type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents}>
-                    {(editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) && <LottieLoader width={16} height={16} className="mr-2" />}
-                    {(editStudentForm.formState.isSubmitting || isLoadingClasses || isLoadingParents) ? "Menyimpan..." : "Simpan Perubahan"}
+                  <Button form="editStudentDialogForm" type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingInitialData}>
+                    {(editStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                    {(editStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -1052,13 +1099,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-    
-
-    
-
-    
-
-
-
-
-
