@@ -841,17 +841,32 @@ export default function LessonsPage() {
                         
                         <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                           {isStudentOrParent ? (
-                            <Button 
-                              asChild 
-                              size="sm" 
-                              variant={(role === "orangtua" || !isActiveNow) ? "outline" : "default"} 
-                              disabled={role === "orangtua" || !isActiveNow}
-                              className={cn(role !== "orangtua" && isActiveNow && "border-primary text-primary hover:bg-primary/10")}
-                            >
-                              <Link href={`/lessons/${lesson.id}`}>
+                            role === "orangtua" ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={true}
+                                className={cn(isMobile && "w-full justify-start")}
+                                aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)"
+                              >
                                 <LogIn className="mr-2 h-4 w-4" /> {isMobile ? "" : "Masuk Kelas"}
-                              </Link>
-                            </Button>
+                              </Button>
+                            ) : ( // For 'siswa' role
+                              <Button
+                                asChild
+                                size="sm"
+                                variant={!isActiveNow ? "outline" : "default"}
+                                disabled={!isActiveNow}
+                                className={cn(
+                                  isActiveNow && "border-primary text-primary hover:bg-primary/10",
+                                  isMobile && "w-full justify-start"
+                                )}
+                              >
+                                <Link href={`/lessons/${lesson.id}`}>
+                                  <LogIn className="mr-2 h-4 w-4" /> {isMobile ? "" : "Masuk Kelas"}
+                                </Link>
+                              </Button>
+                            )
                           ) : canManageLessons ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
