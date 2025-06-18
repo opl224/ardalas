@@ -248,7 +248,7 @@ export default function StudentsPage() {
       let finalFetchedStudents: Student[] = [];
 
       if (authRole === 'siswa' && authUser?.classId) {
-        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("name", "asc"));
+        const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), where("classId", "==", authUser.classId), orderBy("attendanceNumber", "asc"), orderBy("name", "asc"));
         const querySnapshot = await getDocs(studentsQuery);
         finalFetchedStudents = querySnapshot.docs.map(docSnap => ({
           id: docSnap.id,
@@ -830,15 +830,14 @@ export default function StudentsPage() {
                         {!isMobile && <TableHead>Email</TableHead>}
                       </>
                     )}
-                    {authRole === 'siswa' && <TableHead className={cn(isMobile && "px-2")}>No. Absen</TableHead>}
-                     <TableHead className={cn(isMobile ? "px-2" : "")}>Kelas</TableHead>
+                    {authRole === 'siswa' && <TableHead className={cn(isMobile && "px-2 w-1/4")}>No. Absen</TableHead>}
+                     <TableHead className={cn(isMobile ? "px-2 w-1/4" : "")}>Kelas</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && (
                       <>
                         {!isMobile && <TableHead>Gender</TableHead>}
                         <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-center w-16")}>Aksi</TableHead>
                       </>
                     )}
-                    {authRole === 'siswa' && <TableHead className={cn("text-right px-1 w-12", isMobile && "w-auto text-left")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -872,7 +871,7 @@ export default function StudentsPage() {
                         </TableCell>
                       )}
 
-                      {(authRole === 'admin' || authRole === 'guru') ? (
+                      {(authRole === 'admin' || authRole === 'guru') && (
                         <TableCell className={cn(isMobile ? "text-right px-1" : "text-center")}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -920,14 +919,7 @@ export default function StudentsPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
-                      ) : authRole === 'siswa' ? (
-                        <TableCell className={cn("text-right", isMobile ? "px-1 text-left" : "")}>
-                           <Button variant="outline" size={isMobile ? "xs" : "icon"} onClick={() => openViewStudentDialog(student)} aria-label={`Lihat detail ${student.name}`}>
-                                <Eye className="h-4 w-4" />
-                                {isMobile && <span className="ml-1">Detail</span>}
-                           </Button>
-                        </TableCell>
-                      ) : null}
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1065,5 +1057,6 @@ export default function StudentsPage() {
     
 
     
+
 
 
