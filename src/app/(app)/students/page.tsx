@@ -831,7 +831,7 @@ export default function StudentsPage() {
                       </>
                     )}
                     {authRole === 'siswa' && <TableHead className={cn(isMobile && "px-2 w-1/4")}>No. Absen</TableHead>}
-                     <TableHead className={cn(isMobile && authRole !== 'siswa' ? "px-2 text-left" : isMobile && authRole === 'siswa' ? "px-2" : "", "w-1/4")}>Kelas</TableHead>
+                     <TableHead className={cn(isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2 text-left" : isMobile && authRole === 'siswa' ? "px-2" : "", "w-1/4")}>Kelas</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && (
                       <>
                         {!isMobile && <TableHead>Gender</TableHead>}
@@ -857,7 +857,7 @@ export default function StudentsPage() {
                         <TableCell className={cn(isMobile && "px-2")}>{student.attendanceNumber ?? "-"}</TableCell>
                       )}
 
-                      <TableCell className={cn("truncate", isMobile && authRole !== 'siswa' ? "px-2 text-left" : isMobile && authRole === 'siswa' ? "px-2" : "")} title={student.className || student.classId}>{student.className || student.classId}</TableCell>
+                      <TableCell className={cn("truncate", isMobile && (authRole === 'admin' || authRole === 'guru') ? "px-2" : isMobile && authRole === 'siswa' ? "px-2" : "")} title={student.className || student.classId}>{student.className || student.classId}</TableCell>
                       
                       {(authRole === 'admin' || authRole === 'guru') && !isMobile && (
                         <TableCell>
@@ -1057,6 +1057,7 @@ export default function StudentsPage() {
     
 
     
+
 
 
 
