@@ -46,7 +46,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { FileText, PlusCircle, Edit, Trash2, CalendarIcon, MoreVertical, Search, Filter as FilterIcon } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
@@ -65,7 +65,9 @@ import {
   query,
   orderBy,
   where,
-  writeBatch
+  writeBatch,
+  limit,
+  documentId
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -87,11 +89,14 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import LottieLoader from "@/components/ui/LottieLoader";
 
 
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
 interface ClassMin { id: string; name: string; }
+interface TeacherMin { id: string; name: string; uid: string;}
+
 
 interface ExamData {
   id: string;
@@ -105,6 +110,8 @@ interface ExamData {
   endTime: string; // HH:MM
   description?: string;
   createdAt?: Timestamp;
+  recordedById?: string; // UID of the user who created/recorded the exam
+  recordedByName?: string; // Name of the user
 }
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
@@ -146,10 +153,16 @@ type EditExamFormValues = z.infer<typeof editExamFormSchema>;
 const ITEMS_PER_PAGE = 10;
 
 export default function ExamsPage() {
-  const { user, role, loading: authLoading } = useAuth();
+  const { user: authUser, role, loading: authLoading } = useAuth();
   const [exams, setExams] = useState<ExamData[]>([]);
-  const [subjects, setSubjects] = useState<SubjectMin[]>([]);
-  const [classes, setClasses] = useState<ClassMin[]>([]);
+  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); // For Admin filters & form
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);   // For Admin filters & form
+  
+  const [teacherSubjectsForForm, setTeacherSubjectsForForm] = useState<SubjectMin[]>([]); // For Guru form
+  const [teacherClassesForForm, setTeacherClassesForForm] = useState<ClassMin[]>([]);   // For Guru form
+  const [isLoadingTeacherFormDropdownData, setIsLoadingTeacherFormDropdownData] = useState(false);
+  const [teacherProfileId, setTeacherProfileId] = useState<string | null>(null);
+
 
   const [isLoading, setIsLoading] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -181,42 +194,106 @@ export default function ExamsPage() {
     resolver: zodResolver(editExamFormSchema),
   });
 
-  const fetchDropdownData = async () => {
+  const fetchAdminDropdownData = async () => {
     try {
       const [subjectsSnapshot, classesSnapshot] = await Promise.all([
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
       ]);
-      setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setAllSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
-      console.error("Error fetching dropdown data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung", description: "Terjadi kesalahan saat memuat data subjek atau kelas.", variant: "destructive" });
+      console.error("Error fetching admin dropdown data: ", error);
+      toast({ title: "Gagal Memuat Data Pendukung Admin", variant: "destructive" });
+    }
+  };
+
+  const fetchTeacherSpecificFormData = async () => {
+    if (role !== "guru" || !authUser?.uid) return;
+    setIsLoadingTeacherFormDropdownData(true);
+    try {
+      const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
+      const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+
+      if (teacherProfileSnapshot.empty) {
+        toast({ title: "Profil Guru Tidak Ditemukan", variant: "warning" });
+        setTeacherProfileId(null);
+        setTeacherClassesForForm([]);
+        setTeacherSubjectsForForm([]);
+        return;
+      }
+      const currentTeacherProfileId = teacherProfileSnapshot.docs[0].id;
+      setTeacherProfileId(currentTeacherProfileId);
+
+      const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", currentTeacherProfileId));
+      const lessonsSnapshot = await getDocs(lessonsQuery);
+      
+      const uniqueClassIds = new Set<string>();
+      const uniqueSubjectIds = new Set<string>();
+      lessonsSnapshot.docs.forEach(doc => {
+        uniqueClassIds.add(doc.data().classId);
+        uniqueSubjectIds.add(doc.data().subjectId);
+      });
+
+      let fetchedClasses: ClassMin[] = [];
+      if (uniqueClassIds.size > 0) {
+        const classChunks = [];
+        const classIdsArray = Array.from(uniqueClassIds);
+        for (let i = 0; i < classIdsArray.length; i += 30) { classChunks.push(classIdsArray.slice(i, i + 30)); }
+        const classPromises = classChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))));
+        const classSnapshots = await Promise.all(classPromises);
+        classSnapshots.forEach(snap => snap.docs.forEach(d => fetchedClasses.push({ id: d.id, name: d.data().name })));
+        fetchedClasses.sort((a, b) => a.name.localeCompare(b.name));
+      }
+      setTeacherClassesForForm(fetchedClasses);
+
+      let fetchedSubjects: SubjectMin[] = [];
+      if (uniqueSubjectIds.size > 0) {
+        const subjectChunks = [];
+        const subjectIdsArray = Array.from(uniqueSubjectIds);
+        for (let i = 0; i < subjectIdsArray.length; i += 30) { subjectChunks.push(subjectIdsArray.slice(i, i + 30)); }
+        const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db, "subjects"), where(documentId(), "in", chunk))));
+        const subjectSnapshots = await Promise.all(subjectPromises);
+        subjectSnapshots.forEach(snap => snap.docs.forEach(d => fetchedSubjects.push({ id: d.id, name: d.data().name })));
+        fetchedSubjects.sort((a,b) => a.name.localeCompare(b.name));
+      }
+      setTeacherSubjectsForForm(fetchedSubjects);
+
+    } catch (error) {
+      console.error("Error fetching teacher specific form data: ", error);
+      toast({ title: "Gagal Memuat Data Form Guru", variant: "destructive" });
+    } finally {
+      setIsLoadingTeacherFormDropdownData(false);
     }
   };
 
   const fetchExams = async () => {
     setIsLoading(true);
     try {
-      if (role === "admin" || role === "guru") { // Fetch dropdowns only if needed for forms/filters
-        await fetchDropdownData();
+      if (role === "admin") { // Fetch all dropdowns for admin filters
+        await fetchAdminDropdownData();
+      } else if (role === "guru" && (allSubjects.length === 0 || allClasses.length === 0)) {
+        // For guru filters, they might see all subjects/classes if the filter is global
+        // This depends on the desired UX for main page filters for gurus.
+        // For now, let's assume gurus also need all subjects/classes for main page filters
+        await fetchAdminDropdownData();
       }
+
       const examsCollectionRef = collection(db, "exams");
       let q = query(examsCollectionRef, orderBy("date", "desc"), orderBy("startTime", "asc"));
 
-      if (role === "siswa" && user?.classId) {
-          q = query(examsCollectionRef, where("classId", "==", user.classId), orderBy("date", "desc"), orderBy("startTime", "asc"));
-      } else if (role === "orangtua" && user?.linkedStudentClassId) {
-          q = query(examsCollectionRef, where("classId", "==", user.linkedStudentClassId), orderBy("date", "desc"), orderBy("startTime", "asc"));
-      } else if (role === 'orangtua' && !user?.linkedStudentClassId) {
+      if (role === "siswa" && authUser?.classId) {
+          q = query(examsCollectionRef, where("classId", "==", authUser.classId), orderBy("date", "desc"), orderBy("startTime", "asc"));
+      } else if (role === "orangtua" && authUser?.linkedStudentClassId) {
+          q = query(examsCollectionRef, where("classId", "==", authUser.linkedStudentClassId), orderBy("date", "desc"), orderBy("startTime", "asc"));
+      } else if (role === 'orangtua' && !authUser?.linkedStudentClassId) {
           setExams([]);
           setIsLoading(false);
           return;
       }
-
+      // For admin and guru, the initial query `q` fetches all exams, filtering happens client-side or could be server-side if needed.
 
       const querySnapshot = await getDocs(q);
-
       const fetchedExams: ExamData[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
         return {
@@ -231,6 +308,8 @@ export default function ExamsPage() {
           endTime: data.endTime,
           description: data.description,
           createdAt: data.createdAt,
+          recordedById: data.recordedById,
+          recordedByName: data.recordedByName,
         };
       });
       setExams(fetchedExams);
@@ -243,13 +322,16 @@ export default function ExamsPage() {
   };
 
   useEffect(() => {
-    if (!authLoading) { // Ensure auth state is resolved before fetching
+    if (!authLoading) { 
         fetchExams();
     }
-  }, [authLoading, user, role]); // Re-fetch if user or role changes
+  }, [authLoading, authUser, role]); 
 
   useEffect(() => {
     if (selectedExam && isEditDialogOpen) {
+      if (role === 'guru') {
+        fetchTeacherSpecificFormData(); // Fetch specific data when dialog opens for guru
+      }
       editExamForm.reset({
         id: selectedExam.id,
         title: selectedExam.title,
@@ -261,26 +343,26 @@ export default function ExamsPage() {
         description: selectedExam.description || "",
       });
     }
-  }, [selectedExam, isEditDialogOpen, editExamForm]);
+  }, [selectedExam, isEditDialogOpen, editExamForm, role]);
 
-  const getDenormalizedNames = (data: ExamFormValues | EditExamFormValues) => {
-    const subject = subjects.find(s => s.id === data.subjectId);
-    const aClass = classes.find(c => c.id === data.classId);
-    return {
-      subjectName: subject?.name,
-      className: aClass?.name,
-    };
-  };
 
   const handleAddExamSubmit: SubmitHandler<ExamFormValues> = async (data) => {
     addExamForm.clearErrors();
-    const { subjectName, className } = getDenormalizedNames(data);
+    let subjectName, className;
 
+    if (role === 'guru') {
+        subjectName = teacherSubjectsForForm.find(s => s.id === data.subjectId)?.name;
+        className = teacherClassesForForm.find(c => c.id === data.classId)?.name;
+    } else { // Admin
+        subjectName = allSubjects.find(s => s.id === data.subjectId)?.name;
+        className = allClasses.find(c => c.id === data.classId)?.name;
+    }
+    
     if (!subjectName || !className) {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek dan kelas valid.", variant: "destructive"});
       return;
     }
-    if (!user) {
+    if (!authUser) {
         toast({ title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive" });
         return;
     }
@@ -292,6 +374,8 @@ export default function ExamsPage() {
         subjectName,
         className,
         createdAt: serverTimestamp(),
+        recordedById: authUser.uid,
+        recordedByName: authUser.displayName || authUser.email,
       };
       await addDoc(collection(db, "exams"), examData);
       toast({ title: "Ujian Ditambahkan", description: "Jadwal ujian berhasil disimpan." });
@@ -316,7 +400,7 @@ export default function ExamsPage() {
       });
 
       const creatorNotificationRef = doc(collection(db, "notifications"));
-      batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda membuat jadwal ujian: ${data.title} (${subjectName})` });
+      batch.set(creatorNotificationRef, { ...notificationBase, userId: authUser.uid, title: `Anda membuat jadwal ujian: ${data.title} (${subjectName})` });
 
       await batch.commit();
 
@@ -330,9 +414,20 @@ export default function ExamsPage() {
   };
 
   const handleEditExamSubmit: SubmitHandler<EditExamFormValues> = async (data) => {
-    if (!selectedExam) return;
+    if (!selectedExam || !authUser) {
+        toast({ title: "Aksi Gagal", description: "Data atau pengguna tidak valid.", variant: "destructive" });
+        return;
+    }
     editExamForm.clearErrors();
-    const { subjectName, className } = getDenormalizedNames(data);
+    let subjectName, className;
+
+    if (role === 'guru') {
+        subjectName = teacherSubjectsForForm.find(s => s.id === data.subjectId)?.name;
+        className = teacherClassesForForm.find(c => c.id === data.classId)?.name;
+    } else { // Admin
+        subjectName = allSubjects.find(s => s.id === data.subjectId)?.name;
+        className = allClasses.find(c => c.id === data.classId)?.name;
+    }
 
     if (!subjectName || !className) {
       toast({title: "Data Tidak Lengkap", description: "Pastikan subjek dan kelas valid.", variant: "destructive"});
@@ -346,6 +441,7 @@ export default function ExamsPage() {
         date: Timestamp.fromDate(data.date),
         subjectName,
         className,
+        // No need to update recordedById/Name on edit, or keep original
       });
       toast({ title: "Ujian Diperbarui", description: "Jadwal ujian berhasil diperbarui." });
       setIsEditDialogOpen(false);
@@ -371,6 +467,9 @@ export default function ExamsPage() {
 
   const openEditDialog = (exam: ExamData) => {
     setSelectedExam(exam);
+    if (role === 'guru') {
+      fetchTeacherSpecificFormData(); // Ensure data is ready for guru edit form
+    }
     setIsEditDialogOpen(true);
   };
 
@@ -457,6 +556,9 @@ export default function ExamsPage() {
     return pageNumbers;
   };
 
+  const subjectsForCurrentForm = role === 'guru' ? teacherSubjectsForForm : allSubjects;
+  const classesForCurrentForm = role === 'guru' ? teacherClassesForForm : allClasses;
+  const isLoadingFormOptions = role === 'guru' ? isLoadingTeacherFormDropdownData : (isLoading || authLoading) ; //Simplified for admin
 
   return (
     <div className="space-y-6">
@@ -474,9 +576,11 @@ export default function ExamsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) { addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "" }); addExamForm.clearErrors(); }
+              else if (role === 'guru') { fetchTeacherSpecificFormData(); }
+              else if (role === 'admin' && (allSubjects.length === 0 || allClasses.length === 0)) { fetchAdminDropdownData(); }
             }}>
               <DialogTrigger asChild>
-                <Button size="sm" onClick={() => { if (subjects.length === 0 || classes.length === 0) fetchDropdownData(); }}>
+                <Button size="sm" disabled={isLoadingFormOptions && role === 'guru'}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Tambah Ujian
                 </Button>
               </DialogTrigger>
@@ -495,22 +599,22 @@ export default function ExamsPage() {
                   </div>
                   <div>
                     <Label htmlFor="add-exam-subjectId">Mata Pelajaran</Label>
-                    <Select onValueChange={(value) => addExamForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addExamForm.getValues("subjectId")}>
-                      <SelectTrigger id="add-exam-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                    <Select onValueChange={(value) => addExamForm.setValue("subjectId", value, { shouldValidate: true })} value={addExamForm.getValues("subjectId") || undefined} disabled={isLoadingFormOptions}>
+                      <SelectTrigger id="add-exam-subjectId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih mata pelajaran"} /></SelectTrigger>
                       <SelectContent>
-                        {subjects.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        {subjectsForCurrentForm.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        {subjectsForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada mapel</SelectItem>}
                       </SelectContent>
                     </Select>
                     {addExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
                     <Label htmlFor="add-exam-classId">Kelas</Label>
-                    <Select onValueChange={(value) => addExamForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addExamForm.getValues("classId")}>
-                      <SelectTrigger id="add-exam-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                    <Select onValueChange={(value) => addExamForm.setValue("classId", value, { shouldValidate: true })} value={addExamForm.getValues("classId") || undefined} disabled={isLoadingFormOptions}>
+                      <SelectTrigger id="add-exam-classId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
                       <SelectContent>
-                        {classes.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {classesForCurrentForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {classesForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada kelas</SelectItem>}
                       </SelectContent>
                     </Select>
                     {addExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.classId.message}</p>}
@@ -556,7 +660,10 @@ export default function ExamsPage() {
                   </div>
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                    <Button type="submit" disabled={addExamForm.formState.isSubmitting}>{addExamForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Jadwal"}</Button>
+                    <Button type="submit" disabled={addExamForm.formState.isSubmitting || isLoadingFormOptions}>
+                        {(addExamForm.formState.isSubmitting || isLoadingFormOptions) && <LottieLoader width={16} height={16} className="mr-2"/>}
+                        {(addExamForm.formState.isSubmitting || isLoadingFormOptions) ? "Menyimpan..." : "Simpan Jadwal"}
+                    </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -589,6 +696,7 @@ export default function ExamsPage() {
                         {uniqueSubjectNamesForFilter.map((subjectName) => (
                             <SelectItem key={subjectName} value={subjectName}>{subjectName}</SelectItem>
                         ))}
+                         {uniqueSubjectNamesForFilter.length === 0 && !isLoading && <SelectItem value="no-subjects" disabled>Belum ada mapel terfilter</SelectItem>}
                     </SelectContent>
                 </Select>
             </div>
@@ -725,20 +833,22 @@ export default function ExamsPage() {
                 </div>
                 <div>
                   <Label htmlFor="edit-exam-subjectId">Mata Pelajaran</Label>
-                  <Select onValueChange={(value) => editExamForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editExamForm.getValues("subjectId")}>
-                    <SelectTrigger id="edit-exam-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                  <Select onValueChange={(value) => editExamForm.setValue("subjectId", value, { shouldValidate: true })} value={editExamForm.getValues("subjectId") || undefined} disabled={isLoadingFormOptions}>
+                    <SelectTrigger id="edit-exam-subjectId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih mata pelajaran"} /></SelectTrigger>
                     <SelectContent>
-                      {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      {subjectsForCurrentForm.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                      {subjectsForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada mapel</SelectItem>}
                     </SelectContent>
                   </Select>
                   {editExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.subjectId.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="edit-exam-classId">Kelas</Label>
-                  <Select onValueChange={(value) => editExamForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editExamForm.getValues("classId")}>
-                    <SelectTrigger id="edit-exam-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                  <Select onValueChange={(value) => editExamForm.setValue("classId", value, { shouldValidate: true })} value={editExamForm.getValues("classId") || undefined} disabled={isLoadingFormOptions}>
+                    <SelectTrigger id="edit-exam-classId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
                     <SelectContent>
-                      {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {classesForCurrentForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      {classesForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada kelas</SelectItem>}
                     </SelectContent>
                   </Select>
                   {editExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.classId.message}</p>}
@@ -784,7 +894,10 @@ export default function ExamsPage() {
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                  <Button type="submit" disabled={editExamForm.formState.isSubmitting}>{editExamForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+                  <Button type="submit" disabled={editExamForm.formState.isSubmitting || isLoadingFormOptions}>
+                    {(editExamForm.formState.isSubmitting || isLoadingFormOptions) && <LottieLoader width={16} height={16} className="mr-2"/>}
+                    {(editExamForm.formState.isSubmitting || isLoadingFormOptions) ? "Menyimpan..." : "Simpan Perubahan"}
+                    </Button>
                 </DialogFooter>
               </form>
             )}
