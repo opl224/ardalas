@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FileText, PlusCircle, Edit, Trash2, CalendarIcon, MoreVertical, Search, Filter as FilterIcon, Eye } from "lucide-react";
+import { FileText, PlusCircle, Edit, Trash2, CalendarIcon, MoreVertical, Search, Filter as FilterIcon, Eye, LogIn, BookCopy, Link as LinkExternalIcon } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -90,6 +90,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 import LottieLoader from "@/components/ui/LottieLoader";
+import Link from "next/link";
 
 
 // Minimal interfaces for dropdowns
@@ -109,6 +110,7 @@ interface ExamData {
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   description?: string;
+  examLink?: string; // Link to the exam
   createdAt?: Timestamp;
   recordedById?: string; // UID of the user who created/recorded the exam
   recordedByName?: string; // Name of the user
@@ -124,6 +126,7 @@ const baseExamObjectSchema = z.object({
   startTime: z.string().regex(timeRegex, { message: "Format waktu mulai JJ:MM (e.g., 07:00)." }),
   endTime: z.string().regex(timeRegex, { message: "Format waktu selesai JJ:MM (e.g., 08:30)." }),
   description: z.string().optional(),
+  examLink: z.string().url({ message: "Format URL link ujian tidak valid." }).optional().or(z.literal("")),
 });
 
 const examTimeRefinement = (data: { startTime: string; endTime: string; }) => {
@@ -155,11 +158,11 @@ const ITEMS_PER_PAGE = 10;
 export default function ExamsPage() {
   const { user: authUser, role, loading: authLoading } = useAuth();
   const [exams, setExams] = useState<ExamData[]>([]);
-  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); // For Admin filters & form
-  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);   // For Admin filters & form
+  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); 
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);   
   
-  const [teacherSubjectsForForm, setTeacherSubjectsForForm] = useState<SubjectMin[]>([]); // For Guru form
-  const [teacherClassesForForm, setTeacherClassesForForm] = useState<ClassMin[]>([]);   // For Guru form
+  const [teacherSubjectsForForm, setTeacherSubjectsForForm] = useState<SubjectMin[]>([]); 
+  const [teacherClassesForForm, setTeacherClassesForForm] = useState<ClassMin[]>([]);   
   const [isLoadingTeacherFormDropdownData, setIsLoadingTeacherFormDropdownData] = useState(false);
   const [teacherProfileId, setTeacherProfileId] = useState<string | null>(null);
 
@@ -190,6 +193,7 @@ export default function ExamsPage() {
       startTime: "",
       endTime: "",
       description: "",
+      examLink: "",
     },
   });
 
@@ -273,12 +277,9 @@ export default function ExamsPage() {
   const fetchExams = async () => {
     setIsLoading(true);
     try {
-      if (role === "admin") { // Fetch all dropdowns for admin filters
+      if (role === "admin") { 
         await fetchAdminDropdownData();
       } else if (role === "guru" && (allSubjects.length === 0 || allClasses.length === 0)) {
-        // For guru filters, they might see all subjects/classes if the filter is global
-        // This depends on the desired UX for main page filters for gurus.
-        // For now, let's assume gurus also need all subjects/classes for main page filters
         await fetchAdminDropdownData();
       }
 
@@ -294,8 +295,7 @@ export default function ExamsPage() {
           setIsLoading(false);
           return;
       }
-      // For admin and guru, the initial query `q` fetches all exams, filtering happens client-side or could be server-side if needed.
-
+      
       const querySnapshot = await getDocs(q);
       const fetchedExams: ExamData[] = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data();
@@ -310,6 +310,7 @@ export default function ExamsPage() {
           startTime: data.startTime,
           endTime: data.endTime,
           description: data.description,
+          examLink: data.examLink,
           createdAt: data.createdAt,
           recordedById: data.recordedById,
           recordedByName: data.recordedByName,
@@ -333,7 +334,7 @@ export default function ExamsPage() {
   useEffect(() => {
     if (selectedExam && isEditDialogOpen) {
       if (role === 'guru') {
-        fetchTeacherSpecificFormData(); // Fetch specific data when dialog opens for guru
+        fetchTeacherSpecificFormData(); 
       }
       editExamForm.reset({
         id: selectedExam.id,
@@ -344,6 +345,7 @@ export default function ExamsPage() {
         startTime: selectedExam.startTime,
         endTime: selectedExam.endTime,
         description: selectedExam.description || "",
+        examLink: selectedExam.examLink || "",
       });
     }
   }, [selectedExam, isEditDialogOpen, editExamForm, role]);
@@ -376,6 +378,7 @@ export default function ExamsPage() {
         date: Timestamp.fromDate(data.date),
         subjectName,
         className,
+        examLink: data.examLink || null,
         createdAt: serverTimestamp(),
         recordedById: authUser.uid,
         recordedByName: authUser.displayName || authUser.email,
@@ -408,7 +411,7 @@ export default function ExamsPage() {
       await batch.commit();
 
       setIsAddDialogOpen(false);
-      addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "" });
+      addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "", examLink: "" });
       fetchExams();
     } catch (error: any) {
       console.error("Error adding exam or notifications:", error);
@@ -444,7 +447,7 @@ export default function ExamsPage() {
         date: Timestamp.fromDate(data.date),
         subjectName,
         className,
-        // No need to update recordedById/Name on edit, or keep original
+        examLink: data.examLink || null,
       });
       toast({ title: "Ujian Diperbarui", description: "Jadwal ujian berhasil diperbarui." });
       setIsEditDialogOpen(false);
@@ -476,7 +479,7 @@ export default function ExamsPage() {
   const openEditDialog = (exam: ExamData) => {
     setSelectedExam(exam);
     if (role === 'guru') {
-      fetchTeacherSpecificFormData(); // Ensure data is ready for guru edit form
+      fetchTeacherSpecificFormData(); 
     }
     setIsEditDialogOpen(true);
   };
@@ -566,13 +569,98 @@ export default function ExamsPage() {
 
   const subjectsForCurrentForm = role === 'guru' ? teacherSubjectsForForm : allSubjects;
   const classesForCurrentForm = role === 'guru' ? teacherClassesForForm : allClasses;
-  const isLoadingFormOptions = role === 'guru' ? isLoadingTeacherFormDropdownData : (isLoading || authLoading) ; //Simplified for admin
+  const isLoadingFormOptions = role === 'guru' ? isLoadingTeacherFormDropdownData : (isLoading || authLoading) ; 
+  
+  const renderExamFormFields = (formInstance: typeof addExamForm | typeof editExamForm, dialogType: 'add' | 'edit') => (
+    <>
+      <div>
+        <Label htmlFor={`${dialogType}-exam-title`}>Judul Ujian</Label>
+        <Input id={`${dialogType}-exam-title`} {...formInstance.register("title")} className="mt-1" />
+        {formInstance.formState.errors.title && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.title.message}</p>}
+      </div>
+      <div>
+        <Label htmlFor={`${dialogType}-exam-subjectId`}>Mata Pelajaran</Label>
+        <Select onValueChange={(value) => formInstance.setValue("subjectId", value, { shouldValidate: true })} value={formInstance.getValues("subjectId") || undefined} disabled={isLoadingFormOptions}>
+          <SelectTrigger id={`${dialogType}-exam-subjectId`} className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih mata pelajaran"} /></SelectTrigger>
+          <SelectContent>
+            {subjectsForCurrentForm.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+            {subjectsForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada mapel</SelectItem>}
+          </SelectContent>
+        </Select>
+        {formInstance.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.subjectId.message}</p>}
+      </div>
+      <div>
+        <Label htmlFor={`${dialogType}-exam-classId`}>Kelas</Label>
+        <Select onValueChange={(value) => formInstance.setValue("classId", value, { shouldValidate: true })} value={formInstance.getValues("classId") || undefined} disabled={isLoadingFormOptions}>
+          <SelectTrigger id={`${dialogType}-exam-classId`} className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
+          <SelectContent>
+            {classesForCurrentForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            {classesForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada kelas</SelectItem>}
+          </SelectContent>
+        </Select>
+        {formInstance.formState.errors.classId && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.classId.message}</p>}
+      </div>
+      <div>
+        <Label htmlFor={`${dialogType}-exam-date`}>Tanggal Ujian</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              className="w-full justify-start text-left font-normal mt-1"
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {formInstance.watch("date") ? format(formInstance.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={formInstance.watch("date")}
+              onSelect={(date) => formInstance.setValue("date", date || new Date(), { shouldValidate: true })}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        {formInstance.formState.errors.date && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.date.message}</p>}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+              <Label htmlFor={`${dialogType}-exam-startTime`}>Waktu Mulai</Label>
+              <Input id={`${dialogType}-exam-startTime`} type="time" {...formInstance.register("startTime")} className="mt-1" />
+              {formInstance.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.startTime.message}</p>}
+          </div>
+          <div>
+              <Label htmlFor={`${dialogType}-exam-endTime`}>Waktu Selesai</Label>
+              <Input id={`${dialogType}-exam-endTime`} type="time" {...formInstance.register("endTime")} className="mt-1" />
+              {formInstance.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.endTime.message}</p>}
+          </div>
+      </div>
+      <div>
+        <Label htmlFor={`${dialogType}-exam-examLink`}>Link Ujian (Opsional)</Label>
+        <Input id={`${dialogType}-exam-examLink`} {...formInstance.register("examLink")} className="mt-1" placeholder="https://contoh.com/link-ujian" />
+        {formInstance.formState.errors.examLink && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.examLink.message}</p>}
+      </div>
+      <div>
+        <Label htmlFor={`${dialogType}-exam-description`}>Deskripsi (Opsional)</Label>
+        <Textarea id={`${dialogType}-exam-description`} {...formInstance.register("description")} className="mt-1" />
+      </div>
+    </>
+  );
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold font-headline">Manajemen Ujian</h1>
-        <p className="text-muted-foreground">Kelola jadwal ujian, input soal, dan pelaksanaan ujian.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+            <h1 className="text-3xl font-bold font-headline">Manajemen Ujian</h1>
+            <p className="text-muted-foreground">Kelola jadwal ujian, input soal, dan pelaksanaan ujian.</p>
+        </div>
+        {role === 'siswa' && (
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link href="/assignments">
+                    <BookCopy className="mr-2 h-4 w-4" /> Lihat Daftar Tugas
+                </Link>
+            </Button>
+        )}
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -583,7 +671,7 @@ export default function ExamsPage() {
           {canManageExams && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
-              if (!isOpen) { addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "" }); addExamForm.clearErrors(); }
+              if (!isOpen) { addExamForm.reset({ date: new Date(), title: "", subjectId: undefined, classId: undefined, startTime: "", endTime: "", description: "", examLink: "" }); addExamForm.clearErrors(); }
               else if (role === 'guru') { fetchTeacherSpecificFormData(); }
               else if (role === 'admin' && (allSubjects.length === 0 || allClasses.length === 0)) { fetchAdminDropdownData(); }
             }}>
@@ -600,72 +688,7 @@ export default function ExamsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={addExamForm.handleSubmit(handleAddExamSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  <div>
-                    <Label htmlFor="add-exam-title">Judul Ujian</Label>
-                    <Input id="add-exam-title" {...addExamForm.register("title")} className="mt-1" />
-                    {addExamForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.title.message}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-exam-subjectId">Mata Pelajaran</Label>
-                    <Select onValueChange={(value) => addExamForm.setValue("subjectId", value, { shouldValidate: true })} value={addExamForm.getValues("subjectId") || undefined} disabled={isLoadingFormOptions}>
-                      <SelectTrigger id="add-exam-subjectId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih mata pelajaran"} /></SelectTrigger>
-                      <SelectContent>
-                        {subjectsForCurrentForm.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        {subjectsForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada mapel</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                    {addExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.subjectId.message}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-exam-classId">Kelas</Label>
-                    <Select onValueChange={(value) => addExamForm.setValue("classId", value, { shouldValidate: true })} value={addExamForm.getValues("classId") || undefined} disabled={isLoadingFormOptions}>
-                      <SelectTrigger id="add-exam-classId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
-                      <SelectContent>
-                        {classesForCurrentForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        {classesForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada kelas</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                    {addExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.classId.message}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-exam-date">Tanggal Ujian</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className="w-full justify-start text-left font-normal mt-1"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {addExamForm.watch("date") ? format(addExamForm.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={addExamForm.watch("date")}
-                          onSelect={(date) => addExamForm.setValue("date", date || new Date(), { shouldValidate: true })}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {addExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.date.message}</p>}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                          <Label htmlFor="add-exam-startTime">Waktu Mulai</Label>
-                          <Input id="add-exam-startTime" type="time" {...addExamForm.register("startTime")} className="mt-1" />
-                          {addExamForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.startTime.message}</p>}
-                      </div>
-                      <div>
-                          <Label htmlFor="add-exam-endTime">Waktu Selesai</Label>
-                          <Input id="add-exam-endTime" type="time" {...addExamForm.register("endTime")} className="mt-1" />
-                          {addExamForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{addExamForm.formState.errors.endTime.message}</p>}
-                      </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="add-exam-description">Deskripsi (Opsional)</Label>
-                    <Textarea id="add-exam-description" {...addExamForm.register("description")} className="mt-1" />
-                  </div>
+                  {renderExamFormFields(addExamForm, 'add')}
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                     <Button type="submit" disabled={addExamForm.formState.isSubmitting || isLoadingFormOptions}>
@@ -721,10 +744,11 @@ export default function ExamsPage() {
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
                     <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[120px]")}>Tanggal</TableHead>
                     {!isMobile && (role === "admin" || role === "guru") && <TableHead className="min-w-[180px]">Judul Ujian</TableHead>}
                     {!isMobile && (role === "admin" || role === "guru") && <TableHead className="min-w-[100px]">Kelas</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[120px]")}>Tanggal</TableHead>
                     {!isMobile && (role === "siswa" || role === "orangtua") && <TableHead className="min-w-[180px]">Judul Ujian</TableHead>}
+                    {!isMobile && (role === "siswa" || role === "orangtua") && <TableHead className="min-w-[100px]">Kelas</TableHead>}
                     {!isMobile && <TableHead className="min-w-[120px]">Waktu</TableHead>}
                     <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
@@ -734,18 +758,15 @@ export default function ExamsPage() {
                     <TableRow key={exam.id}>
                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className={cn("truncate", isMobile ? "px-2" : "font-medium")} title={exam.subjectName || exam.subjectId}>{exam.subjectName || exam.subjectId}</TableCell>
-                      
-                      {!isMobile && (role === "admin" || role === "guru") && <TableCell className="truncate" title={exam.title}>{exam.title}</TableCell>}
-                      {!isMobile && (role === "admin" || role === "guru") && <TableCell className="truncate" title={exam.className || exam.classId}>{exam.className || exam.classId}</TableCell>}
-                      
                       <TableCell className={cn(isMobile && "px-2 text-xs")}>
                           {format(exam.date.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy", { locale: indonesiaLocale })}
                           {isMobile && <span className="block text-muted-foreground">{exam.startTime} - {exam.endTime}</span>}
                       </TableCell>
-                      
+                      {!isMobile && (role === "admin" || role === "guru") && <TableCell className="truncate" title={exam.title}>{exam.title}</TableCell>}
+                      {!isMobile && (role === "admin" || role === "guru") && <TableCell className="truncate" title={exam.className || exam.classId}>{exam.className || exam.classId}</TableCell>}
                       {!isMobile && (role === "siswa" || role === "orangtua") && <TableCell className="font-medium truncate" title={exam.title}>{exam.title}</TableCell>}
+                      {!isMobile && (role === "siswa" || role === "orangtua") && <TableCell className="truncate" title={exam.className || exam.classId}>{exam.className || exam.classId}</TableCell>}
                       {!isMobile && <TableCell>{exam.startTime} - {exam.endTime}</TableCell>}
-                      
                       <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -757,6 +778,13 @@ export default function ExamsPage() {
                                 <DropdownMenuItem onClick={() => openViewDetailDialog(exam)}>
                                   <Eye className="mr-2 h-4 w-4" /> Lihat Detail
                                 </DropdownMenuItem>
+                                {role === "siswa" && exam.examLink && (
+                                   <DropdownMenuItem asChild>
+                                      <Link href={exam.examLink} target="_blank" rel="noopener noreferrer">
+                                          <LogIn className="mr-2 h-4 w-4" /> Masuk Ujian
+                                      </Link>
+                                  </DropdownMenuItem>
+                                )}
                                 {canManageExams && (
                                   <>
                                     <DropdownMenuItem onClick={() => openEditDialog(exam)}>
@@ -852,6 +880,16 @@ export default function ExamsPage() {
               <div><Label className="text-muted-foreground">Tanggal:</Label><p className="font-medium">{format(selectedExamForDetail.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p></div>
               <div><Label className="text-muted-foreground">Waktu Mulai:</Label><p className="font-medium">{selectedExamForDetail.startTime}</p></div>
               <div><Label className="text-muted-foreground">Waktu Selesai:</Label><p className="font-medium">{selectedExamForDetail.endTime}</p></div>
+              {selectedExamForDetail.examLink && (
+                <div>
+                  <Label className="text-muted-foreground">Link Ujian:</Label>
+                   <Button variant="link" asChild className="p-0 h-auto block text-sm">
+                    <Link href={selectedExamForDetail.examLink} target="_blank" rel="noopener noreferrer">
+                      <LinkExternalIcon className="inline-block mr-1 h-4 w-4" /> Buka Link Ujian
+                    </Link>
+                  </Button>
+                </div>
+              )}
               {selectedExamForDetail.description && (
                 <div><Label className="text-muted-foreground">Deskripsi:</Label><p className="whitespace-pre-line">{selectedExamForDetail.description}</p></div>
               )}
@@ -882,72 +920,7 @@ export default function ExamsPage() {
             {selectedExam && (
               <form onSubmit={editExamForm.handleSubmit(handleEditExamSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <Input type="hidden" {...editExamForm.register("id")} />
-                <div>
-                  <Label htmlFor="edit-exam-title">Judul Ujian</Label>
-                  <Input id="edit-exam-title" {...editExamForm.register("title")} className="mt-1" />
-                  {editExamForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.title.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="edit-exam-subjectId">Mata Pelajaran</Label>
-                  <Select onValueChange={(value) => editExamForm.setValue("subjectId", value, { shouldValidate: true })} value={editExamForm.getValues("subjectId") || undefined} disabled={isLoadingFormOptions}>
-                    <SelectTrigger id="edit-exam-subjectId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih mata pelajaran"} /></SelectTrigger>
-                    <SelectContent>
-                      {subjectsForCurrentForm.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                      {subjectsForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada mapel</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                  {editExamForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.subjectId.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="edit-exam-classId">Kelas</Label>
-                  <Select onValueChange={(value) => editExamForm.setValue("classId", value, { shouldValidate: true })} value={editExamForm.getValues("classId") || undefined} disabled={isLoadingFormOptions}>
-                    <SelectTrigger id="edit-exam-classId" className="mt-1"><SelectValue placeholder={isLoadingFormOptions ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
-                    <SelectContent>
-                      {classesForCurrentForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      {classesForCurrentForm.length === 0 && !isLoadingFormOptions && <SelectItem value="no-data" disabled>Tidak ada kelas</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                  {editExamForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.classId.message}</p>}
-                </div>
-                <div>
-                    <Label htmlFor="edit-exam-date">Tanggal Ujian</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className="w-full justify-start text-left font-normal mt-1"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {editExamForm.watch("date") ? format(editExamForm.watch("date"), "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={editExamForm.watch("date")}
-                          onSelect={(date) => editExamForm.setValue("date", date || new Date(), { shouldValidate: true })}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    {editExamForm.formState.errors.date && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.date.message}</p>}
-                  </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="edit-exam-startTime">Waktu Mulai</Label>
-                        <Input id="edit-exam-startTime" type="time" {...editExamForm.register("startTime")} className="mt-1" />
-                        {editExamForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.startTime.message}</p>}
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-exam-endTime">Waktu Selesai</Label>
-                        <Input id="edit-exam-endTime" type="time" {...editExamForm.register("endTime")} className="mt-1" />
-                        {editExamForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{editExamForm.formState.errors.endTime.message}</p>}
-                    </div>
-                </div>
-                <div>
-                  <Label htmlFor="edit-exam-description">Deskripsi (Opsional)</Label>
-                  <Textarea id="edit-exam-description" {...editExamForm.register("description")} className="mt-1" />
-                </div>
+                {renderExamFormFields(editExamForm, 'edit')}
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                   <Button type="submit" disabled={editExamForm.formState.isSubmitting || isLoadingFormOptions}>
@@ -963,4 +936,3 @@ export default function ExamsPage() {
     </div>
   );
 }
-
