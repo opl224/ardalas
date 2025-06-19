@@ -1,9 +1,10 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-  font-family: "Montserrat Alternates", sans-serif;
+  font-family: "Sulphur Point", sans-serif;
 }
 
 @layer base {
@@ -29,8 +30,8 @@ body {
     --secondary: 210 40% 90%; /* Lighter blue-gray */
     --secondary-foreground: 222 47% 11%;
 
-    --accent: 242 70% 75%; /* #8784EB Pale Violet Blue */
-    --accent-foreground: 0 0% 100%; /* White */
+    --accent: 0 0% 94%; /* #F0F0F0 */
+    --accent-foreground: 222 47% 11%; /* Dark Blue-Gray for contrast */
 
     --destructive: 0 72% 51%; /* Standard red */
     --destructive-foreground: 0 0% 100%; /* White */
@@ -41,13 +42,13 @@ body {
 
     /* Custom Sidebar Variables aligned with the theme */
     --sidebar-background: 0 100% 99%; /* #FFFAFA Snow */
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 219 79% 66%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%; /* Dark Blue-Gray */
+    --sidebar-primary: 219 79% 66%; /* CornflowerBlue */
+    --sidebar-primary-foreground: 0 0% 100%; /* White */
     --sidebar-accent: 0 0% 94%; /* #F0F0F0 for hover */
     --sidebar-accent-foreground: 222 47% 11%; /* Dark text for light hover */
     --sidebar-border: 220 15% 35%; /* Same as main border */
-    --sidebar-ring: 219 79% 66%;
+    --sidebar-ring: 219 79% 66%; /* Primary color for focus rings */
 
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
@@ -81,7 +82,7 @@ body {
     --secondary-foreground: 210 40% 98%;
 
     /* For dark mode, if #F0F0F0 is too light, you might want a different accent */
-    --accent: 217 33% 22%; /* A slightly lighter dark for accent in dark mode */
+    --accent: 0 0% 14%; /* Darker Gray for dark mode accent, e.g. #242424 */
     --accent-foreground: 210 40% 98%; /* Light text for dark accent */
 
     --destructive: 0 63% 31%;
@@ -94,7 +95,7 @@ body {
     --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 210 40% 98%;
     --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 217 33% 22%; /* Darker hover for dark mode */
+    --sidebar-accent: 0 0% 14%; /* Darker Gray for dark mode sidebar hover */
     --sidebar-accent-foreground: 210 40% 98%; /* Light text for dark hover */
     --sidebar-border: 217 33% 27%;
     --sidebar-ring: 217 33% 17%;
