@@ -36,8 +36,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const LAST_ACTIVITY_STORAGE_KEY = 'lastUserActivityTimestamp';
-const INACTIVITY_TIMEOUT_MS = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
-// const INACTIVITY_TIMEOUT_MS = 10 * 1000; // For testing: 10 seconds
+const INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -196,7 +195,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (auth.currentUser) { // Check if user is still authenticated with Firebase
               toast({
                 title: "Sesi Berakhir",
-                description: "Anda telah dikeluarkan secara otomatis karena tidak aktif selama 5 jam.",
+                description: "Anda telah dikeluarkan secara otomatis karena tidak aktif selama 2 jam.",
                 variant: "default",
               });
               signOut(auth).catch(error => {
