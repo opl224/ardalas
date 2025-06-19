@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { FileText, PlusCircle, Edit, Trash2, CalendarIcon, MoreVertical, Search, Filter as FilterIcon } from "lucide-react";
+import { FileText, PlusCircle, Edit, Trash2, CalendarIcon, MoreVertical, Search, Filter as FilterIcon, Eye } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -168,6 +168,9 @@ export default function ExamsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<ExamData | null>(null);
+  const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
+  const [selectedExamForDetail, setSelectedExamForDetail] = useState<ExamData | null>(null);
+
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>("all");
@@ -465,6 +468,11 @@ export default function ExamsPage() {
     }
   };
 
+  const openViewDetailDialog = (exam: ExamData) => {
+    setSelectedExamForDetail(exam);
+    setIsViewDetailDialogOpen(true);
+  };
+
   const openEditDialog = (exam: ExamData) => {
     setSelectedExam(exam);
     if (role === 'guru') {
@@ -671,7 +679,7 @@ export default function ExamsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {canManageExams && (
+          { (role === "admin" || role === "guru") && (
             <div className="my-4 flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-grow">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -712,28 +720,33 @@ export default function ExamsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile ? "px-2" : "min-w-[180px]")}>Judul Ujian</TableHead>
-                    <TableHead className={cn(isMobile ? "px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
-                    {!isMobile && <TableHead className="min-w-[100px]">Kelas</TableHead>}
-                    <TableHead className={cn(isMobile ? "px-2" : "min-w-[120px]")}>Tanggal</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
+                    {!isMobile && (role === "admin" || role === "guru") && <TableHead className="min-w-[180px]">Judul Ujian</TableHead>}
+                    {!isMobile && (role === "admin" || role === "guru") && <TableHead className="min-w-[100px]">Kelas</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[120px]")}>Tanggal</TableHead>
+                    {!isMobile && (role === "siswa" || role === "orangtua") && <TableHead className="min-w-[180px]">Judul Ujian</TableHead>}
                     {!isMobile && <TableHead className="min-w-[120px]">Waktu</TableHead>}
-                    {canManageExams && <TableHead className={cn("text-right min-w-[100px]", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>}
+                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((exam, index) => (
                     <TableRow key={exam.id}>
                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className={cn("font-medium truncate", isMobile && "px-2")} title={exam.title}>{exam.title}</TableCell>
-                      <TableCell className={cn("truncate", isMobile && "px-2")} title={exam.subjectName || exam.subjectId}>{exam.subjectName || exam.subjectId}</TableCell>
-                      {!isMobile && <TableCell className="truncate" title={exam.className || exam.classId}>{exam.className || exam.classId}</TableCell>}
+                      <TableCell className={cn("truncate", isMobile ? "px-2" : "font-medium")} title={exam.subjectName || exam.subjectId}>{exam.subjectName || exam.subjectId}</TableCell>
+                      
+                      {!isMobile && (role === "admin" || role === "guru") && <TableCell className="truncate" title={exam.title}>{exam.title}</TableCell>}
+                      {!isMobile && (role === "admin" || role === "guru") && <TableCell className="truncate" title={exam.className || exam.classId}>{exam.className || exam.classId}</TableCell>}
+                      
                       <TableCell className={cn(isMobile && "px-2 text-xs")}>
                           {format(exam.date.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy", { locale: indonesiaLocale })}
-                          {isMobile && <span className="block text-muted-foreground">{exam.startTime}</span>}
+                          {isMobile && <span className="block text-muted-foreground">{exam.startTime} - {exam.endTime}</span>}
                       </TableCell>
+                      
+                      {!isMobile && (role === "siswa" || role === "orangtua") && <TableCell className="font-medium truncate" title={exam.title}>{exam.title}</TableCell>}
                       {!isMobile && <TableCell>{exam.startTime} - {exam.endTime}</TableCell>}
-                      {canManageExams && (
-                        <TableCell className={cn("text-right", isMobile && "px-1")}>
+                      
+                      <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${exam.title}`}>
@@ -741,40 +754,44 @@ export default function ExamsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditDialog(exam)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
+                                <DropdownMenuItem onClick={() => openViewDetailDialog(exam)}>
+                                  <Eye className="mr-2 h-4 w-4" /> Lihat Detail
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem
-                                      onSelect={(e) => { e.preventDefault(); openDeleteDialog(exam); }}
-                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Hapus
+                                {canManageExams && (
+                                  <>
+                                    <DropdownMenuItem onClick={() => openEditDialog(exam)}>
+                                      <Edit className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  {selectedExam && selectedExam.id === exam.id && (
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tindakan ini akan menghapus jadwal ujian <span className="font-semibold">{selectedExam?.title}</span>.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setSelectedExam(null)}>Batal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteExam(selectedExam.id)}>Ya, Hapus Jadwal</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  )}
-                                </AlertDialog>
+                                    <DropdownMenuSeparator />
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => { e.preventDefault(); openDeleteDialog(exam); }}
+                                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      {selectedExam && selectedExam.id === exam.id && (
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Tindakan ini akan menghapus jadwal ujian <span className="font-semibold">{selectedExam?.title}</span>.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel onClick={() => setSelectedExam(null)}>Batal</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteExam(selectedExam.id)}>Ya, Hapus Jadwal</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      )}
+                                    </AlertDialog>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
-                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -812,6 +829,45 @@ export default function ExamsPage() {
           )}
         </CardContent>
       </Card>
+
+       <Dialog open={isViewDetailDialogOpen} onOpenChange={(isOpen) => {
+          setIsViewDetailDialogOpen(isOpen);
+          if (!isOpen) setSelectedExamForDetail(null);
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Detail Ujian: {selectedExamForDetail?.title}
+            </DialogTitle>
+            <DialogDescription>
+              Informasi lengkap mengenai jadwal ujian ini.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedExamForDetail && (
+            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+              <div><Label className="text-muted-foreground">Judul Ujian:</Label><p className="font-medium">{selectedExamForDetail.title}</p></div>
+              <div><Label className="text-muted-foreground">Mata Pelajaran:</Label><p className="font-medium">{selectedExamForDetail.subjectName || selectedExamForDetail.subjectId}</p></div>
+              <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedExamForDetail.className || selectedExamForDetail.classId}</p></div>
+              <div><Label className="text-muted-foreground">Tanggal:</Label><p className="font-medium">{format(selectedExamForDetail.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p></div>
+              <div><Label className="text-muted-foreground">Waktu Mulai:</Label><p className="font-medium">{selectedExamForDetail.startTime}</p></div>
+              <div><Label className="text-muted-foreground">Waktu Selesai:</Label><p className="font-medium">{selectedExamForDetail.endTime}</p></div>
+              {selectedExamForDetail.description && (
+                <div><Label className="text-muted-foreground">Deskripsi:</Label><p className="whitespace-pre-line">{selectedExamForDetail.description}</p></div>
+              )}
+              {selectedExamForDetail.recordedByName && (role === "admin" || role === "guru") && (
+                <div><Label className="text-muted-foreground">Dicatat Oleh:</Label><p className="font-medium">{selectedExamForDetail.recordedByName}</p></div>
+              )}
+              {selectedExamForDetail.createdAt && (role === "admin" || role === "guru") && (
+                <div><Label className="text-muted-foreground">Tanggal Dibuat:</Label><p className="font-medium">{format(selectedExamForDetail.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p></div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {canManageExams && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
