@@ -36,19 +36,21 @@ function AppLogo() {
       href="/dashboard" 
       className={cn(
         "flex items-center gap-2 font-headline text-lg font-semibold tracking-tight text-primary",
-        !isMobile && state === 'collapsed' ? 'justify-center' : '' 
+        state === 'collapsed' && !isMobile ? "w-full justify-center" : "" 
       )}
     >
        <Image 
         src="/logo2.png" 
         alt="Ardalas Logo" 
-        width={40} // Adjusted width
-        height={40} // Adjusted height
+        width={52} 
+        height={52} 
         data-ai-hint="logo company" 
-        className={cn(
-          !isMobile && state === 'collapsed' ? 'mx-auto' : ''
-        )}
       />
+      {/* Text logo can be added here if needed, hidden when collapsed:
+      {(!isMobile && state !== 'collapsed') && (
+        <span>Ardalas</span>
+      )}
+      */}
     </Link>
   );
 }
@@ -129,10 +131,8 @@ export function AppSidebar() {
               >
                 <Link href={item.href} onClick={() => { 
                   if (isMobile) setOpenMobile(false);
-                  // Close submenu if the clicked item is a top-level one without its own children,
-                  // or if it's a submenu item whose parent is not the currently open one.
-                  if (!hasChildren && (!isSubMenuParam || (isSubMenuParam && parentTitle !== openSubmenu))) {
-                    setOpenSubmenu(null);
+                  if (!hasChildren && (!isSubMenuParam || (isSubMenuParam && parentTitle !== item.title && parentTitle !== openSubmenu))) {
+                     setOpenSubmenu(null);
                   }
                 }}>
                   <item.icon className="h-5 w-5 shrink-0" />
