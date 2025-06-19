@@ -24,7 +24,8 @@ import { id as indonesiaLocale } from "date-fns/locale";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { ScrollArea } from "@/components/ui/scroll-area"; // Added ScrollArea
+import { ScrollArea } from "@/components/ui/scroll-area"; 
+import { useSidebar } from "@/components/ui/sidebar"; // Added useSidebar
 
 interface NotificationDoc {
   id: string;
@@ -33,7 +34,7 @@ interface NotificationDoc {
   read: boolean;
   createdAt: Timestamp | null;
   href?: string;
-  type?: "new_assignment" | "new_announcement" | "new_exam" | string; // Added string for future types
+  type?: "new_assignment" | "new_announcement" | "new_exam" | string; 
   userId?: string;
 }
 
@@ -51,6 +52,7 @@ export default function AllNotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const { toast } = useToast();
+  const { isMobile } = useSidebar(); // Initialized useSidebar
 
   useEffect(() => {
     if (authLoading || !user || !user.uid) {
@@ -100,7 +102,7 @@ export default function AllNotificationsPage() {
   }, [user, authLoading, toast]);
 
   const handleMarkAsRead = async (id: string, index: number) => {
-    if (notifications[index]?.read) return; // Already read
+    if (notifications[index]?.read) return; 
 
     const notificationRef = doc(db, "notifications", id);
     try {
@@ -130,7 +132,6 @@ export default function AllNotificationsPage() {
     
     try {
       await batch.commit();
-      // Optimistically update UI, or rely on listener if you have one for all notifications
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
@@ -144,7 +145,7 @@ export default function AllNotificationsPage() {
 
   const filteredNotifications = useMemo(() => {
     if (filter === "all") return notifications;
-    if (filter === "tugas") return notifications.filter(n => n.type === "new_assignment" || n.type === "new_exam"); // Combine exam with task for simplicity
+    if (filter === "tugas") return notifications.filter(n => n.type === "new_assignment" || n.type === "new_exam"); 
     if (filter === "pengumuman") return notifications.filter(n => n.type === "new_announcement");
     return notifications;
   }, [notifications, filter]);
@@ -215,13 +216,13 @@ export default function AllNotificationsPage() {
                 >
                   <CardHeader className="pb-3 pt-4 px-4">
                     <div className="flex justify-between items-start">
-                        <CardTitle className="text-base font-semibold leading-tight block truncate flex-1 min-w-0">
+                        <CardTitle className={cn("text-base font-semibold leading-tight block flex-1 min-w-0", isMobile ? "line-clamp-1" : "truncate")}>
                             {notification.href ? (
-                                <Link href={notification.href} className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm block truncate">
+                                <Link href={notification.href} className="hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded-sm block">
                                     {notification.title}
                                 </Link>
                             ) : (
-                                <span className="block truncate">{notification.title}</span>
+                                <span className="block">{notification.title}</span>
                             )}
                         </CardTitle>
                         {!notification.read && (
@@ -240,7 +241,7 @@ export default function AllNotificationsPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="text-sm text-foreground pt-0 pb-4 px-4">
-                    <p className="block w-full truncate">{notification.description}</p>
+                    <p className={cn("block w-full", isMobile ? "line-clamp-2" : "truncate")}>{notification.description}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -251,3 +252,4 @@ export default function AllNotificationsPage() {
     </div>
   );
 }
+
