@@ -767,7 +767,7 @@ export default function UserAdministrationPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className="w-full">
+              <Table className={cn("w-full", isMobile && "table-fixed")}>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
