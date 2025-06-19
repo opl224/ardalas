@@ -30,9 +30,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 
 function AppLogo() {
+  const { state, isMobile } = useSidebar();
   return (
-    <Link href="/dashboard" className="flex items-center gap-2 px-10 font-headline text-lg font-semibold tracking-tight text-primary">
-       <Image src="/logo2.png" alt="Ardalas Logo" width={120} height={28} data-ai-hint="logo company" />
+    <Link 
+      href="/dashboard" 
+      className={cn(
+        "flex items-center gap-2 font-headline text-lg font-semibold tracking-tight text-primary",
+        !isMobile && state === 'collapsed' ? 'justify-center px-0' : 'px-10' 
+      )}
+    >
+       <Image 
+        src="/logo2.ico" 
+        alt="Ardalas Logo" 
+        width={40} 
+        height={40} 
+        data-ai-hint="logo company" 
+        className={cn(
+          !isMobile && state === 'collapsed' ? 'mx-auto' : ''
+        )}
+      />
     </Link>
   );
 }
@@ -77,8 +93,8 @@ export function AppSidebar() {
                 onClick={() => toggleSubmenu(item.title)}
                 isActive={isActive} 
                 className={cn(
-                  "w-full justify-between",
-                  (isActive) && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
+                  "w-full justify-between hover:underline",
+                  (isActive) && "bg-sidebar-accent text-sidebar-accent-foreground dark:bg-sidebar-accent dark:text-sidebar-accent-foreground"
                 )}
                 tooltip={item.title}
               >
@@ -105,13 +121,13 @@ export function AppSidebar() {
                 asChild
                 isActive={isActive}
                 className={cn(
-                  "w-full",
+                  "w-full hover:underline",
                   !isMobile && state === 'collapsed' ? "justify-center" : "justify-start",
-                  isActive && "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
+                  isActive && "bg-sidebar-accent text-sidebar-accent-foreground dark:bg-sidebar-accent dark:text-sidebar-accent-foreground"
                 )}
                 tooltip={item.title}
               >
-                <Link href={item.href} onClick={() => isMobile && setOpenMobile(false)}>
+                <Link href={item.href} onClick={() => { if (isMobile) setOpenMobile(false); setOpenSubmenu(null); }}>
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                   {item.label && <span className="ml-auto text-xs">{item.label}</span>}
@@ -137,7 +153,7 @@ export function AppSidebar() {
 
   const sidebarDesktopContent = (
     <>
-      <div className="flex h-16 items-center border-b border-border px-4">
+      <div className={cn("flex h-16 items-center border-b border-border", !isMobile && state === 'collapsed' ? 'px-0' : 'px-4')}>
          <AppLogo />
       </div>
       <SidebarContent className="flex-1"> 
@@ -153,7 +169,7 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton 
                 onClick={handleLogout} 
-                className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive hover:underline"
                 tooltip="Logout"
               >
                 <LogOut className="h-5 w-5 shrink-0" />
@@ -193,7 +209,7 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={handleLogout} 
-                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive hover:underline"
                 >
                   <LogOut className="h-5 w-5 shrink-0" />
                   <span className="truncate">Logout</span>
@@ -215,4 +231,3 @@ export function AppSidebar() {
       </Sidebar>
   );
 }
-
