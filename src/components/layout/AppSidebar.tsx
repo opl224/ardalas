@@ -41,7 +41,7 @@ function AppLogo() {
         // When collapsed, the parent div already centers this Link.
         // The Link itself needs to center its content (the Image).
         // w-full h-full helps ensure the justify-center and items-center apply correctly to the image.
-        isCollapsedAndNotMobile ? "justify-center w-full h-full" : "gap-2 px-4" 
+        isCollapsedAndNotMobile ? "justify-center w-full h-full items-center" : "gap-2 px-4" 
       )}
     >
       <Image
@@ -50,6 +50,7 @@ function AppLogo() {
         width={52} 
         height={52} 
         data-ai-hint="logo company"
+        className={cn(isCollapsedAndNotMobile && "relative left-1")} 
         // No explicit rounding classes are applied here.
         // If logo2.png has its own transparency or shape, that will be shown.
       />
@@ -164,7 +165,7 @@ export function AppSidebar() {
     <>
       <div className={cn(
         "flex h-16 items-center border-b border-border", // Base styles
-        (!isMobile && state === 'collapsed') ? 'justify-center px-0' : 'px-0' // Centering and padding logic for collapsed/expanded
+        (!isMobile && state === 'collapsed') ? 'justify-center px-0' : 'justify-start px-0' // Centering and padding logic for collapsed/expanded
       )}>
          <AppLogo />
       </div>
@@ -243,3 +244,4 @@ export function AppSidebar() {
       </Sidebar>
   );
 }
+
