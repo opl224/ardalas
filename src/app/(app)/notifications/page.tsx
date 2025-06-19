@@ -25,7 +25,8 @@ import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area"; 
-import { useSidebar } from "@/components/ui/sidebar"; // Added useSidebar
+import { useSidebar } from "@/components/ui/sidebar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Added Select imports
 
 interface NotificationDoc {
   id: string;
@@ -38,7 +39,7 @@ interface NotificationDoc {
   userId?: string;
 }
 
-type NotificationFilter = "all" | "tugas" | "pengumuman";
+type NotificationFilter = "all" | "tugas_ujian" | "pengumuman"; // Updated filter types
 
 const NOTIFICATION_TYPE_MAP: Record<string, string> = {
   new_assignment: "Tugas",
@@ -52,7 +53,7 @@ export default function AllNotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const { toast } = useToast();
-  const { isMobile } = useSidebar(); // Initialized useSidebar
+  const { isMobile } = useSidebar();
 
   useEffect(() => {
     if (authLoading || !user || !user.uid) {
@@ -145,10 +146,16 @@ export default function AllNotificationsPage() {
 
   const filteredNotifications = useMemo(() => {
     if (filter === "all") return notifications;
-    if (filter === "tugas") return notifications.filter(n => n.type === "new_assignment" || n.type === "new_exam"); 
+    if (filter === "tugas_ujian") return notifications.filter(n => n.type === "new_assignment" || n.type === "new_exam"); 
     if (filter === "pengumuman") return notifications.filter(n => n.type === "new_announcement");
     return notifications;
   }, [notifications, filter]);
+
+  const filterOptions = [
+    { value: "all", label: "Semua", icon: Filter },
+    { value: "tugas_ujian", label: "Tugas & Ujian", icon: FileText },
+    { value: "pengumuman", label: "Pengumuman", icon: Megaphone },
+  ];
 
   if (authLoading) {
     return (
@@ -184,16 +191,25 @@ export default function AllNotificationsPage() {
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader>
           <CardTitle className="text-xl">Filter Notifikasi</CardTitle>
-          <div className="flex space-x-2 pt-2 flex-wrap">
-            <Button variant={filter === "all" ? "default" : "outline"} onClick={() => setFilter("all")} size="sm">
-              <Filter className="mr-2 h-4 w-4" /> Semua
-            </Button>
-            <Button variant={filter === "tugas" ? "default" : "outline"} onClick={() => setFilter("tugas")} size="sm">
-              <FileText className="mr-2 h-4 w-4" /> Tugas & Ujian
-            </Button>
-            <Button variant={filter === "pengumuman" ? "default" : "outline"} onClick={() => setFilter("pengumuman")} size="sm">
-              <Megaphone className="mr-2 h-4 w-4" /> Pengumuman
-            </Button>
+          <div className="pt-2">
+            <Select
+              value={filter}
+              onValueChange={(value) => setFilter(value as NotificationFilter)}
+            >
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue placeholder="Pilih filter" />
+              </SelectTrigger>
+              <SelectContent>
+                {filterOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center gap-2">
+                      <option.icon className="h-4 w-4 text-muted-foreground" />
+                      <span>{option.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -204,7 +220,7 @@ export default function AllNotificationsPage() {
           ) : filteredNotifications.length === 0 ? (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               <BellRing className="mx-auto h-12 w-12 mb-4" />
-              Tidak ada notifikasi {filter !== "all" ? `untuk kategori ${filter === "tugas" ? "Tugas & Ujian" : "Pengumuman"}` : ""} saat ini.
+              Tidak ada notifikasi {filter !== "all" ? `untuk kategori "${filterOptions.find(f => f.value === filter)?.label}"` : ""} saat ini.
             </div>
           ) : (
             <div className="mt-4 space-y-3 max-h-[60vh] overflow-y-auto pr-2">
