@@ -60,7 +60,7 @@ import {
   orderBy,
   where,
   documentId,
-  writeBatch, 
+  writeBatch,
   limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -72,9 +72,9 @@ interface AnnouncementData {
   id: string;
   title: string;
   content: string;
-  date: Timestamp; 
+  date: Timestamp;
   targetAudience: Role[];
-  targetClassIds?: string[]; 
+  targetClassIds?: string[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   createdById?: string;
@@ -90,11 +90,11 @@ const baseAnnouncementSchema = z.object({
 
 const announcementFormSchema = baseAnnouncementSchema.refine(
   (data) => {
-    return true; 
+    return true;
   },
   {
     message: "Guru harus memilih minimal satu kelas jika menargetkan Siswa atau Orang Tua.",
-    path: ["targetClassIds"], 
+    path: ["targetClassIds"],
   }
 );
 type AnnouncementFormValues = z.infer<typeof announcementFormSchema>;
@@ -116,7 +116,7 @@ export default function AnnouncementsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementData | null>(null);
-  
+
   const [teacherClasses, setTeacherClasses] = useState<ClassMin[]>([]);
   const [isLoadingTeacherClasses, setIsLoadingTeacherClasses] = useState(false);
 
@@ -156,14 +156,14 @@ export default function AnnouncementsPage() {
       // Filter announcements based on user role and class
       if (user && (role === 'siswa' || role === 'orangtua')) {
         const userClassId = role === 'siswa' ? user.classId : user.linkedStudentClassId;
-        fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
+        fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
           ann.targetAudience.includes(role!) ||
           ann.targetAudience.includes("semua") || // "semua" might not be in ROLES type, adjust if needed
           (ann.targetClassIds && userClassId && ann.targetClassIds.includes(userClassId))
         );
       } else if (user && role === 'guru') {
-         fetchedAnnouncements = fetchedAnnouncements.filter(ann => 
-            ann.targetAudience.includes('guru') || 
+         fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
+            ann.targetAudience.includes('guru') ||
             ann.targetAudience.includes("semua") ||
             (ann.createdById === user.uid) || // Show announcements created by this teacher
             (teacherClasses.length > 0 && ann.targetClassIds && ann.targetClassIds.some(tcId => teacherClasses.map(tc => tc.id).includes(tcId)) ) // Show if targets any of their classes
@@ -250,9 +250,9 @@ export default function AnnouncementsPage() {
       toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan siswa atau orang tua.", variant: "destructive"});
       return;
     }
-    
+
     let finalTargetClassIds = data.targetClassIds;
-    if (role !== 'guru') { 
+    if (role !== 'guru') {
         finalTargetClassIds = [];
     }
 
@@ -268,12 +268,12 @@ export default function AnnouncementsPage() {
       };
       const newAnnouncementRef = await addDoc(collection(db, "announcements"), announcementData);
       toast({ title: "Pengumuman Ditambahkan", description: `"${data.title}" berhasil dipublikasikan.` });
-      
+
       const batch = writeBatch(db);
       const notificationBase = {
         title: `Pengumuman Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
         description: data.content.substring(0, 50) + (data.content.length > 50 ? "..." : ""),
-        href: `/announcements`, 
+        href: `/announcements`,
         read: false,
         createdAt: serverTimestamp(),
         type: "new_announcement",
@@ -285,31 +285,43 @@ export default function AnnouncementsPage() {
       if (role === 'admin' && data.targetAudience && data.targetAudience.length > 0) {
         const usersRef = collection(db, "users");
         for (const targetRole of data.targetAudience) {
-          if (targetRole === 'admin' && user.uid) { 
-             // Continue to next role if target is admin and creator is admin
-          } else {
-            const qUsers = query(usersRef, where("role", "==", targetRole));
-            try {
-              const querySnapshot = await getDocs(qUsers);
-              querySnapshot.forEach((userDoc) => {
-                if (userDoc.id !== user.uid) { 
-                  const userNotificationRef = doc(collection(db, "notifications"));
-                  batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
-                }
-              });
-            } catch (e) {
-              console.error(`Error querying users for role ${targetRole} for notification:`, e);
-            }
+          // Skip creating individual notifications for 'siswa' or 'orangtua'
+          // if the announcement is created by an admin and targets these roles broadly.
+          // They will see these announcements on the /announcements page or dashboard.
+          if (targetRole === 'siswa' || targetRole === 'orangtua') {
+            continue;
+          }
+
+          // For other roles (e.g., 'guru', other 'admin') targeted by admin, create notifications.
+          // Also, ensure admin doesn't get self-notification if target is 'admin'
+          if (targetRole === 'admin' && user.uid === user.uid) { // Check if creator is the target admin
+            // Potentially skip self-notification or handle differently.
+            // For now, the existing userDoc.id !== user.uid check below handles this.
+          }
+
+          const qUsers = query(usersRef, where("role", "==", targetRole));
+          try {
+            const querySnapshot = await getDocs(qUsers);
+            querySnapshot.forEach((userDoc) => {
+              // Don't send notification to self (admin creating for other admins or teachers)
+              if (userDoc.id !== user.uid) {
+                const userNotificationRef = doc(collection(db, "notifications"));
+                batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
+              }
+            });
+          } catch (e) {
+            console.error(`Error querying users for role ${targetRole} for notification:`, e);
           }
         }
       } else if (role === 'guru' && data.targetAudience && data.targetClassIds && data.targetClassIds.length > 0) {
+        // Teacher sending to specific classes for 'siswa' or 'orangtua' - this is fine.
         const usersRef = collection(db, "users");
         for (const targetRole of data.targetAudience.filter(r => ROLES_FOR_TEACHER_TARGETING.includes(r))) {
             const qStudents = query(usersRef, where("role", "==", targetRole), where("classId", "in", data.targetClassIds));
              try {
               const querySnapshot = await getDocs(qStudents);
               querySnapshot.forEach((userDoc) => {
-                if (userDoc.id !== user.uid) { 
+                if (userDoc.id !== user.uid) {
                   const userNotificationRef = doc(collection(db, "notifications"));
                   batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
                 }
@@ -341,11 +353,11 @@ export default function AnnouncementsPage() {
     }
 
     let finalTargetClassIds = data.targetClassIds;
-    if (role !== 'guru') { 
+    if (role !== 'guru') {
       if (data.targetAudience.length === 0 || !data.targetAudience.some(r => ['siswa', 'orangtua'].includes(r))) {
         finalTargetClassIds = [];
       } else {
-        finalTargetClassIds = selectedAnnouncement.targetClassIds || []; 
+        finalTargetClassIds = selectedAnnouncement.targetClassIds || [];
       }
     }
 
@@ -353,12 +365,12 @@ export default function AnnouncementsPage() {
     try {
       const announcementDocRef = doc(db, "announcements", data.id);
       await updateDoc(announcementDocRef, {
-        ...data, 
+        ...data,
         targetClassIds: finalTargetClassIds,
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Pengumuman Diperbarui", description: `"${data.title}" berhasil diperbarui.` });
-      
+
       setIsEditDialogOpen(false);
       setSelectedAnnouncement(null);
       fetchAnnouncements();
@@ -384,7 +396,7 @@ export default function AnnouncementsPage() {
     setSelectedAnnouncement(announcement);
     setIsEditDialogOpen(true);
   };
-  
+
   const openDeleteDialog = (announcement: AnnouncementData) => {
     setSelectedAnnouncement(announcement);
   };
@@ -490,7 +502,7 @@ export default function AnnouncementsPage() {
             {(formInstance.formState.errors as any).targetAudience && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetAudience.message}</p>}
           </div>
         </>
-      ) : ( 
+      ) : (
         <div>
           <Label>Target Audiens (Untuk Admin)</Label>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -693,4 +705,4 @@ export default function AnnouncementsPage() {
     </div>
   );
 }
-    
+
