@@ -577,25 +577,25 @@ export default function TeachersPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Nama Profil</TableHead>
+                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[150px]")}>Nama Profil</TableHead>
                     {!isMobile && <TableHead>Email Profil</TableHead>}
-                    <TableHead>Mapel</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[120px]")}>Mapel</TableHead>
                     {!isMobile && <TableHead>Gender</TableHead>}
                     {!isMobile && <TableHead>UID Akun Tertaut</TableHead>}
-                    <TableHead className="text-center w-16">Aksi</TableHead>
+                    <TableHead className={cn("text-center w-16", isMobile && "w-12 px-1")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((teacher, index) => (
                     <TableRow key={teacher.id}>
-                       <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium truncate" title={teacher.name}>{teacher.name}</TableCell>
+                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={teacher.name}>{teacher.name}</TableCell>
                       {!isMobile && <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>}
-                      <TableCell className="truncate" title={teacher.subject}>{teacher.subject}</TableCell>
+                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={teacher.subject}>{teacher.subject}</TableCell>
                       {!isMobile && (
                         <TableCell>
                           {teacher.gender === "laki-laki" ? 
@@ -617,7 +617,7 @@ export default function TeachersPage() {
                           )}
                         </TableCell>
                       )}
-                      <TableCell className="text-center">
+                      <TableCell className={cn("text-center", isMobile && "px-1")}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${teacher.name}`}>
