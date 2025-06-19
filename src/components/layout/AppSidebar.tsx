@@ -38,20 +38,19 @@ function AppLogo() {
       href="/dashboard"
       className={cn(
         "flex items-center font-headline text-lg font-semibold tracking-tight text-primary",
-        // When collapsed, the parent div already centers this Link.
-        // The Link itself needs to center its content (the Image).
-        // w-full h-full helps ensure the justify-center and items-center apply correctly to the image.
-        isCollapsedAndNotMobile ? "justify-center w-full h-full" : "gap-2 px-4" 
+        isCollapsedAndNotMobile ? "justify-center w-full h-full items-center" : "gap-2 px-4"
       )}
     >
       <Image
-        src="/logo3.png"
+        src="/logo2.png"
         alt="Ardalas Logo"
-        width={120} 
+        width={52} 
         height={52} 
         data-ai-hint="logo company"
-        // No explicit rounding classes are applied here.
-        // If logo2.png has its own transparency or shape, that will be shown.
+        className={cn(
+          "relative",
+          isCollapsedAndNotMobile && "left-1" // Adjust left shift for collapsed state
+        )}
       />
     </Link>
   );
@@ -163,8 +162,8 @@ export function AppSidebar() {
   const sidebarDesktopContent = (
     <>
       <div className={cn(
-        "flex h-16 items-center border-b border-border", // Base styles
-        (!isMobile && state === 'collapsed') ? 'justify-center px-0' : 'px-0' // Centering and padding logic for collapsed/expanded
+        "flex h-16 items-center border-b border-border justify-center", 
+        (!isMobile && state === 'collapsed') ? 'px-0' : 'px-0' 
       )}>
          <AppLogo />
       </div>
