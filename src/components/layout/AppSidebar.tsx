@@ -31,26 +31,28 @@ import { useState } from "react";
 
 function AppLogo() {
   const { state, isMobile } = useSidebar();
+  const isCollapsedAndNotMobile = state === 'collapsed' && !isMobile;
+
   return (
-    <Link 
-      href="/dashboard" 
+    <Link
+      href="/dashboard"
       className={cn(
-        "flex items-center gap-2 font-headline text-lg font-semibold tracking-tight text-primary",
-        state === 'collapsed' && !isMobile ? "w-full justify-center" : "" 
+        "flex items-center font-headline text-lg font-semibold tracking-tight text-primary",
+        // When collapsed, the parent div already centers this Link.
+        // The Link itself needs to center its content (the Image).
+        // w-full h-full helps ensure the justify-center and items-center apply correctly to the image.
+        isCollapsedAndNotMobile ? "justify-center w-full h-full" : "gap-2 px-4" 
       )}
     >
-       <Image 
-        src="/logo2.png" 
-        alt="Ardalas Logo" 
+      <Image
+        src="/logo2.png"
+        alt="Ardalas Logo"
         width={52} 
         height={52} 
-        data-ai-hint="logo company" 
+        data-ai-hint="logo company"
+        // No explicit rounding classes are applied here.
+        // If logo2.png has its own transparency or shape, that will be shown.
       />
-      {/* Text logo can be added here if needed, hidden when collapsed:
-      {(!isMobile && state !== 'collapsed') && (
-        <span>Ardalas</span>
-      )}
-      */}
     </Link>
   );
 }
@@ -160,7 +162,10 @@ export function AppSidebar() {
 
   const sidebarDesktopContent = (
     <>
-      <div className={cn("flex h-16 items-center border-b border-border", !isMobile && state === 'collapsed' ? 'justify-center' : 'px-4')}>
+      <div className={cn(
+        "flex h-16 items-center border-b border-border", // Base styles
+        (!isMobile && state === 'collapsed') ? 'justify-center px-0' : 'px-0' // Centering and padding logic for collapsed/expanded
+      )}>
          <AppLogo />
       </div>
       <SidebarContent className="flex-1"> 
