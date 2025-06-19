@@ -300,7 +300,14 @@ export function AppHeader() {
         {isMobile && (
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
-              <Image src="/hamburger.png" alt="Menu" width={20} height={20} data-ai-hint="menu icon" />
+              <Image 
+                src="/hamburger.png" 
+                alt="Menu" 
+                width={20} 
+                height={20} 
+                data-ai-hint="menu icon"
+                className="dark:invert dark:brightness-95" 
+              />
               <span className="sr-only">Toggle Sidebar</span>
             </Button>
           </SheetTrigger>
