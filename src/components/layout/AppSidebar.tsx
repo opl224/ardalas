@@ -36,7 +36,7 @@ function AppLogo() {
       href="/dashboard" 
       className={cn(
         "flex items-center gap-2 font-headline text-lg font-semibold tracking-tight text-primary",
-        !isMobile && state === 'collapsed' ? 'justify-center' : 'px-4' // Adjusted padding for collapsed state
+        !isMobile && state === 'collapsed' ? 'justify-center' : '' 
       )}
     >
        <Image 
@@ -67,7 +67,7 @@ export function AppSidebar() {
     setOpenSubmenu(prevOpenTitle => (prevOpenTitle === title ? null : title));
   };
 
-  const renderNavItemsRecursive = (items: NavItem[], currentPath: string, userRole: string | null, isSubMenuParam = false) => {
+  const renderNavItemsRecursive = (items: NavItem[], currentPath: string, userRole: string | null, isSubMenuParam = false, parentTitle: string | null = null) => {
     return items
       .filter(item => !item.roles || (userRole && item.roles.includes(userRole as any)))
       .map((item) => {
@@ -93,7 +93,7 @@ export function AppSidebar() {
                 onClick={() => toggleSubmenu(item.title)}
                 isActive={isActive} 
                 className={cn(
-                  "w-full justify-between hover:underline",
+                  "w-full justify-between",
                   (isActive) && "bg-sidebar-accent text-sidebar-accent-foreground dark:bg-sidebar-accent dark:text-sidebar-accent-foreground"
                 )}
                 tooltip={item.title}
@@ -110,7 +110,7 @@ export function AppSidebar() {
                   isCurrentSubmenuOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0 pointer-events-none"
                 )}
               >
-                {renderNavItemsRecursive(item.children, currentPath, userRole, true)}
+                {renderNavItemsRecursive(item.children, currentPath, userRole, true, item.title)}
               </SidebarMenuSub>
             </ItemComponent>
           );
@@ -121,7 +121,7 @@ export function AppSidebar() {
                 asChild
                 isActive={isActive}
                 className={cn(
-                  "w-full hover:underline",
+                  "w-full",
                   !isMobile && state === 'collapsed' ? "justify-center" : "justify-start",
                   isActive && "bg-sidebar-accent text-sidebar-accent-foreground dark:bg-sidebar-accent dark:text-sidebar-accent-foreground"
                 )}
@@ -129,7 +129,7 @@ export function AppSidebar() {
               >
                 <Link href={item.href} onClick={() => { 
                   if (isMobile) setOpenMobile(false);
-                  if (!isSubMenuParam) { // Only close submenu if it's a top-level item
+                  if (!isSubMenuParam) { // Only close submenu if it's a top-level item that doesn't have its own children
                     setOpenSubmenu(null);
                   }
                 }}>
@@ -162,7 +162,7 @@ export function AppSidebar() {
          <AppLogo />
       </div>
       <SidebarContent className="flex-1"> 
-        <ScrollArea className="h-full w-full p-2"> 
+        <ScrollArea className="h-full w-full p-2"> {/* Added padding p-2 here */}
           <SidebarMenu>
             {renderNavItemsRecursive(navItems, pathname, role)}
           </SidebarMenu>
@@ -174,7 +174,7 @@ export function AppSidebar() {
             <SidebarMenuItem>
               <SidebarMenuButton 
                 onClick={handleLogout} 
-                className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive hover:underline"
+                className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                 tooltip="Logout"
               >
                 <LogOut className="h-5 w-5 shrink-0" />
@@ -202,7 +202,7 @@ export function AppSidebar() {
           <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
         <SidebarContent className="flex-1"> 
-          <ScrollArea className="h-full w-full p-2"> 
+          <ScrollArea className="h-full w-full p-2"> {/* Added padding p-2 here */}
             <SidebarMenu>
               {renderNavItemsRecursive(navItems, pathname, role)}
             </SidebarMenu>
@@ -214,7 +214,7 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={handleLogout} 
-                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive hover:underline"
+                  className="justify-start w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
                 >
                   <LogOut className="h-5 w-5 shrink-0" />
                   <span className="truncate">Logout</span>
