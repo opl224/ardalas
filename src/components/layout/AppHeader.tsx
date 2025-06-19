@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/components/ui/sidebar"; 
 import { SheetTrigger } from "@/components/ui/sheet"; 
 import { useState, useEffect, type ReactNode } from "react";
+import Image from "next/image"; // Added Image import
 import {
   collection,
   query,
@@ -299,7 +300,7 @@ export function AppHeader() {
         {isMobile && (
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
-              <PanelLeft className="h-5 w-5" />
+              <Image src="/hamburger.png" alt="Menu" width={20} height={20} data-ai-hint="menu icon" />
               <span className="sr-only">Toggle Sidebar</span>
             </Button>
           </SheetTrigger>
