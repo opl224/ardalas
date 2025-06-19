@@ -782,7 +782,7 @@ export default function UserAdministrationPage() {
                   {currentTableData.map((user, index) => (
                     <TableRow key={user.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
+                      <TableCell className={cn("font-medium", isMobile && "truncate")} title={user.name}>{user.name}</TableCell>
                       {!isMobile && <TableCell className="truncate" title={user.email}>{user.email}</TableCell>}
                       <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
                       {!isMobile && (
