@@ -40,10 +40,10 @@ function AppLogo() {
       )}
     >
        <Image 
-        src="/logo2.ico" 
+        src="/logo2.png" 
         alt="Ardalas Logo" 
-        width={40} 
-        height={40} 
+        width={36} // Adjusted width
+        height={36} // Adjusted height
         data-ai-hint="logo company" 
         className={cn(
           !isMobile && state === 'collapsed' ? 'mx-auto' : ''
@@ -129,7 +129,10 @@ export function AppSidebar() {
               >
                 <Link href={item.href} onClick={() => { 
                   if (isMobile) setOpenMobile(false);
-                  if (!isSubMenuParam) { // Only close submenu if it's a top-level item that doesn't have its own children
+                  // Only close submenu if the clicked item is a top-level one without its own children
+                  // OR if it's a direct child of a submenu (isSubMenuParam is true),
+                  // but its parent menu should remain open.
+                  if (!hasChildren && !isSubMenuParam) { 
                     setOpenSubmenu(null);
                   }
                 }}>
@@ -202,7 +205,7 @@ export function AppSidebar() {
           <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
         <SidebarContent className="flex-1"> 
-          <ScrollArea className="h-full w-full p-2"> {/* Added padding p-2 here */}
+          <ScrollArea className="h-full w-full p-2"> 
             <SidebarMenu>
               {renderNavItemsRecursive(navItems, pathname, role)}
             </SidebarMenu>

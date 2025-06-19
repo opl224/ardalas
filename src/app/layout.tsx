@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'Ardalas - Sistem Informasi Sekolah',
   description: 'Aplikasi web manajemen sistem informasi sekolah terintegrasi.',
   icons: {
-    icon: '/logo2.ico',
+    icon: '/logo2.png', // Changed from .ico to .png
   },
 };
 
