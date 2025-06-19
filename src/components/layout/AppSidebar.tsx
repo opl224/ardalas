@@ -36,7 +36,7 @@ function AppLogo() {
       href="/dashboard" 
       className={cn(
         "flex items-center gap-2 font-headline text-lg font-semibold tracking-tight text-primary",
-        !isMobile && state === 'collapsed' ? 'justify-center px-0' : 'px-10' 
+        !isMobile && state === 'collapsed' ? 'justify-center' : 'px-4' // Adjusted padding for collapsed state
       )}
     >
        <Image 
@@ -127,7 +127,12 @@ export function AppSidebar() {
                 )}
                 tooltip={item.title}
               >
-                <Link href={item.href} onClick={() => { if (isMobile) setOpenMobile(false); setOpenSubmenu(null); }}>
+                <Link href={item.href} onClick={() => { 
+                  if (isMobile) setOpenMobile(false);
+                  if (!isSubMenuParam) { // Only close submenu if it's a top-level item
+                    setOpenSubmenu(null);
+                  }
+                }}>
                   <item.icon className="h-5 w-5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                   {item.label && <span className="ml-auto text-xs">{item.label}</span>}
@@ -153,7 +158,7 @@ export function AppSidebar() {
 
   const sidebarDesktopContent = (
     <>
-      <div className={cn("flex h-16 items-center border-b border-border", !isMobile && state === 'collapsed' ? 'px-0' : 'px-4')}>
+      <div className={cn("flex h-16 items-center border-b border-border", !isMobile && state === 'collapsed' ? 'justify-center' : 'px-4')}>
          <AppLogo />
       </div>
       <SidebarContent className="flex-1"> 
