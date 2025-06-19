@@ -11,8 +11,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Montserrat Alternates', 'sans-serif'],
-        headline: ['Montserrat Alternates', 'sans-serif'],
+        body: ['Sulphur Point', 'sans-serif'],
+        headline: ['Sulphur Point', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
