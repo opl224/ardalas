@@ -82,6 +82,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 
 interface TeacherMin { 
@@ -136,6 +137,7 @@ export default function ClassesPage() {
   const [isLoadingStudentsInClass, setIsLoadingStudentsInClass] = useState(false);
 
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
 
   const addClassForm = useForm<ClassFormValues>({
     resolver: zodResolver(classFormSchema),
@@ -555,22 +557,22 @@ export default function ClassesPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table>
+              <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Nama Kelas</TableHead>
-                    <TableHead>Wali Kelas</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    <TableHead className={cn("w-[50px]", isMobile && "w-10 px-2 text-center")}>No.</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "")}>Nama Kelas</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "")}>Wali Kelas</TableHead>
+                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((classItem, index) => (
                     <TableRow key={classItem.id}>
-                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className="font-medium">{classItem.name}</TableCell>
-                      <TableCell>{classItem.teacherName || "-"}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className={cn("font-medium", isMobile ? "truncate px-2" : "")} title={classItem.name}>{classItem.name}</TableCell>
+                      <TableCell className={cn(isMobile ? "truncate px-2" : "")} title={classItem.teacherName || "-"}>{classItem.teacherName || "-"}</TableCell>
+                      <TableCell className={cn("text-right", isMobile && "px-1")}>
                         {authRole === "guru" || authRole === "orangtua" ? (
                            <Button
                             variant="outline"
