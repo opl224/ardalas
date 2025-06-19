@@ -31,9 +31,8 @@ import { useState } from "react";
 
 function AppLogo() {
   return (
-    <Link href="/dashboard" className="flex items-center gap-2 px-2 font-headline text-lg font-semibold tracking-tight text-primary">
-       <Image src="/logo.png" alt="Ardalas Logo" width={28} height={28} data-ai-hint="logo company" />
-      <span>Ardalas</span>
+    <Link href="/dashboard" className="flex items-center gap-2 px-10 font-headline text-lg font-semibold tracking-tight text-primary">
+       <Image src="/logo2.png" alt="Ardalas Logo" width={120} height={28} data-ai-hint="logo company" />
     </Link>
   );
 }

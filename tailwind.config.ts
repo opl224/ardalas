@@ -1,3 +1,4 @@
+
 import type {Config} from 'tailwindcss';
 
 export default {
@@ -10,8 +11,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Poppins', 'sans-serif'],
-        headline: ['Poppins', 'sans-serif'],
+        body: ['Montserrat Alternates', 'sans-serif'],
+        headline: ['Montserrat Alternates', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
