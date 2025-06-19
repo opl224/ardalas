@@ -25,7 +25,7 @@ import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase/config";
 import { updateProfile, type User as FirebaseUserType } from "firebase/auth";
-import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, Timestamp, updateDoc } from "firebase/firestore"; // Added updateDoc
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -330,7 +330,7 @@ export default function ProfilePage() {
       </Card>
 
       <Dialog open={isStudentDetailDialogOpen} onOpenChange={setIsStudentDetailDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Detail Data Siswa</DialogTitle>
             <DialogDescription>
@@ -343,7 +343,7 @@ export default function ProfilePage() {
                 <span className="ml-2">Memuat data detail...</span>
             </div>
           ) : detailedStudentData ? (
-            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
               <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{detailedStudentData.name || "-"}</p></div>
               <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{detailedStudentData.nis || "-"}</p></div>
               <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{detailedStudentData.email || "-"}</p></div>
@@ -356,10 +356,10 @@ export default function ProfilePage() {
                 </p>
               </div>
               <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{detailedStudentData.gender || "-"}</p></div>
-              <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{detailedStudentData.address || "-"}</p></div>
               <div><Label className="text-muted-foreground">Orang Tua Terhubung:</Label><p className="font-medium">{detailedStudentData.parentName || "-"}</p></div>
+              <div className="md:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{detailedStudentData.address || "-"}</p></div>
               {detailedStudentData.createdAt && (
-                <div>
+                <div className="md:col-span-2">
                   <Label className="text-muted-foreground">Tanggal Profil Dibuat:</Label>
                   <p className="font-medium">{format(detailedStudentData.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
                 </div>
@@ -380,3 +380,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
