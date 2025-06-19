@@ -6,10 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check, LinkIcon } from "lucide-react";
+import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check, LinkIcon, Info, UserSquare2 } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { roleDisplayNames } from "@/config/roles";
-import type { Metadata } from 'next';
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import {
@@ -26,15 +25,11 @@ import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase/config";
 import { updateProfile, type User as FirebaseUserType } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { cn } from "@/lib/utils";
-
-// Metadata tidak bisa diekspor dari client component secara langsung, 
-// akan lebih baik jika diatur oleh layout induk jika diperlukan secara statis.
-// export const metadata: Metadata = {
-//   title: 'Profil Pengguna - Ardalas',
-//   description: 'Lihat dan kelola informasi profil Anda.',
-// };
+import { format } from "date-fns";
+import { id as indonesiaLocale } from "date-fns/locale";
+import { Label } from "@/components/ui/label";
 
 const localAvatars = [
     { src: '/avatars/laki-laki.png', hint: 'avatar male', alt: 'Avatar Laki-laki'},
@@ -53,13 +48,30 @@ const localAvatars = [
     { src: '/avatars/p-sains.png', hint: 'Sains female avatar', alt: 'Avatar Sains Perempuan' },
 ];
 
+interface DetailedStudentData {
+  name?: string;
+  nis?: string;
+  email?: string;
+  className?: string;
+  dateOfBirth?: Timestamp;
+  gender?: "laki-laki" | "perempuan";
+  address?: string;
+  parentName?: string;
+  attendanceNumber?: number;
+  createdAt?: Timestamp;
+}
 
 export default function ProfilePage() {
-  const { user, loading, role, refreshUser } = useAuth(); 
+  const { user, loading, role, refreshUser } = useAuth();
   const { toast } = useToast();
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [selectedAvatarUrlInDialog, setSelectedAvatarUrlInDialog] = useState<string | null>(null);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+
+  const [isStudentDetailDialogOpen, setIsStudentDetailDialogOpen] = useState(false);
+  const [detailedStudentData, setDetailedStudentData] = useState<DetailedStudentData | null>(null);
+  const [isLoadingStudentDetail, setIsLoadingStudentDetail] = useState(false);
+
 
   useEffect(() => {
     if (user?.photoURL) {
@@ -97,11 +109,11 @@ export default function ProfilePage() {
       await updateProfile(auth.currentUser as FirebaseUserType, { photoURL: selectedAvatarUrlInDialog });
       const userDocRef = doc(db, "users", user.uid);
       await updateDoc(userDocRef, { photoURL: selectedAvatarUrlInDialog });
-      
+
       if (refreshUser) {
-        await refreshUser(); 
+        await refreshUser();
       }
-      
+
       toast({ title: "Sukses", description: "Avatar berhasil diperbarui." });
       setIsAvatarDialogOpen(false);
     } catch (error) {
@@ -110,6 +122,44 @@ export default function ProfilePage() {
     } finally {
       setIsUpdatingAvatar(false);
     }
+  };
+
+  const fetchDetailedStudentData = async () => {
+    if (!user || role !== 'siswa') return;
+    setIsLoadingStudentDetail(true);
+    try {
+      const studentDocRef = doc(db, "users", user.uid);
+      const studentDocSnap = await getDoc(studentDocRef);
+      if (studentDocSnap.exists()) {
+        const data = studentDocSnap.data();
+        setDetailedStudentData({
+          name: data.name,
+          nis: data.nis,
+          email: data.email,
+          className: data.className,
+          dateOfBirth: data.dateOfBirth,
+          gender: data.gender,
+          address: data.address,
+          parentName: data.parentName,
+          attendanceNumber: data.attendanceNumber,
+          createdAt: data.createdAt,
+        });
+      } else {
+        toast({ title: "Data Tidak Ditemukan", description: "Detail data siswa tidak ditemukan.", variant: "destructive" });
+        setDetailedStudentData(null);
+      }
+    } catch (error) {
+      console.error("Error fetching detailed student data:", error);
+      toast({ title: "Error", description: "Gagal memuat detail data siswa.", variant: "destructive" });
+      setDetailedStudentData(null);
+    } finally {
+      setIsLoadingStudentDetail(false);
+    }
+  };
+
+  const handleOpenStudentDetailDialog = () => {
+    fetchDetailedStudentData();
+    setIsStudentDetailDialogOpen(true);
   };
 
 
@@ -159,7 +209,7 @@ export default function ProfilePage() {
             </Avatar>
             <Dialog open={isAvatarDialogOpen} onOpenChange={(open) => {
               setIsAvatarDialogOpen(open);
-              if (!open) setSelectedAvatarUrlInDialog(user.photoURL || (localAvatars.length > 0 ? localAvatars[0].src : null)); 
+              if (!open) setSelectedAvatarUrlInDialog(user.photoURL || (localAvatars.length > 0 ? localAvatars[0].src : null));
             }}>
               <DialogTrigger asChild>
                 <Button
@@ -176,7 +226,7 @@ export default function ProfilePage() {
                 <DialogHeader>
                   <DialogTitle>Pilih Avatar Baru</DialogTitle>
                   <DialogDescription>
-                    Klik pada salah satu avatar di bawah ini untuk memilihnya. Pastikan gambar tersedia di folder public/avatars.
+                    Klik pada salah satu avatar di bawah ini untuk memilihnya.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 py-4 max-h-[60vh] overflow-y-auto">
@@ -243,7 +293,7 @@ export default function ProfilePage() {
               <p className="font-medium">{role ? roleDisplayNames[role] : "-"}</p>
             </div>
           </div>
-          
+
           {user.role === 'siswa' && user.className && (
             <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-md">
               <School className="h-6 w-6 text-muted-foreground" />
@@ -265,13 +315,68 @@ export default function ProfilePage() {
                 </div>
             </div>
           )}
+
+          {role === 'siswa' && (
+            <Button onClick={handleOpenStudentDetailDialog} variant="outline" className="w-full mt-4">
+                <UserSquare2 className="mr-2 h-4 w-4" />
+                Lihat Detail Data Saya
+            </Button>
+          )}
+
            <p className="text-xs text-muted-foreground text-center pt-2">
             Untuk perubahan data sensitif lainnya, silakan hubungi Administrator.
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={isStudentDetailDialogOpen} onOpenChange={setIsStudentDetailDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detail Data Siswa</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap mengenai data diri Anda sebagai siswa.
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingStudentDetail ? (
+            <div className="flex justify-center items-center py-8">
+                <LottieLoader width={48} height={48} />
+                <span className="ml-2">Memuat data detail...</span>
+            </div>
+          ) : detailedStudentData ? (
+            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+              <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{detailedStudentData.name || "-"}</p></div>
+              <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{detailedStudentData.nis || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{detailedStudentData.email || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{detailedStudentData.className || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Nomor Absen:</Label><p className="font-medium">{detailedStudentData.attendanceNumber ?? "-"}</p></div>
+              <div>
+                <Label className="text-muted-foreground">Tanggal Lahir:</Label>
+                <p className="font-medium">
+                  {detailedStudentData.dateOfBirth ? format(detailedStudentData.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "-"}
+                </p>
+              </div>
+              <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{detailedStudentData.gender || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{detailedStudentData.address || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Orang Tua Terhubung:</Label><p className="font-medium">{detailedStudentData.parentName || "-"}</p></div>
+              {detailedStudentData.createdAt && (
+                <div>
+                  <Label className="text-muted-foreground">Tanggal Profil Dibuat:</Label>
+                  <p className="font-medium">{format(detailedStudentData.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+                <Info className="mx-auto h-10 w-10 mb-2" />
+                Tidak dapat memuat detail data siswa.
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
-
-
