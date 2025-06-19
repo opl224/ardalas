@@ -203,7 +203,7 @@ export default function ProfilePage() {
       <Card className="max-w-2xl mx-auto bg-card/80 backdrop-blur-md border shadow-lg">
         <CardHeader className="items-center text-center pb-4 border-b">
           <div className="relative">
-            <Avatar className="h-24 w-24 mb-3 border-2 border-primary transition-opacity">
+            <Avatar className="h-24 w-24 mb-3 border-2 border-accent transition-opacity">
               <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile picture" />
               <AvatarFallback className="text-3xl bg-muted">{getInitials(user.displayName)}</AvatarFallback>
             </Avatar>
