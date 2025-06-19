@@ -280,7 +280,8 @@ export default function ExamsPage() {
       if (role === "admin") { 
         await fetchAdminDropdownData();
       } else if (role === "guru" && (allSubjects.length === 0 || allClasses.length === 0)) {
-        await fetchAdminDropdownData();
+        // This ensures dropdowns are populated if guru goes here directly or if admin data wasn't needed before.
+        await fetchAdminDropdownData(); 
       }
 
       const examsCollectionRef = collection(db, "exams");
@@ -654,13 +655,7 @@ export default function ExamsPage() {
             <h1 className="text-3xl font-bold font-headline">Manajemen Ujian</h1>
             <p className="text-muted-foreground">Kelola jadwal ujian, input soal, dan pelaksanaan ujian.</p>
         </div>
-        {role === 'siswa' && (
-            <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link href="/assignments">
-                    <BookCopy className="mr-2 h-4 w-4" /> Lihat Daftar Tugas
-                </Link>
-            </Button>
-        )}
+        {/* Tombol Lihat Daftar Tugas dihapus untuk role siswa */}
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
