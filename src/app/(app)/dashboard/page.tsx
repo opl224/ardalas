@@ -138,7 +138,7 @@ export default function DashboardPage() {
           const [studentSnap, teacherUserSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
-            getDocs(parentUserSnap),
+            getDocs(parentUserQuery), // Corrected line
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
