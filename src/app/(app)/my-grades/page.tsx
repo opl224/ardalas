@@ -22,8 +22,8 @@ import {
   Timestamp,
   orderBy,
 } from "firebase/firestore";
-import { useState, useEffect, useMemo } from "react";
-import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Download, FileDown, Hourglass } from "lucide-react"; // Added Hourglass
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Download, FileDown, Hourglass, RefreshCw } from "lucide-react"; 
 import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -91,125 +91,127 @@ export default function MyGradesPage() {
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchMyGrades = async () => {
-      if (authLoading || !user) {
-        setIsLoading(false);
+  const fetchMyGrades = useCallback(async () => {
+    if (authLoading || !user) {
+      setIsLoading(true); 
+      setAllGrades([]);
+      setGroupedGrades([]);
+      setIsLoading(false);
+      return;
+    }
+
+    const studentAuthId = role === "siswa" ? user.uid : user.linkedStudentId;
+
+    if (!studentAuthId) {
+      setIsLoading(true); 
+      setAllGrades([]);
+      setGroupedGrades([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const resultsQuery = query(
+        collection(db, "results"),
+        where("studentId", "==", studentAuthId),
+        orderBy("dateOfAssessment", "desc")
+      );
+      const resultsSnapshot = await getDocs(resultsQuery);
+      const fetchedResultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResultDocData));
+
+      if (fetchedResultsData.length === 0) {
         setAllGrades([]);
         setGroupedGrades([]);
+        setIsLoading(false);
         return;
       }
 
-      const studentAuthId = role === "siswa" ? user.uid : user.linkedStudentId;
+      const assignmentIdsWithSubmissionsToFetch = fetchedResultsData
+        .map(r => r.assignmentId)
+        .filter((id): id is string => !!id);
 
-      if (!studentAuthId) {
-        setIsLoading(false);
-        setAllGrades([]);
-        setGroupedGrades([]);
-        return;
-      }
-
-      setIsLoading(true);
-      try {
-        const resultsQuery = query(
-          collection(db, "results"),
-          where("studentId", "==", studentAuthId),
-          orderBy("dateOfAssessment", "desc")
-        );
-        const resultsSnapshot = await getDocs(resultsQuery);
-        const fetchedResultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResultDocData));
-
-        if (fetchedResultsData.length === 0) {
-          setAllGrades([]);
-          setGroupedGrades([]);
-          setIsLoading(false);
-          return;
+      const submissionsMap = new Map<string, { submissionLink?: string }>();
+      if (assignmentIdsWithSubmissionsToFetch.length > 0) {
+        const submissionsPromises = [];
+        for (let i = 0; i < assignmentIdsWithSubmissionsToFetch.length; i += 30) {
+          const chunk = assignmentIdsWithSubmissionsToFetch.slice(i, i + 30);
+          submissionsPromises.push(
+            getDocs(query(
+              collection(db, "assignmentSubmissions"),
+              where("studentId", "==", studentAuthId),
+              where("assignmentId", "in", chunk)
+            ))
+          );
         }
-
-        const assignmentIdsWithSubmissionsToFetch = fetchedResultsData
-          .map(r => r.assignmentId)
-          .filter((id): id is string => !!id);
-
-        const submissionsMap = new Map<string, { submissionLink?: string }>();
-        if (assignmentIdsWithSubmissionsToFetch.length > 0) {
-          const submissionsPromises = [];
-          for (let i = 0; i < assignmentIdsWithSubmissionsToFetch.length; i += 30) {
-            const chunk = assignmentIdsWithSubmissionsToFetch.slice(i, i + 30);
-            submissionsPromises.push(
-              getDocs(query(
-                collection(db, "assignmentSubmissions"),
-                where("studentId", "==", studentAuthId),
-                where("assignmentId", "in", chunk)
-              ))
-            );
-          }
-          const submissionsSnapshots = await Promise.all(submissionsPromises);
-          submissionsSnapshots.forEach(snapshot => {
-            snapshot.forEach(doc => {
-              const subData = doc.data();
-              if (subData.assignmentId) {
-                submissionsMap.set(subData.assignmentId, { submissionLink: subData.submissionLink });
-              }
-            });
+        const submissionsSnapshots = await Promise.all(submissionsPromises);
+        submissionsSnapshots.forEach(snapshot => {
+          snapshot.forEach(doc => {
+            const subData = doc.data();
+            if (subData.assignmentId) {
+              submissionsMap.set(subData.assignmentId, { submissionLink: subData.submissionLink });
+            }
           });
-        }
-
-        const finalGradesData: MyGradeEntry[] = fetchedResultsData.map(result => {
-          let submissionLinkEntry: string | undefined = undefined;
-          if (result.assignmentId && submissionsMap.has(result.assignmentId)) {
-            submissionLinkEntry = submissionsMap.get(result.assignmentId)?.submissionLink;
-          }
-          return {
-            id: result.id,
-            assessmentTitle: result.assessmentTitle,
-            assessmentType: result.assessmentType,
-            subjectName: result.subjectName,
-            score: result.score,
-            maxScore: result.maxScore,
-            dateOfAssessment: result.dateOfAssessment,
-            teacherFeedback: result.feedback,
-            assignmentId: result.assignmentId,
-            meetingNumber: result.meetingNumber,
-            submissionLink: submissionLinkEntry,
-            isSentToStudent: result.isSentToStudent ?? false,
-          };
         });
-        setAllGrades(finalGradesData);
-
-        const subjectMap = new Map<string, MyGradeEntry[]>();
-        finalGradesData.forEach(grade => {
-          const key = grade.subjectName || "Tanpa Mata Pelajaran";
-          if (!subjectMap.has(key)) {
-            subjectMap.set(key, []);
-          }
-          subjectMap.get(key)!.push(grade);
-        });
-
-        const studentNameDisplay = role === "siswa" ? user?.displayName : user?.linkedStudentName;
-        const newGroupedGrades: GroupedGradeDisplay[] = Array.from(subjectMap.entries()).map(([subject, results]) => ({
-          subjectName: subject,
-          studentName: studentNameDisplay || "Siswa",
-          resultsForThisSubject: results,
-        }));
-        setGroupedGrades(newGroupedGrades);
-
-
-      } catch (error) {
-        console.error("Error fetching student grades:", error);
-        toast({ title: "Gagal Memuat Hasil Belajar", variant: "destructive" });
-      } finally {
-        setIsLoading(false);
       }
-    };
 
+      const finalGradesData: MyGradeEntry[] = fetchedResultsData.map(result => {
+        let submissionLinkEntry: string | undefined = undefined;
+        if (result.assignmentId && submissionsMap.has(result.assignmentId)) {
+          submissionLinkEntry = submissionsMap.get(result.assignmentId)?.submissionLink;
+        }
+        return {
+          id: result.id,
+          assessmentTitle: result.assessmentTitle,
+          assessmentType: result.assessmentType,
+          subjectName: result.subjectName,
+          score: result.score,
+          maxScore: result.maxScore,
+          dateOfAssessment: result.dateOfAssessment,
+          teacherFeedback: result.feedback,
+          assignmentId: result.assignmentId,
+          meetingNumber: result.meetingNumber,
+          submissionLink: submissionLinkEntry,
+          isSentToStudent: result.isSentToStudent ?? false,
+        };
+      });
+      setAllGrades(finalGradesData);
+
+      const subjectMap = new Map<string, MyGradeEntry[]>();
+      finalGradesData.forEach(grade => {
+        const key = grade.subjectName || "Tanpa Mata Pelajaran";
+        if (!subjectMap.has(key)) {
+          subjectMap.set(key, []);
+        }
+        subjectMap.get(key)!.push(grade);
+      });
+
+      const studentNameDisplay = role === "siswa" ? user?.displayName : user?.linkedStudentName;
+      const newGroupedGrades: GroupedGradeDisplay[] = Array.from(subjectMap.entries()).map(([subject, results]) => ({
+        subjectName: subject,
+        studentName: studentNameDisplay || "Siswa",
+        resultsForThisSubject: results,
+      }));
+      setGroupedGrades(newGroupedGrades);
+
+    } catch (error) {
+      console.error("Error fetching student grades:", error);
+      toast({ title: "Gagal Memuat Hasil Belajar", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [authLoading, user, role, toast]);
+
+
+  useEffect(() => {
     if (!authLoading && user) {
         fetchMyGrades();
     } else if (!authLoading && !user) {
-        setIsLoading(false);
+        setIsLoading(false); // Ensure loading is false if no user
         setAllGrades([]);
         setGroupedGrades([]);
     }
-  }, [authLoading, user, role, toast]);
+  }, [authLoading, user, fetchMyGrades]);
 
 
   const handleDownloadBySubjectAndType = (subjectName: string, assessmentType: AssessmentTypeMyGrades, studentName: string, resultsForType: MyGradeEntry[]) => {
@@ -240,100 +242,18 @@ export default function MyGradesPage() {
       head: [['Judul', 'Nilai', 'Tanggal Penilaian', 'Komentar Guru', 'Link Tugas']],
       body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: [64, 149, 237] },
+      headStyles: { fillColor: [64, 149, 237] }, // Cornflower Blue
       columnStyles: {
-        0: { cellWidth: 50 }, // Judul
-        1: { cellWidth: 15 }, // Nilai
-        2: { cellWidth: 25 }, // Tanggal
-        3: { cellWidth: 'auto' }, // Komentar
-        4: { cellWidth: 30 }, // Link
+        0: { cellWidth: 50 }, 
+        1: { cellWidth: 15 }, 
+        2: { cellWidth: 25 }, 
+        3: { cellWidth: 'auto' }, 
+        4: { cellWidth: 30 }, 
       }
     });
 
     doc.save(fileName);
     toast({title: "Unduhan Dimulai", description: `${fileName} sedang diunduh.`});
-  };
-
-
-  const handleExportAllMyGrades = async (formatType: 'xlsx' | 'pdf') => {
-    if (allGrades.length === 0) {
-      toast({ title: "Tidak Ada Data", description: "Tidak ada hasil belajar untuk diekspor.", variant: "info" });
-      return;
-    }
-    setIsExporting(true);
-    const studentName = role === "siswa" ? user?.displayName : user?.linkedStudentName;
-    const fileNameBase = `Semua_Hasil_Belajar_${studentName?.replace(/\s+/g, '_') || 'Siswa'}`;
-
-    const dataToExport = allGrades
-      .filter(grade => grade.isSentToStudent === true) // Only export sent grades
-      .map((grade, index) => ({
-        "No.": index + 1,
-        "Judul Asesmen/Tugas": `${grade.assessmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`,
-        "Mata Pelajaran": grade.subjectName || "-",
-        "Tipe Asesmen": grade.assessmentType || "-",
-        "Nilai": grade.score ?? "Belum Dinilai",
-        "Komentar Guru": grade.teacherFeedback || "-",
-        "Tanggal Dinilai": grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }) : "-",
-        "Link Tugas": grade.submissionLink || "Tidak Ada",
-      }));
-
-    if (dataToExport.length === 0) {
-      toast({ title: "Tidak Ada Hasil Terkirim", description: "Tidak ada hasil belajar yang sudah dikirim oleh guru untuk diekspor.", variant: "info" });
-      setIsExporting(false);
-      return;
-    }
-
-    try {
-      if (formatType === 'xlsx') {
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Belajar");
-
-        XLSX.utils.sheet_add_aoa(worksheet, [
-          [`Laporan Semua Hasil Belajar (Terkirim) - ${studentName || 'Siswa'}`],
-          [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
-          []
-        ], { origin: "A1" });
-
-        const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
-        worksheet['!cols'] = cols;
-
-        XLSX.writeFile(workbook, `${fileNameBase}_Terkirim.xlsx`);
-        toast({ title: "Ekspor Excel Berhasil", description: `${fileNameBase}_Terkirim.xlsx telah diunduh.` });
-      } else if (formatType === 'pdf') {
-        const doc = new jsPDF({ orientation: 'landscape' });
-        doc.setFontSize(16);
-        doc.text(`Laporan Semua Hasil Belajar (Terkirim) - ${studentName || 'Siswa'}`, 14, 15);
-        doc.setFontSize(10);
-        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, 22);
-
-        autoTable(doc, {
-          startY: 30,
-          head: [Object.keys(dataToExport[0])],
-          body: dataToExport.map(row => Object.values(row)),
-          theme: 'grid',
-          headStyles: { fillColor: [22, 160, 133] },
-          styles: { fontSize: 7, cellPadding: 1.5 },
-          columnStyles: {
-            0: { cellWidth: 8 },
-            1: { cellWidth: 40 },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 25 },
-            4: { cellWidth: 12 },
-            5: { cellWidth: 40 },
-            6: { cellWidth: 20 },
-            7: { cellWidth: 'auto' },
-          }
-        });
-        doc.save(`${fileNameBase}_Terkirim.pdf`);
-        toast({ title: "Ekspor PDF Berhasil", description: `${fileNameBase}_Terkirim.pdf telah diunduh.` });
-      }
-    } catch (error) {
-      console.error("Error exporting grades:", error);
-      toast({ title: `Gagal Mengekspor ke ${formatType.toUpperCase()}`, variant: "destructive" });
-    } finally {
-      setIsExporting(false);
-    }
   };
 
 
@@ -401,31 +321,16 @@ export default function MyGradesPage() {
           <h1 className="text-3xl font-bold font-headline">{pageTitleText}</h1>
           <p className="text-muted-foreground">Daftar nilai dan umpan balik dari semua asesmen.</p>
         </div>
-        {allGrades.filter(g => g.isSentToStudent).length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={isExporting}>
-                {isExporting && <LottieLoader width={16} height={16} className="mr-2" />}
-                <FileDown className="mr-2 h-4 w-4" /> Ekspor Hasil Terkirim
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExportAllMyGrades('xlsx')} disabled={isExporting}>
-                Excel (.xlsx)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportAllMyGrades('pdf')} disabled={isExporting}>
-                PDF (.pdf)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-xl">
             <BarChart3 className="h-6 w-6 text-primary" />
             <span>{cardTitleText}</span>
           </CardTitle>
+          <Button onClick={fetchMyGrades} variant="outline" size="icon" aria-label="Refresh data hasil belajar">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           {groupedGrades.length > 0 ? (
@@ -458,8 +363,8 @@ export default function MyGradesPage() {
                         <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={group.subjectName}>
                             {group.subjectName}
                         </TableCell>
-                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
-                            {sentAssessmentTypes.length > 0 ? (
+                        <TableCell className={cn("text-right", isMobile ? "px-1" : "h-10")}> 
+                          {sentAssessmentTypes.length > 0 ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${group.subjectName}`}>
@@ -484,9 +389,9 @@ export default function MyGradesPage() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                             ) : (
-                              <div className="flex items-center justify-end text-muted-foreground" title="Belum ada hasil terkirim">
+                              <Button variant="ghost" size="icon" disabled className="text-muted-foreground opacity-100 cursor-default" title="Belum ada hasil terkirim">
                                 <Hourglass className="h-4 w-4" />
-                              </div>
+                              </Button>
                             )}
                         </TableCell>
                         </TableRow>
