@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription as ShadCardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,7 +18,8 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-  DialogDescription, // Added DialogDescription here
+  DialogDescription,
+  DialogFooter, 
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -26,7 +27,7 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription as AlertDialogDesc,
-  AlertDialogFooter,
+  AlertDialogFooter as AlertDialogFoot, 
   AlertDialogHeader as AlertDialogHead,
   AlertDialogTitle as AlertDialogT,
 } from "@/components/ui/alert-dialog";
@@ -1230,10 +1231,10 @@ export default function ResultsPage() {
                                           Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
                                         </AlertDialogDesc>
                                       </AlertDialogHead>
-                                      <AlertDialogFooter>
+                                      <AlertDialogFoot>
                                         <AlertDialogCancel onClick={() => setSelectedResult(null)}>Batal</AlertDialogCancel>
                                         <AlertDialogAction onClick={() => handleDeleteResult(selectedResult.id)}>Ya, Hapus Hasil</AlertDialogAction>
-                                      </AlertDialogFooter>
+                                      </AlertDialogFoot>
                                     </AlertDialogContent>
                                   )}
                                 </AlertDialog>
