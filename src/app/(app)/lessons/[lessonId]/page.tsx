@@ -84,7 +84,7 @@ export default function LessonDetailPage() {
   useEffect(() => {
     if (!lessonId || authLoading) {
       // If lessonId is explicitly null after paramsFromHook has been processed, and we are not loading auth
-      if (lessonId === null && paramsFromHook && !authLoading && !isLoading) {
+      if (lessonId === null && paramsFromHook && !authLoading) {
         setError("ID Pelajaran tidak ditemukan di URL.");
         setIsLoading(false);
         setIsCheckingAttendance(false);
@@ -132,7 +132,7 @@ export default function LessonDetailPage() {
     };
 
     fetchLessonDetails();
-  }, [lessonId, authLoading, user, role, isLoading]); // isLoading added to dependency array
+  }, [lessonId, authLoading, user, role]); // isLoading removed from dependency array
 
 
   const fetchAttendanceStatus = async (studentUid: string, currentLessonId: string) => {
