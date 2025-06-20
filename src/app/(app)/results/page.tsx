@@ -30,6 +30,7 @@ import {
   AlertDialogFooter as AlertDialogFoot, 
   AlertDialogHeader as AlertDialogHead,
   AlertDialogTitle as AlertDialogT,
+  AlertDialogTrigger, // Added AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -65,8 +66,8 @@ import {
   orderBy,
   where,
   writeBatch,
-  Query as FirebaseQuery,
-  DocumentData,
+  type Query as FirebaseQuery, // Explicitly type FirebaseQuery
+  type DocumentData, // Explicitly type DocumentData
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -1412,3 +1413,4 @@ export default function ResultsPage() {
     </div>
   );
 }
+
