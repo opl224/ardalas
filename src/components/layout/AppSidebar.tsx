@@ -42,9 +42,9 @@ function AppLogo() {
       )}
     >
       <Image
-        src="/logo2.png"
+        src="/logo3.png"
         alt="Ardalas Logo"
-        width={52} 
+        width={120}
         height={52} 
         data-ai-hint="logo company"
         className={cn(

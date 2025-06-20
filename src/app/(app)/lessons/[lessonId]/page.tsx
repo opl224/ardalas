@@ -45,8 +45,9 @@ interface StudentSelfAttendanceRecord {
 
 
 export default function LessonDetailPage() {
-  const params = useParams();
-  const lessonId = params.lessonId as string;
+  const paramsFromHook = useParams();
+  const [lessonId, setLessonId] = useState<string | null>(null);
+
   const { user, role, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
@@ -67,7 +68,27 @@ export default function LessonDetailPage() {
   }, []);
 
   useEffect(() => {
+    if (paramsFromHook && typeof paramsFromHook.lessonId === 'string') {
+      setLessonId(paramsFromHook.lessonId);
+    } else if (paramsFromHook && paramsFromHook.lessonId !== undefined) {
+      setError("ID Pelajaran tidak valid.");
+      setIsLoading(false);
+      setIsCheckingAttendance(false);
+      setLessonId(null);
+    }
+    // If paramsFromHook is null or lessonId is not present, lessonId remains null
+    // The main data fetching effect will handle the null lessonId state.
+  }, [paramsFromHook]);
+
+
+  useEffect(() => {
     if (!lessonId || authLoading) {
+      // If lessonId is explicitly null after paramsFromHook has been processed, and we are not loading auth
+      if (lessonId === null && paramsFromHook && !authLoading && !isLoading) {
+        setError("ID Pelajaran tidak ditemukan di URL.");
+        setIsLoading(false);
+        setIsCheckingAttendance(false);
+      }
       return;
     }
 
@@ -89,7 +110,6 @@ export default function LessonDetailPage() {
             setLesson(null);
           } else {
             setLesson(lessonData);
-            // After setting lesson, fetch attendance status if user is student
             if (role === "siswa" && user?.uid && lessonData.id) {
               fetchAttendanceStatus(user.uid, lessonData.id);
             } else {
@@ -112,7 +132,7 @@ export default function LessonDetailPage() {
     };
 
     fetchLessonDetails();
-  }, [lessonId, authLoading, user, role]);
+  }, [lessonId, authLoading, user, role, isLoading]); // isLoading added to dependency array
 
 
   const fetchAttendanceStatus = async (studentUid: string, currentLessonId: string) => {
@@ -188,7 +208,7 @@ export default function LessonDetailPage() {
       studentId: user.uid,
       studentName: user.displayName,
       classId: lesson.classId,
-      className: user.className, // Assuming student's className is correct for this lesson
+      className: user.className, 
       lessonId: lesson.id,
       subjectName: lesson.subjectName,
       lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
@@ -199,7 +219,7 @@ export default function LessonDetailPage() {
 
     try {
       const docRef = await addDoc(collection(db, "studentAttendanceRecords"), attendanceData);
-      setAttendanceRecord({ ...attendanceData, id: docRef.id, attendedAt: Timestamp.now() }); // Optimistic update
+      setAttendanceRecord({ ...attendanceData, id: docRef.id, attendedAt: Timestamp.now() }); 
       toast({ title: "Kehadiran Tercatat", description: `Anda berhasil absen untuk pelajaran ${lesson.subjectName}.` });
     } catch (error) {
       console.error("Error recording self-attendance:", error);
