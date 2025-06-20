@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
-import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check, LinkIcon, Info, UserSquare2 } from "lucide-react";
+import { UserCircle, Mail, Shield, Edit3, Pencil, School, Check, LinkIcon, Info, UserSquare2, Briefcase, Users as UsersIcon } from "lucide-react"; // Added Briefcase, UsersIcon
 import LottieLoader from "@/components/ui/LottieLoader";
 import { roleDisplayNames } from "@/config/roles";
 import Link from "next/link";
@@ -67,6 +67,28 @@ interface DetailedStudentData {
   createdAt?: Timestamp;
 }
 
+interface DetailedParentData {
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  gender?: "laki-laki" | "perempuan";
+  studentName?: string; // From parents collection
+  studentClassName?: string; // To be fetched or derived
+  createdAt?: Timestamp; // From parents collection
+}
+
+interface DetailedTeacherData {
+  name?: string;
+  email?: string;
+  subject?: string;
+  phone?: string;
+  address?: string;
+  gender?: "laki-laki" | "perempuan";
+  createdAt?: Timestamp; // From teachers collection
+}
+
+
 const GENDERS_OPTIONS = ["laki-laki", "perempuan"] as const;
 
 const adminDetailFormSchema = z.object({
@@ -88,11 +110,18 @@ export default function ProfilePage() {
   const [detailedStudentData, setDetailedStudentData] = useState<DetailedStudentData | null>(null);
   const [isLoadingStudentDetail, setIsLoadingStudentDetail] = useState(false);
 
+  const [isParentDetailDialogOpen, setIsParentDetailDialogOpen] = useState(false);
+  const [detailedParentData, setDetailedParentData] = useState<DetailedParentData | null>(null);
+  const [isLoadingParentDetail, setIsLoadingParentDetail] = useState(false);
+
+  const [isTeacherDetailDialogOpen, setIsTeacherDetailDialogOpen] = useState(false);
+  const [detailedTeacherData, setDetailedTeacherData] = useState<DetailedTeacherData | null>(null);
+  const [isLoadingTeacherDetail, setIsLoadingTeacherDetail] = useState(false);
+
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [newName, setNewName] = useState(user?.displayName || "");
   const [isUpdatingName, setIsUpdatingName] = useState(false);
 
-  // Admin details state
   const [isAdminDetailDialogOpen, setIsAdminDetailDialogOpen] = useState(false);
   const [adminDetails, setAdminDetails] = useState<{ phone?: string; gender?: "laki-laki" | "perempuan"; address?: string; } | null>(null);
   const [isLoadingAdminDetails, setIsLoadingAdminDetails] = useState(false);
@@ -202,6 +231,79 @@ export default function ProfilePage() {
     setIsStudentDetailDialogOpen(true);
   };
 
+  const fetchDetailedParentData = async () => {
+    if (!user || role !== 'orangtua') return;
+    setIsLoadingParentDetail(true);
+    try {
+      const parentQuery = query(collection(db, "parents"), where("uid", "==", user.uid), limit(1));
+      const parentSnapshot = await getDocs(parentQuery);
+      if (!parentSnapshot.empty) {
+        const parentData = parentSnapshot.docs[0].data();
+        const dataToSet: DetailedParentData = {
+          name: parentData.name,
+          email: parentData.email,
+          phone: parentData.phone,
+          address: parentData.address,
+          gender: parentData.gender,
+          studentName: parentData.studentName,
+          createdAt: parentData.createdAt,
+        };
+        // Use existing info from AuthContext if available for child's class name
+        dataToSet.studentClassName = user.linkedStudentClassName || user.linkedStudentClassId || "Tidak Diketahui";
+        setDetailedParentData(dataToSet);
+      } else {
+        toast({ title: "Data Tidak Ditemukan", description: "Profil orang tua tidak ditemukan.", variant: "destructive" });
+        setDetailedParentData(null);
+      }
+    } catch (error) {
+      console.error("Error fetching detailed parent data:", error);
+      toast({ title: "Error", description: "Gagal memuat detail data orang tua.", variant: "destructive" });
+      setDetailedParentData(null);
+    } finally {
+      setIsLoadingParentDetail(false);
+    }
+  };
+
+  const handleOpenParentDetailDialog = () => {
+    fetchDetailedParentData();
+    setIsParentDetailDialogOpen(true);
+  };
+
+  const fetchDetailedTeacherData = async () => {
+    if (!user || role !== 'guru') return;
+    setIsLoadingTeacherDetail(true);
+    try {
+      const teacherQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+      const teacherSnapshot = await getDocs(teacherQuery);
+      if (!teacherSnapshot.empty) {
+        const teacherData = teacherSnapshot.docs[0].data();
+        setDetailedTeacherData({
+          name: teacherData.name,
+          email: teacherData.email,
+          subject: teacherData.subject,
+          phone: teacherData.phone,
+          address: teacherData.address,
+          gender: teacherData.gender,
+          createdAt: teacherData.createdAt,
+        });
+      } else {
+        toast({ title: "Data Tidak Ditemukan", description: "Profil guru tidak ditemukan.", variant: "destructive" });
+        setDetailedTeacherData(null);
+      }
+    } catch (error) {
+      console.error("Error fetching detailed teacher data:", error);
+      toast({ title: "Error", description: "Gagal memuat detail data guru.", variant: "destructive" });
+      setDetailedTeacherData(null);
+    } finally {
+      setIsLoadingTeacherDetail(false);
+    }
+  };
+
+  const handleOpenTeacherDetailDialog = () => {
+    fetchDetailedTeacherData();
+    setIsTeacherDetailDialogOpen(true);
+  };
+
   const handleSaveName = async () => {
     if (!user || !auth.currentUser) {
       toast({ title: "Gagal", description: "Pengguna tidak ditemukan.", variant: "destructive" });
@@ -293,7 +395,7 @@ export default function ProfilePage() {
       });
       toast({ title: "Sukses", description: "Detail admin berhasil diperbarui." });
       setAdminDetails(data); 
-      if (refreshUser) await refreshUser(); // Refresh context if needed
+      if (refreshUser) await refreshUser(); 
       setIsAdminDetailDialogOpen(false);
     } catch (error) {
       console.error("Error updating admin details:", error);
@@ -498,6 +600,18 @@ export default function ProfilePage() {
                 Lihat Detail Data Saya
             </Button>
           )}
+          {role === 'orangtua' && (
+            <Button onClick={handleOpenParentDetailDialog} variant="outline" className="w-full mt-4">
+                <UsersIcon className="mr-2 h-4 w-4" />
+                Lihat Detail Data Saya
+            </Button>
+          )}
+          {role === 'guru' && (
+             <Button onClick={handleOpenTeacherDetailDialog} variant="outline" className="w-full mt-4">
+                <Briefcase className="mr-2 h-4 w-4" />
+                Lihat Detail Data Saya
+            </Button>
+          )}
           {role === 'admin' && (
             <Button onClick={handleOpenAdminDetailDialog} variant="outline" className="w-full mt-4">
                 <UserSquare2 className="mr-2 h-4 w-4" />
@@ -559,7 +673,87 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog for Admin Details */}
+      <Dialog open={isParentDetailDialogOpen} onOpenChange={setIsParentDetailDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detail Data Orang Tua</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap mengenai data diri Anda sebagai orang tua.
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingParentDetail ? (
+            <div className="flex justify-center items-center py-8">
+                <LottieLoader width={48} height={48} />
+                <span className="ml-2">Memuat data detail...</span>
+            </div>
+          ) : detailedParentData ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+              <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{detailedParentData.name || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{detailedParentData.email || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{detailedParentData.phone || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{detailedParentData.gender || "-"}</p></div>
+              <div className="md:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{detailedParentData.address || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Anak Terhubung:</Label><p className="font-medium">{detailedParentData.studentName || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Kelas Anak:</Label><p className="font-medium">{detailedParentData.studentClassName || "-"}</p></div>
+              {detailedParentData.createdAt && (
+                <div className="md:col-span-2">
+                  <Label className="text-muted-foreground">Tanggal Profil Dibuat:</Label>
+                  <p className="font-medium">{format(detailedParentData.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+             <div className="text-center py-8 text-muted-foreground">
+                <Info className="mx-auto h-10 w-10 mb-2" />
+                Tidak dapat memuat detail data orang tua.
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isTeacherDetailDialogOpen} onOpenChange={setIsTeacherDetailDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Detail Data Guru</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap mengenai data diri Anda sebagai guru.
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingTeacherDetail ? (
+             <div className="flex justify-center items-center py-8">
+                <LottieLoader width={48} height={48} />
+                <span className="ml-2">Memuat data detail...</span>
+            </div>
+          ) : detailedTeacherData ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+              <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{detailedTeacherData.name || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{detailedTeacherData.email || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Mata Pelajaran Utama:</Label><p className="font-medium">{detailedTeacherData.subject || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{detailedTeacherData.phone || "-"}</p></div>
+              <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{detailedTeacherData.gender || "-"}</p></div>
+              <div className="md:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{detailedTeacherData.address || "-"}</p></div>
+              {detailedTeacherData.createdAt && (
+                <div className="md:col-span-2">
+                  <Label className="text-muted-foreground">Tanggal Profil Dibuat:</Label>
+                  <p className="font-medium">{format(detailedTeacherData.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+                <Info className="mx-auto h-10 w-10 mb-2" />
+                Tidak dapat memuat detail data guru.
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isAdminDetailDialogOpen} onOpenChange={(open) => {
           setIsAdminDetailDialogOpen(open);
           if (!open) {
