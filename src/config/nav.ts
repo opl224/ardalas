@@ -17,7 +17,6 @@ import {
   Settings,
   UserCog,
   GraduationCap, 
-  ScanSearch,
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -72,7 +71,7 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Ujian", href: "/exams", icon: FileText, roles: ["admin", "guru", "siswa", "orangtua"] },
       { title: "Tugas", href: "/assignments", icon: ClipboardCheck, roles: ["admin", "guru", "siswa", "orangtua"] },
-      { title: "Nilai Tugas", href: "/my-grades", icon: GraduationCap, roles: ["siswa", "orangtua"]},
+      { title: "Hasil Belajar", href: "/my-grades", icon: GraduationCap, roles: ["siswa", "orangtua"]}, // Changed label
       { title: "Hasil", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
     ],
   },
@@ -86,6 +85,3 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
-
-
-
