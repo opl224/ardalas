@@ -23,7 +23,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Download, FileDown } from "lucide-react";
+import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Download, FileDown, Hourglass } from "lucide-react"; // Added Hourglass
 import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -46,7 +46,7 @@ const ASSESSMENT_TYPES_MY_GRADES = ["UTS", "UAS", "Tugas Harian", "Kuis", "Proye
 type AssessmentTypeMyGrades = typeof ASSESSMENT_TYPES_MY_GRADES[number];
 
 interface MyGradeEntry {
-  id: string; 
+  id: string;
   assessmentTitle: string;
   assessmentType?: AssessmentTypeMyGrades;
   subjectName?: string;
@@ -57,7 +57,7 @@ interface MyGradeEntry {
   assignmentId?: string;
   meetingNumber?: number;
   submissionLink?: string;
-  isSentToStudent?: boolean; // New field
+  isSentToStudent?: boolean;
 }
 
 interface ResultDocData {
@@ -72,7 +72,7 @@ interface ResultDocData {
   feedback?: string;
   assignmentId?: string;
   meetingNumber?: number;
-  isSentToStudent?: boolean; // New field
+  isSentToStudent?: boolean;
 }
 
 interface GroupedGradeDisplay {
@@ -101,7 +101,7 @@ export default function MyGradesPage() {
       }
 
       const studentAuthId = role === "siswa" ? user.uid : user.linkedStudentId;
-      
+
       if (!studentAuthId) {
         setIsLoading(false);
         setAllGrades([]);
@@ -171,12 +171,11 @@ export default function MyGradesPage() {
             assignmentId: result.assignmentId,
             meetingNumber: result.meetingNumber,
             submissionLink: submissionLinkEntry,
-            isSentToStudent: result.isSentToStudent ?? false, // Add isSentToStudent
+            isSentToStudent: result.isSentToStudent ?? false,
           };
         });
         setAllGrades(finalGradesData);
 
-        // Group grades by subject
         const subjectMap = new Map<string, MyGradeEntry[]>();
         finalGradesData.forEach(grade => {
           const key = grade.subjectName || "Tanpa Mata Pelajaran";
@@ -220,7 +219,7 @@ export default function MyGradesPage() {
     }
 
     const fileName = `Hasil_${studentName.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${assessmentType.replace(/\s+/g, '_')}.pdf`;
-    
+
     const doc = new jsPDF();
     doc.setFontSize(16);
     doc.text(`Hasil Belajar - ${studentName}`, 14, 20);
@@ -241,8 +240,8 @@ export default function MyGradesPage() {
       head: [['Judul', 'Nilai', 'Tanggal Penilaian', 'Komentar Guru', 'Link Tugas']],
       body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: [64, 149, 237] }, 
-      columnStyles: { 
+      headStyles: { fillColor: [64, 149, 237] },
+      columnStyles: {
         0: { cellWidth: 50 }, // Judul
         1: { cellWidth: 15 }, // Nilai
         2: { cellWidth: 25 }, // Tanggal
@@ -265,38 +264,46 @@ export default function MyGradesPage() {
     const studentName = role === "siswa" ? user?.displayName : user?.linkedStudentName;
     const fileNameBase = `Semua_Hasil_Belajar_${studentName?.replace(/\s+/g, '_') || 'Siswa'}`;
 
-    const dataToExport = allGrades.map((grade, index) => ({
-      "No.": index + 1,
-      "Judul Asesmen/Tugas": `${grade.assessmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`,
-      "Mata Pelajaran": grade.subjectName || "-",
-      "Tipe Asesmen": grade.assessmentType || "-",
-      "Nilai": grade.score ?? "Belum Dinilai",
-      "Komentar Guru": grade.teacherFeedback || "-",
-      "Tanggal Dinilai": grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }) : "-",
-      "Link Tugas": grade.submissionLink || "Tidak Ada",
-    }));
+    const dataToExport = allGrades
+      .filter(grade => grade.isSentToStudent === true) // Only export sent grades
+      .map((grade, index) => ({
+        "No.": index + 1,
+        "Judul Asesmen/Tugas": `${grade.assessmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`,
+        "Mata Pelajaran": grade.subjectName || "-",
+        "Tipe Asesmen": grade.assessmentType || "-",
+        "Nilai": grade.score ?? "Belum Dinilai",
+        "Komentar Guru": grade.teacherFeedback || "-",
+        "Tanggal Dinilai": grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }) : "-",
+        "Link Tugas": grade.submissionLink || "Tidak Ada",
+      }));
+
+    if (dataToExport.length === 0) {
+      toast({ title: "Tidak Ada Hasil Terkirim", description: "Tidak ada hasil belajar yang sudah dikirim oleh guru untuk diekspor.", variant: "info" });
+      setIsExporting(false);
+      return;
+    }
 
     try {
       if (formatType === 'xlsx') {
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Belajar");
-        
+
         XLSX.utils.sheet_add_aoa(worksheet, [
-          [`Laporan Semua Hasil Belajar - ${studentName || 'Siswa'}`],
+          [`Laporan Semua Hasil Belajar (Terkirim) - ${studentName || 'Siswa'}`],
           [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
-          [] 
+          []
         ], { origin: "A1" });
-        
+
         const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
         worksheet['!cols'] = cols;
 
-        XLSX.writeFile(workbook, `${fileNameBase}.xlsx`);
-        toast({ title: "Ekspor Excel Berhasil", description: `${fileNameBase}.xlsx telah diunduh.` });
+        XLSX.writeFile(workbook, `${fileNameBase}_Terkirim.xlsx`);
+        toast({ title: "Ekspor Excel Berhasil", description: `${fileNameBase}_Terkirim.xlsx telah diunduh.` });
       } else if (formatType === 'pdf') {
         const doc = new jsPDF({ orientation: 'landscape' });
         doc.setFontSize(16);
-        doc.text(`Laporan Semua Hasil Belajar - ${studentName || 'Siswa'}`, 14, 15);
+        doc.text(`Laporan Semua Hasil Belajar (Terkirim) - ${studentName || 'Siswa'}`, 14, 15);
         doc.setFontSize(10);
         doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, 22);
 
@@ -307,19 +314,19 @@ export default function MyGradesPage() {
           theme: 'grid',
           headStyles: { fillColor: [22, 160, 133] },
           styles: { fontSize: 7, cellPadding: 1.5 },
-          columnStyles: { 
-            0: { cellWidth: 8 }, 
-            1: { cellWidth: 40 }, 
-            2: { cellWidth: 25 }, 
-            3: { cellWidth: 25 }, 
-            4: { cellWidth: 12 }, 
-            5: { cellWidth: 40 }, 
-            6: { cellWidth: 20 }, 
-            7: { cellWidth: 'auto' }, 
+          columnStyles: {
+            0: { cellWidth: 8 },
+            1: { cellWidth: 40 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 25 },
+            4: { cellWidth: 12 },
+            5: { cellWidth: 40 },
+            6: { cellWidth: 20 },
+            7: { cellWidth: 'auto' },
           }
         });
-        doc.save(`${fileNameBase}.pdf`);
-        toast({ title: "Ekspor PDF Berhasil", description: `${fileNameBase}.pdf telah diunduh.` });
+        doc.save(`${fileNameBase}_Terkirim.pdf`);
+        toast({ title: "Ekspor PDF Berhasil", description: `${fileNameBase}_Terkirim.pdf telah diunduh.` });
       }
     } catch (error) {
       console.error("Error exporting grades:", error);
@@ -394,12 +401,12 @@ export default function MyGradesPage() {
           <h1 className="text-3xl font-bold font-headline">{pageTitleText}</h1>
           <p className="text-muted-foreground">Daftar nilai dan umpan balik dari semua asesmen.</p>
         </div>
-        {allGrades.length > 0 && (
+        {allGrades.filter(g => g.isSentToStudent).length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" disabled={isExporting}>
                 {isExporting && <LottieLoader width={16} height={16} className="mr-2" />}
-                <FileDown className="mr-2 h-4 w-4" /> Ekspor Semua Hasil
+                <FileDown className="mr-2 h-4 w-4" /> Ekspor Hasil Terkirim
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -441,7 +448,7 @@ export default function MyGradesPage() {
                           .map(r => r.assessmentType)
                       )
                     ).filter(Boolean) as AssessmentTypeMyGrades[];
-                    
+
                     return (
                         <TableRow key={group.subjectName}>
                         <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{index + 1}</TableCell>
@@ -461,12 +468,12 @@ export default function MyGradesPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                 {sentAssessmentTypes.map(type => (
-                                    <DropdownMenuItem 
+                                    <DropdownMenuItem
                                         key={type}
                                         onSelect={() => handleDownloadBySubjectAndType(
-                                            group.subjectName, 
-                                            type, 
-                                            group.studentName, 
+                                            group.subjectName,
+                                            type,
+                                            group.studentName,
                                             group.resultsForThisSubject.filter(r => r.assessmentType === type && r.isSentToStudent === true)
                                         )}
                                     >
@@ -477,7 +484,9 @@ export default function MyGradesPage() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                             ) : (
-                                <span className="text-xs text-muted-foreground italic">Belum ada hasil terkirim</span>
+                              <div className="flex items-center justify-end text-muted-foreground" title="Belum ada hasil terkirim">
+                                <Hourglass className="h-4 w-4" />
+                              </div>
                             )}
                         </TableCell>
                         </TableRow>
@@ -497,3 +506,5 @@ export default function MyGradesPage() {
   );
 }
 
+
+    
