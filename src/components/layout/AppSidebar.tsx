@@ -4,7 +4,7 @@
 import Link from "next/link";
 import Image from "next/image"; // Added Image import
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Settings, ChevronRight, UserCog, PanelLeft } from "lucide-react";
+import { LogOut, Settings, ChevronRight, UserCog, PanelLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { navItems } from "@/config/nav";
 import type { NavItem } from "@/config/nav";
@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"; 
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function AppLogo() {
   const { state, isMobile } = useSidebar();
@@ -37,19 +37,18 @@ function AppLogo() {
     <Link
       href="/dashboard"
       className={cn(
-        "flex items-center font-headline text-lg font-semibold tracking-tight text-primary",
-        isCollapsedAndNotMobile ? "justify-center w-full h-full items-center" : "gap-2 px-4"
+        "flex items-center justify-center font-headline text-lg font-semibold tracking-tight text-primary",
+        isCollapsedAndNotMobile ? "justify-center w-full h-full" : "gap-2 px-4" 
       )}
     >
       <Image
         src="/logo3.png"
         alt="Ardalas Logo"
-        width={120}
+        width={120} 
         height={52} 
         data-ai-hint="logo company"
         className={cn(
-          "relative",
-          isCollapsedAndNotMobile && "left-1" // Adjust left shift for collapsed state
+            isCollapsedAndNotMobile && "relative left-1" 
         )}
       />
     </Link>
@@ -63,11 +62,21 @@ export function AppSidebar() {
   const router = useRouter();
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
 
-  const { isMobile, setOpenMobile, state } = useSidebar();
+  const { isMobile, setOpenMobile, state, openMobile } = useSidebar();
+  const [isClosing, setIsClosing] = useState(false);
 
 
   const toggleSubmenu = (title: string) => {
     setOpenSubmenu(prevOpenTitle => (prevOpenTitle === title ? null : title));
+  };
+
+  const handleSheetClose = () => {
+    setIsClosing(true);
+    // Delay actual closing to allow animation to play
+    setTimeout(() => {
+      setOpenMobile(false);
+      setIsClosing(false);
+    }, 300); // Match animation duration
   };
 
   const renderNavItemsRecursive = (items: NavItem[], currentPath: string, userRole: string | null, isSubMenuParam = false, parentTitle: string | null = null) => {
@@ -131,7 +140,7 @@ export function AppSidebar() {
                 tooltip={item.title}
               >
                 <Link href={item.href} onClick={() => { 
-                  if (isMobile) setOpenMobile(false);
+                  if (isMobile) handleSheetClose(); // Use animated close
                   if (!hasChildren && (!isSubMenuParam || (isSubMenuParam && parentTitle !== item.title && parentTitle !== openSubmenu))) {
                      setOpenSubmenu(null);
                   }
@@ -151,7 +160,7 @@ export function AppSidebar() {
     try {
       await signOut(auth);
       toast({ title: "Logout Berhasil", description: "Anda telah keluar dari akun." });
-      if(isMobile) setOpenMobile(false);
+      if(isMobile) handleSheetClose(); // Use animated close
       router.push("/login");
     } catch (error) {
       console.error("Logout error:", error);
@@ -162,8 +171,8 @@ export function AppSidebar() {
   const sidebarDesktopContent = (
     <>
       <div className={cn(
-        "flex h-16 items-center border-b border-border justify-center", 
-        (!isMobile && state === 'collapsed') ? 'px-0' : 'px-0' 
+        "flex h-16 items-center border-b border-border", 
+        (!isMobile && state === 'collapsed') ? 'justify-center px-0' : 'px-0 justify-center' 
       )}>
          <AppLogo />
       </div>
@@ -200,10 +209,15 @@ export function AppSidebar() {
         side="left" 
         className="w-[18rem] bg-sidebar p-0 text-sidebar-foreground flex flex-col"
         aria-labelledby="mobile-sidebar-title-component" 
+        // Remove onOpenChange from here if we manage openMobile directly via setOpenMobile(false)
       >
         <SheetHeader className="p-4 border-b border-border">
           <div className="flex items-center justify-between">
              <AppLogo />
+             <Button variant="ghost" size="icon" onClick={handleSheetClose} className={cn(isClosing && "animate-x-spin-once")}>
+                <X className="h-5 w-5" />
+                <span className="sr-only">Tutup Sidebar</span>
+              </Button>
           </div>
           <SheetTitle id="mobile-sidebar-title-component" className="sr-only">Navigasi Utama</SheetTitle>
         </SheetHeader>
