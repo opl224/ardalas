@@ -99,7 +99,7 @@ interface Subject {
 }
 
 const subjectFormSchema = z.object({
-  name: z.string().min(3, { message: "Nama subjek minimal 3 karakter." }),
+  name: z.string().min(3, { message: "Nama mata pelajaran minimal 3 karakter." }),
   description: z.string().optional(),
   teacherUid: z.string().optional(), // To store the selected Firebase Auth UID
 });
@@ -197,7 +197,7 @@ export default function SubjectsPage() {
     } catch (error) {
       console.error("Error fetching subjects: ", error);
       toast({
-        title: "Gagal Memuat Subjek",
+        title: "Gagal Memuat Mata Pelajaran",
         variant: "destructive",
       });
     } finally {
@@ -249,14 +249,14 @@ export default function SubjectsPage() {
         createdAt: serverTimestamp(),
       });
 
-      toast({ title: "Subjek Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
+      toast({ title: "Mata Pelajaran Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
       addSubjectForm.reset();
       fetchSubjects();
     } catch (error: any) {
       console.error("Error adding subject:", error);
       toast({
-        title: "Gagal Menambahkan Subjek",
+        title: "Gagal Menambahkan Mata Pelajaran",
         variant: "destructive",
       });
     }
@@ -276,14 +276,14 @@ export default function SubjectsPage() {
         teacherName: selectedTeacher?.name || null,
       });
 
-      toast({ title: "Subjek Diperbarui", description: `${data.name} berhasil diperbarui.` });
+      toast({ title: "Mata Pelajaran Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditDialogOpen(false);
       setSelectedSubject(null);
       fetchSubjects();
     } catch (error) {
       console.error("Error editing subject:", error);
       toast({
-        title: "Gagal Memperbarui Subjek",
+        title: "Gagal Memperbarui Mata Pelajaran",
         variant: "destructive",
       });
     }
@@ -293,13 +293,13 @@ export default function SubjectsPage() {
     if (role !== "admin") return;
     try {
       await deleteDoc(doc(db, "subjects", subjectId));
-      toast({ title: "Subjek Dihapus", description: `${subjectName || 'Subjek'} berhasil dihapus.` });
+      toast({ title: "Mata Pelajaran Dihapus", description: `${subjectName || 'Mata Pelajaran'} berhasil dihapus.` });
       setSelectedSubject(null);
       fetchSubjects();
     } catch (error) {
       console.error("Error deleting subject:", error);
       toast({
-        title: "Gagal Menghapus Subjek",
+        title: "Gagal Menghapus Mata Pelajaran",
         variant: "destructive",
       });
     }
@@ -322,7 +322,7 @@ export default function SubjectsPage() {
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-subject-name`}>Nama Subjek</Label>
+        <Label htmlFor={`${formType}-subject-name`}>Nama Mata Pelajaran</Label>
         <Input id={`${formType}-subject-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
@@ -370,8 +370,8 @@ export default function SubjectsPage() {
   );
 
   const pageDescription = role === "guru"
-    ? "Daftar subjek atau mata pelajaran yang menjadi tanggung jawab Anda."
-    : "Kelola daftar subjek atau mata pelajaran yang diajarkan.";
+    ? "Daftar mata pelajaran yang menjadi tanggung jawab Anda."
+    : "Kelola daftar mata pelajaran yang diajarkan.";
 
   const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingAuthUsers);
 
@@ -447,14 +447,14 @@ export default function SubjectsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Manajemen Subjek Pelajaran</h1>
+        <h1 className="text-3xl font-bold font-headline">Manajemen Mata Pelajaran</h1>
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <BookOpen className="h-6 w-6 text-primary" />
-            <span>Daftar Subjek</span>
+            <span>Daftar Mata Pelajaran</span>
           </CardTitle>
           {role === "admin" && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
@@ -468,14 +468,14 @@ export default function SubjectsPage() {
             }}>
               <DialogTrigger asChild>
                 <Button size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Subjek
+                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Mata Pelajaran
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Tambah Subjek Baru</DialogTitle>
+                  <DialogTitle>Tambah Mata Pelajaran Baru</DialogTitle>
                   <DialogDescription>
-                    Isi detail subjek pelajaran baru.
+                    Isi detail mata pelajaran baru.
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -485,7 +485,7 @@ export default function SubjectsPage() {
                        <Button type="button" variant="outline">Batal</Button>
                     </DialogClose>
                     <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
-                      {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Subjek"}
+                      {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Mata Pelajaran"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -499,7 +499,7 @@ export default function SubjectsPage() {
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari berdasarkan nama subjek atau guru..."
+                  placeholder="Cari berdasarkan nama mata pelajaran atau guru..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 w-full"
@@ -518,7 +518,7 @@ export default function SubjectsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Nama Subjek</TableHead>
+                    <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Nama Mata Pelajaran</TableHead>
                     {!isMobile && <TableHead className="min-w-[250px]">Deskripsi</TableHead>}
                     <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Guru Penanggung Jawab</TableHead>
                     {role === "admin" && <TableHead className={cn("text-right min-w-[100px]", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>}
@@ -559,13 +559,13 @@ export default function SubjectsPage() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Tindakan ini akan menghapus subjek <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
+                                        Tindakan ini akan menghapus mata pelajaran <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel onClick={() => setSelectedSubject(null)}>Batal</AlertDialogCancel>
                                       <AlertDialogAction onClick={() => handleDeleteSubject(selectedSubject.id, selectedSubject.name)}>
-                                        Ya, Hapus Subjek
+                                        Ya, Hapus Mata Pelajaran
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -604,7 +604,7 @@ export default function SubjectsPage() {
             </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {role === "admin" ? (searchTerm ? 'Tidak ada subjek yang cocok dengan pencarian Anda.' : 'Tidak ada data subjek. Klik "Tambah Subjek" untuk membuat data baru.') : 'Tidak ada subjek yang ditugaskan kepada Anda.'}
+              {role === "admin" ? (searchTerm ? 'Tidak ada mata pelajaran yang cocok dengan pencarian Anda.' : 'Tidak ada data mata pelajaran. Klik "Tambah Mata Pelajaran" untuk membuat data baru.') : 'Tidak ada mata pelajaran yang ditugaskan kepada Anda.'}
             </div>
           )}
         </CardContent>
@@ -620,9 +620,9 @@ export default function SubjectsPage() {
         }}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Edit Subjek</DialogTitle>
+              <DialogTitle>Edit Mata Pelajaran</DialogTitle>
               <DialogDescription>
-                Perbarui detail subjek pelajaran.
+                Perbarui detail mata pelajaran.
               </DialogDescription>
             </DialogHeader>
             {selectedSubject && (

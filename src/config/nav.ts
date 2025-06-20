@@ -17,6 +17,7 @@ import {
   Settings,
   UserCog,
   GraduationCap, 
+  ScanSearch,
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -55,7 +56,7 @@ export const navItems: NavItem[] = [
     icon: BookOpen,
     roles: ["admin", "guru", "siswa", "orangtua"],
     children: [
-      { title: "Subjek", href: "/subjects", icon: BookOpen, roles: ["admin", "guru"] },
+      { title: "Mata Pelajaran", href: "/subjects", icon: BookOpen, roles: ["admin", "guru"] },
       { title: "Kelas", href: "/classes", icon: School, roles: ["admin", "guru"] },
       { title: "Kelas Anak", href: "/classes", icon: School, roles: ["orangtua"] },
       { title: "Kelas Saya", href: "/my-class", icon: School, roles: ["siswa"] },
@@ -75,7 +76,12 @@ export const navItems: NavItem[] = [
       { title: "Hasil", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
     ],
   },
-  // Menu "Kehidupan Sekolah" dihapus dari sini
+  { 
+    title: "Track Aktivitas", 
+    href: "/admin/track-activity", 
+    icon: ScanSearch,
+    roles: ["admin"] 
+  },
   { 
     title: "Pengaturan", 
     href: "/settings", 
@@ -86,4 +92,5 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
+
 
