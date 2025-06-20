@@ -25,11 +25,12 @@ import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase/config";
 import { updateProfile, type User as FirebaseUserType } from "firebase/auth";
-import { doc, getDoc, Timestamp, updateDoc } from "firebase/firestore"; // Added updateDoc
+import { doc, getDoc, Timestamp, updateDoc, query, collection, where, getDocs, limit, writeBatch } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input"; // Added Input for edit name dialog
 
 const localAvatars = [
     { src: '/avatars/laki-laki.png', hint: 'avatar male', alt: 'Avatar Laki-laki'},
@@ -72,6 +73,10 @@ export default function ProfilePage() {
   const [detailedStudentData, setDetailedStudentData] = useState<DetailedStudentData | null>(null);
   const [isLoadingStudentDetail, setIsLoadingStudentDetail] = useState(false);
 
+  const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
+  const [newName, setNewName] = useState(user?.displayName || "");
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
+
 
   useEffect(() => {
     if (user?.photoURL) {
@@ -86,6 +91,12 @@ export default function ProfilePage() {
       setSelectedAvatarUrlInDialog(null);
     }
   }, [user?.photoURL]);
+
+  useEffect(() => {
+    if (user?.displayName) {
+      setNewName(user.displayName);
+    }
+  }, [user?.displayName]);
 
 
   const getInitials = (name: string | null | undefined) => {
@@ -162,6 +173,50 @@ export default function ProfilePage() {
     setIsStudentDetailDialogOpen(true);
   };
 
+  const handleSaveName = async () => {
+    if (!user || !auth.currentUser) {
+      toast({ title: "Gagal", description: "Pengguna tidak ditemukan.", variant: "destructive" });
+      return;
+    }
+    if (!newName.trim() || newName.trim().length < 3) {
+      toast({ title: "Nama Tidak Valid", description: "Nama minimal 3 karakter.", variant: "destructive" });
+      return;
+    }
+    setIsUpdatingName(true);
+    const batch = writeBatch(db);
+    try {
+      // Update Firebase Auth display name
+      await updateProfile(auth.currentUser, { displayName: newName.trim() });
+
+      // Update 'users' collection
+      const userDocRef = doc(db, "users", user.uid);
+      batch.update(userDocRef, { name: newName.trim() });
+
+      // If user is a teacher, update 'teachers' collection as well
+      if (role === 'guru') {
+        const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+        const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
+        if (!teacherProfileSnapshot.empty) {
+          const teacherDocRef = teacherProfileSnapshot.docs[0].ref;
+          batch.update(teacherDocRef, { name: newName.trim() });
+        }
+      }
+      
+      await batch.commit();
+
+      if (refreshUser) {
+        await refreshUser();
+      }
+      toast({ title: "Sukses", description: "Nama berhasil diperbarui." });
+      setIsEditNameDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating name:", error);
+      toast({ title: "Error", description: "Gagal memperbarui nama.", variant: "destructive" });
+    } finally {
+      setIsUpdatingName(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -233,7 +288,7 @@ export default function ProfilePage() {
                   {localAvatars.map((avatar) => (
                     <button
                       key={avatar.src}
-                      onClick={() => handleAvatarSelect(avatar.src)}
+                      onClick={()={() => handleAvatarSelect(avatar.src)} }
                       className={cn(
                         "relative aspect-square rounded-full overflow-hidden border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                         selectedAvatarUrlInDialog === avatar.src ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent hover:border-primary/50"
@@ -259,7 +314,42 @@ export default function ProfilePage() {
               </DialogContent>
             </Dialog>
           </div>
-          <CardTitle className="text-2xl font-semibold">{user.displayName || "Pengguna"}</CardTitle>
+          <CardTitle className="text-2xl font-semibold flex items-center gap-2">
+            {user.displayName || "Pengguna"}
+            {role === 'guru' && (
+                <Dialog open={isEditNameDialogOpen} onOpenChange={setIsEditNameDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full" aria-label="Edit Nama">
+                            <Edit3 className="h-4 w-4 text-muted-foreground hover:text-primary"/>
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Edit Nama Lengkap</DialogTitle>
+                            <DialogDescription>
+                                Masukkan nama lengkap baru Anda.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-2">
+                            <Label htmlFor="edit-name-input">Nama Baru</Label>
+                            <Input
+                                id="edit-name-input"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                                placeholder="Nama Lengkap Baru"
+                            />
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild><Button variant="outline">Batal</Button></DialogClose>
+                            <Button onClick={handleSaveName} disabled={isUpdatingName || !newName.trim() || newName.trim() === user.displayName}>
+                                {isUpdatingName && <LottieLoader width={16} height={16} className="mr-2"/>}
+                                {isUpdatingName ? "Menyimpan..." : "Simpan Nama"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+          </CardTitle>
           {role && (
             <CardDescription className="text-primary font-medium">
               {roleDisplayNames[role]}
@@ -381,3 +471,4 @@ export default function ProfilePage() {
   );
 }
 
+    
