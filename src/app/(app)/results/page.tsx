@@ -90,7 +90,7 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import *XLSX from 'xlsx';
+import * as XLSX from 'xlsx';
 
 
 interface ClassMin { id: string; name: string; }
@@ -1410,4 +1410,5 @@ export default function ResultsPage() {
     </div>
   );
 }
+
 
