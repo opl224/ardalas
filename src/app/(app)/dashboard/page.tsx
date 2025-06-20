@@ -8,7 +8,7 @@ import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Li
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
-import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId } from "firebase/firestore";
+import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
@@ -65,7 +65,7 @@ interface DashboardStats {
   adminTotalTeachers: number;
   adminTotalSubjects: number;
   adminTotalClasses: number;
-  adminTotalParents: number; // Added this line
+  adminTotalParents: number;
   // Teacher specific
   teacherTotalStudentsTaught: number;
   teacherTotalClassesTaught: number;
@@ -76,6 +76,8 @@ interface DashboardStats {
   parentChildTotalLessons: number;
   parentChildTotalAssignments: number;
   parentChildAttendancePercentage: string;
+  // Student/Parent specific
+  waliKelasName: string;
 }
 
 export default function DashboardPage() {
@@ -85,7 +87,7 @@ export default function DashboardPage() {
     adminTotalTeachers: 0,
     adminTotalSubjects: 0,
     adminTotalClasses: 0,
-    adminTotalParents: 0, // Added this line
+    adminTotalParents: 0,
     teacherTotalStudentsTaught: 0,
     teacherTotalClassesTaught: 0,
     teacherTotalSubjectsTaught: 0,
@@ -94,6 +96,7 @@ export default function DashboardPage() {
     parentChildTotalLessons: 0,
     parentChildTotalAssignments: 0,
     parentChildAttendancePercentage: "0%",
+    waliKelasName: "",
   });
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
@@ -108,6 +111,7 @@ export default function DashboardPage() {
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0, adminTotalParents: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
             parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
+            waliKelasName: "",
         });
         setRecentAnnouncements([]);
         return;
@@ -120,27 +124,28 @@ export default function DashboardPage() {
         adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0, adminTotalParents: 0,
         teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
         parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
+        waliKelasName: "",
       };
 
       try {
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
           const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
-          const parentUserQuery = query(collection(db, "users"), where("role", "==", "orangtua")); // Query for parents
+          const parentUserQuery = query(collection(db, "users"), where("role", "==", "orangtua"));
           const subjectsQuery = collection(db, "subjects");
           const classesQuery = collection(db, "classes");
 
           const [studentSnap, teacherUserSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
             getDocs(teacherUserQuery),
-            getDocs(parentUserQuery), // Fetch parents
+            getDocs(parentUserSnap),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
 
           newStats.adminTotalStudents = studentSnap.size;
           newStats.adminTotalTeachers = teacherUserSnap.size;
-          newStats.adminTotalParents = parentUserSnap.size; // Set parent count
+          newStats.adminTotalParents = parentUserSnap.size;
           newStats.adminTotalSubjects = subjectSnap.size;
           newStats.adminTotalClasses = classSnap.size;
 
@@ -171,7 +176,6 @@ export default function DashboardPage() {
                 const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
                 newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
 
-
                 if (taughtClassIds.size > 0) {
                     const studentClassesArray = Array.from(taughtClassIds);
                     const allStudentIds = new Set<string>();
@@ -194,8 +198,28 @@ export default function DashboardPage() {
                     newStats.teacherTotalStudentsTaught = 0;
                 }
             } else {
-                 console.warn(`No teacher profile found in 'teachers' collection linked to Auth UID: ${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.`);
+                 console.warn(\`No teacher profile found in 'teachers' collection linked to Auth UID: \${user.uid}. Ensure a teacher profile exists and its 'uid' field matches the Firebase Auth UID.\`);
             }
+        } else if (role === 'siswa' && user.uid && user.classId) {
+            const classDocRef = doc(db, "classes", user.classId);
+            const classDocSnap = await getDoc(classDocRef);
+            if (classDocSnap.exists()) {
+                const classData = classDocSnap.data();
+                if (classData.teacherId) { // teacherId here is the doc ID from 'teachers' collection
+                    const teacherDocRef = doc(db, "teachers", classData.teacherId);
+                    const teacherDocSnap = await getDoc(teacherDocRef);
+                    if (teacherDocSnap.exists()) {
+                        newStats.waliKelasName = teacherDocSnap.data().name || "Wali Kelas Tidak Ditemukan";
+                    } else {
+                        newStats.waliKelasName = "Info Wali Kelas Tidak Lengkap";
+                    }
+                } else {
+                    newStats.waliKelasName = "Wali Kelas Belum Ditentukan";
+                }
+            } else {
+                newStats.waliKelasName = "Info Kelas Tidak Ditemukan";
+            }
+            // Placeholder for other student stats if needed in future
         } else if (role === 'orangtua' && user.uid && user.linkedStudentClassId) {
             const classId = user.linkedStudentClassId;
 
@@ -214,16 +238,36 @@ export default function DashboardPage() {
             } else {
                  newStats.parentChildTotalAssignments = 0;
             }
-            // Placeholder for attendance - this would need more complex logic
-            newStats.parentChildAttendancePercentage = "0%";
+            newStats.parentChildAttendancePercentage = "0%"; // Placeholder
+
+            // Fetch Wali Kelas for parent's child
+            const classDocRef = doc(db, "classes", user.linkedStudentClassId);
+            const classDocSnap = await getDoc(classDocRef);
+            if (classDocSnap.exists()) {
+                const classData = classDocSnap.data();
+                if (classData.teacherId) { // teacherId here is the doc ID from 'teachers' collection
+                    const teacherDocRef = doc(db, "teachers", classData.teacherId);
+                    const teacherDocSnap = await getDoc(teacherDocRef);
+                    if (teacherDocSnap.exists()) {
+                        newStats.waliKelasName = teacherDocSnap.data().name || "Wali Kelas Tidak Ditemukan";
+                    } else {
+                        newStats.waliKelasName = "Info Wali Kelas Tidak Lengkap";
+                    }
+                } else {
+                    newStats.waliKelasName = "Wali Kelas Belum Ditentukan";
+                }
+            } else {
+                newStats.waliKelasName = "Info Kelas Anak Tidak Ditemukan";
+            }
         }
         setStats(newStats);
       } catch (error) {
         console.error("Error fetching stats: ", error);
-        setStats({ // Reset to default on error
+        setStats({
             adminTotalStudents: 0, adminTotalTeachers: 0, adminTotalSubjects: 0, adminTotalClasses: 0, adminTotalParents: 0,
             teacherTotalStudentsTaught: 0, teacherTotalClassesTaught: 0, teacherTotalSubjectsTaught: 0, teacherTotalAssignmentsGiven: 0,
             parentChildClassStudentCount: 0, parentChildTotalLessons: 0, parentChildTotalAssignments: 0, parentChildAttendancePercentage: "0%",
+            waliKelasName: "",
         });
       } finally {
         setLoadingStats(false);
@@ -237,7 +281,7 @@ export default function DashboardPage() {
            announcementsQueryInstance = query(
             announcementsRef,
             orderBy("date", "desc"),
-            limit(10) // Fetch more initially to ensure enough after filtering
+            limit(10)
           );
         } else if (role === 'orangtua' && user?.linkedStudentClassId) {
            announcementsQueryInstance = query(
@@ -252,7 +296,7 @@ export default function DashboardPage() {
             limit(10)
           );
         }
-        else { // Admin or other roles
+        else {
          announcementsQueryInstance = query(announcementsRef, orderBy("date", "desc"), limit(3));
         }
 
@@ -262,22 +306,21 @@ export default function DashboardPage() {
           ...doc.data()
         })) as Announcement[];
 
-        // Client-side filtering based on role and class if needed
         if (user) {
             if (role === 'siswa' && user.classId) {
                 fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
-                    ann.targetAudience.includes(role!) || // Target audience includes 'siswa'
-                    (ann.targetClassIds && ann.targetClassIds.includes(user.classId!)) // Or target class includes student's class
-                ).slice(0,3); // Then take top 3
+                    ann.targetAudience.includes(role!) ||
+                    (ann.targetClassIds && ann.targetClassIds.includes(user.classId!))
+                ).slice(0,3);
             } else if (role === 'orangtua' && user.linkedStudentClassId) {
                  fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
                     ann.targetAudience.includes(role!) ||
                     (ann.targetClassIds && ann.targetClassIds.includes(user.linkedStudentClassId!))
                 ).slice(0,3);
-            } else if (role === 'guru') { // For teachers, show if target is 'guru', 'semua', or created by them
+            } else if (role === 'guru') {
                 fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
                     ann.targetAudience.includes('guru') ||
-                    ann.targetAudience.includes('semua') || // 'semua' might need to be a defined role or constant
+                    ann.targetAudience.includes('semua') ||
                     ann.createdById === user.uid
                 ).slice(0, 3);
             }
@@ -286,15 +329,14 @@ export default function DashboardPage() {
         setRecentAnnouncements(fetchedAnnouncements);
       } catch (error) {
         console.error("Error fetching announcements:", error);
-        // setRecentAnnouncements([]); // Clear or handle error appropriately
       } finally {
         setLoadingAnnouncements(false);
       }
     };
 
-    if (user && role) { // Ensure user and role are available
+    if (user && role) {
         fetchAllData();
-    } else if (!user && !authLoading) { // If not loading and no user, stop loading indicators
+    } else if (!user && !authLoading) {
         setLoadingStats(false);
         setLoadingAnnouncements(false);
     }
@@ -339,7 +381,7 @@ export default function DashboardPage() {
       {role === 'siswa' && user && (
         <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Siswa</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
                 <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
                 <CardContent>
@@ -348,9 +390,9 @@ export default function DashboardPage() {
                      <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                 </CardContent>
             </Card>
-             {/* Placeholder, actual data to be fetched */}
-             <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
-             <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+            <StatCard title="Wali Kelas Saya" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+            <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
+            <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
           </div>
         </section>
       )}
@@ -358,7 +400,7 @@ export default function DashboardPage() {
       {role === 'orangtua' && user && (
          <section>
           <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Anak ({user.linkedStudentName || "Siswa"})</h2>
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
                 <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
                 <CardContent>
@@ -369,15 +411,16 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-xs text-muted-foreground pt-1">
                       {loadingStats ? <Skeleton className="h-4 w-24" /> :
-                       `(${stats.parentChildClassStudentCount || 0} siswa)`
+                       \`(\${stats.parentChildClassStudentCount || 0} siswa)\`
                       }
                     </div>
                     {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                 </CardContent>
             </Card>
-             <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
-             <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
-             <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+            <StatCard title="Wali Kelas Anak" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+            <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
+            <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
+            <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
           </div>
         </section>
       )}
