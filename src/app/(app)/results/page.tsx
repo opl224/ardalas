@@ -18,7 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-  DialogDescription, 
+  DialogDescription as ShadDialogDescription, // Renamed to avoid conflict
   DialogFooter, 
 } from "@/components/ui/dialog";
 import {
@@ -127,7 +127,7 @@ interface ResultData {
   recordedByName?: string;
   studentSubmissionLink?: string;
   submissionNotes?: string;
-  isSentToStudent?: boolean; // New field
+  isSentToStudent?: boolean; 
 }
 
 const baseResultFormSchema = z.object({
@@ -157,10 +157,10 @@ export default function ResultsPage() {
   const [results, setResults] = useState<ResultData[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [students, setStudents] = useState<StudentMin[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<StudentMin[]>([]); // For form student dropdown
+  const [filteredStudents, setFilteredStudents] = useState<StudentMin[]>([]); 
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [assignments, setAssignments] = useState<AssignmentMin[]>([]);
-  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]); // For form assignment dropdown
+  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]); 
 
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
@@ -181,7 +181,6 @@ export default function ResultsPage() {
   const [teacherUniqueSubjectCount, setTeacherUniqueSubjectCount] = useState<number | null>(null);
 
 
-  // States for export section
   const [exportClassId, setExportClassId] = useState<string | undefined>();
   const [exportSubjectId, setExportSubjectId] = useState<string | undefined>();
   const [exportAssessmentType, setExportAssessmentType] = useState<AssessmentType | undefined>();
@@ -229,7 +228,7 @@ export default function ResultsPage() {
             
             const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
             fetchedSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
-            setTeacherUniqueClassCount(null); // Not applicable for admin
+            setTeacherUniqueClassCount(null); 
             setTeacherUniqueSubjectCount(null);
         } else if (role === "guru" && user?.uid) {
             const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
@@ -433,14 +432,13 @@ export default function ResultsPage() {
   const editWatchSubjectId = editResultForm.watch("subjectId");
   const editWatchAssignmentId = editResultForm.watch("assignmentId");
 
-  // Effect for export class change
   useEffect(() => {
     if (exportClassId) {
       setStudentsForExportDropdown(students.filter(s => s.classId === exportClassId));
     } else {
       setStudentsForExportDropdown([]);
     }
-    setExportStudentId(undefined); // Reset student selection when class changes
+    setExportStudentId(undefined); 
   }, [exportClassId, students]);
 
 
@@ -597,7 +595,7 @@ export default function ResultsPage() {
         recordedByName: user.displayName || user.email,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        isSentToStudent: false, // Initialize as not sent
+        isSentToStudent: false, 
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
         delete resultData.meetingNumber;
@@ -640,7 +638,6 @@ export default function ResultsPage() {
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
         updatedAt: serverTimestamp(),
-        // isSentToStudent will not be reset on edit, it's a separate action
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
         resultData.meetingNumber = null;
@@ -708,9 +705,9 @@ export default function ResultsPage() {
     
     if (semesterFilter !== "all") {
       tempResults = tempResults.filter(result => {
-        const month = getMonth(result.dateOfAssessment.toDate()); // 0-11
-        if (semesterFilter === "1") return month >= 6 && month <= 11; // July - Dec
-        if (semesterFilter === "2") return month >= 0 && month <= 5; // Jan - June
+        const month = getMonth(result.dateOfAssessment.toDate()); 
+        if (semesterFilter === "1") return month >= 6 && month <= 11; 
+        if (semesterFilter === "2") return month >= 0 && month <= 5; 
         return true;
       });
     }
@@ -947,8 +944,8 @@ export default function ResultsPage() {
 
     const batch = writeBatch(db);
     const notificationBase = {
-      title: `Hasil Belajar Baru: ${selectedSubject?.name || 'Mapel'} - ${exportAssessmentType}`,
-      description: `Hasil belajar Anda untuk ${selectedSubject?.name || 'Mata Pelajaran Ini'} - ${exportAssessmentType} telah dicatat/diperbarui.`,
+      title: `Nilai Semester Tersedia: ${selectedSubject?.name || 'Mapel'}`,
+      description: `Guru Anda telah mengirimkan nilai semester untuk mata pelajaran ${selectedSubject?.name || 'Mata Pelajaran Ini'}, asesmen tipe: ${exportAssessmentType}. Silakan periksa di halaman Hasil Belajar.`,
       href: "/my-grades",
       read: false,
       createdAt: serverTimestamp(),
@@ -960,7 +957,6 @@ export default function ResultsPage() {
       batch.set(notificationRef, { ...notificationBase, userId: student.id });
     });
     
-    // Mark corresponding results as sent
     if (studentIdsToUpdateResults.length > 0) {
         const resultsToUpdateQuery = query(
             collection(db, "results"),
@@ -978,15 +974,15 @@ export default function ResultsPage() {
             console.error("Error querying results to mark as sent:", error);
              toast({ title: "Gagal Update Status Hasil", description: "Tidak dapat menandai hasil sebagai terkirim.", variant: "destructive" });
              setIsSendingResults(false);
-             return; // Prevent committing batch if this fails
+             return; 
         }
     }
 
 
     try {
       await batch.commit();
-      toast({ title: "Notifikasi Terkirim", description: `Notifikasi hasil belajar telah dikirim ke ${exportStudentId && exportStudentId !== "all_students" ? 'siswa yang dipilih' : 'semua siswa di kelas tersebut'}. Hasil juga telah ditandai terkirim.` });
-      fetchResults(); // Refresh results table to show updated status if needed
+      toast({ title: "Notifikasi Terkirim", description: `Notifikasi nilai semester telah dikirim ke ${exportStudentId && exportStudentId !== "all_students" ? 'siswa yang dipilih' : 'semua siswa di kelas tersebut'}. Hasil juga telah ditandai terkirim.` });
+      fetchResults(); 
     } catch (error) {
       console.error("Error sending notifications and updating results:", error);
       toast({ title: "Gagal Mengirim Notifikasi & Update Hasil", variant: "destructive" });
@@ -1207,7 +1203,7 @@ export default function ResultsPage() {
                 <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-lg">
                   <DialogHeader>
                       <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
-                      <DialogDescription>Isi detail nilai siswa.</DialogDescription>
+                      <ShadDialogDescription>Isi detail nilai siswa.</ShadDialogDescription>
                   </DialogHeader>
                   <Form {...addResultForm}>
                       <form
@@ -1492,7 +1488,7 @@ export default function ResultsPage() {
               <FileDown className="h-6 w-6 text-primary" />
               <span>Ekspor Hasil Belajar Semester</span>
             </CardTitle>
-            <CardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</CardDescription>
+            <ShadDialogDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</ShadDialogDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
             <div>
@@ -1571,7 +1567,7 @@ export default function ResultsPage() {
           <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-lg">
             <DialogHeader>
                 <DialogTitle>Edit Hasil Belajar</DialogTitle>
-                <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
+                <ShadDialogDescription>Perbarui detail nilai siswa.</ShadDialogDescription>
             </DialogHeader>
             {selectedResult && (
                 <Form {...editResultForm}>
@@ -1602,7 +1598,7 @@ export default function ResultsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Detail Hasil Belajar</DialogTitle>
-            <DialogDescription>Informasi lengkap mengenai hasil asesmen.</DialogDescription>
+            <ShadDialogDescription>Informasi lengkap mengenai hasil asesmen.</ShadDialogDescription>
           </DialogHeader>
           {selectedResultForDetail && (
             <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
@@ -1650,3 +1646,4 @@ export default function ResultsPage() {
     </div>
   );
 }
+
