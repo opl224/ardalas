@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription as ShadCardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,16 +18,17 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-} from "@/components/ui/dialog"; // Removed DialogDescription from here as it's also in Card
+  DialogDescription, // Added DialogDescription here
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription as AlertDialogDesc, // Alias to avoid conflict if DialogDescription from Card is used globally
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter,
-  AlertDialogHeader as AlertDialogHead, // Alias if needed
-  AlertDialogTitle as AlertDialogT, // Alias if needed
+  AlertDialogHeader as AlertDialogHead,
+  AlertDialogTitle as AlertDialogT,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1287,7 +1288,7 @@ export default function ResultsPage() {
               <FileDown className="h-6 w-6 text-primary" />
               <span>Ekspor Hasil Belajar Semester</span>
             </CardTitle>
-            <CardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</CardDescription>
+            <ShadCardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</ShadCardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
@@ -1410,5 +1411,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-
