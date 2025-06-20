@@ -17,14 +17,14 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft, Mail } from "lucide-react"; // Added Mail for example, adjust as needed
+import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft, Mail, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useSidebar } from "@/components/ui/sidebar"; 
-import { SheetTrigger } from "@/components/ui/sheet"; 
+import { SheetTrigger, SheetContent } from "@/components/ui/sheet"; 
 import { useState, useEffect, type ReactNode } from "react";
-import Image from "next/image"; // Added Image import
+import Image from "next/image";
 import {
   collection,
   query,
@@ -37,7 +37,7 @@ import {
   writeBatch,
   Timestamp, 
 } from "firebase/firestore";
-import { ScrollArea } from "@/components/ui/scroll-area"; // Added ScrollArea
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface NotificationDoc {
   id: string; 
@@ -56,7 +56,7 @@ function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const { toast } = useToast();
 
-  const MAX_DROPDOWN_NOTIFICATIONS = 10; // Fetch 10, but initially show 5 in dropdown.
+  const MAX_DROPDOWN_NOTIFICATIONS = 10;
 
   useEffect(() => {
     if (!user || !user.uid) { 
@@ -112,7 +112,11 @@ function NotificationBell() {
 
   const handleMarkAsRead = async (id: string) => {
     if (!user) return;
-    // Optimistically update UI
+    
+    const notificationToUpdate = notifications.find(n => n.id === id);
+    if (!notificationToUpdate || notificationToUpdate.read) return;
+
+
     setNotifications(prev => prev.map(n => n.id === id && !n.read ? {...n, read: true} : n));
     setUnreadCount(prev => prev > 0 ? prev - 1 : 0);
 
@@ -126,7 +130,6 @@ function NotificationBell() {
         description: "Gagal menandai notifikasi sebagai dibaca.",
         variant: "destructive",
       });
-      // Revert UI update on error if needed (complex, for now log and toast)
     }
   };
   
@@ -142,7 +145,6 @@ function NotificationBell() {
     
     try {
       await batch.commit();
-      // Firestore listener will update state
     } catch (error) {
       console.error("Error marking all notifications as read:", error);
       toast({
@@ -153,7 +155,7 @@ function NotificationBell() {
     }
   };
   
-  const displayedNotifications = notifications.slice(0, 5); // Show first 5
+  const displayedNotifications = notifications.slice(0, 5);
 
   return (
     <DropdownMenu>
@@ -184,20 +186,25 @@ function NotificationBell() {
             Tidak ada notifikasi baru.
           </DropdownMenuItem>
         ) : (
-          <ScrollArea className="max-h-[calc(5*3.5rem)]"> {/* Approx 5 items visible */}
+          <ScrollArea className="max-h-[calc(5*3.5rem)]">
             {displayedNotifications.map(notification => (
               <DropdownMenuItem 
                 key={notification.id} 
                 className={cn(
-                  "flex flex-col items-start gap-0.5 p-2 cursor-pointer focus:bg-accent/80",
+                  "flex flex-col items-start gap-0.5 p-2 cursor-pointer focus:bg-accent/80 relative", // Added relative positioning
                   !notification.read && "bg-accent/50 hover:bg-accent/70"
                 )}
-                onClick={() => !notification.read && handleMarkAsRead(notification.id)}
-                asChild={!!notification.href} // Use asChild only if href exists
+                onClick={() => handleMarkAsRead(notification.id)} // Mark as read on click
+                asChild={!!notification.href}
               >
                 {notification.href ? (
                   <Link href={notification.href} className="w-full block">
-                    <p className="font-semibold text-sm line-clamp-1">{notification.title}</p>
+                    {!notification.read && (
+                      <span className="absolute top-1.5 right-1.5 flex h-2 w-2"> 
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      </span>
+                    )}
+                    <p className="font-semibold text-sm line-clamp-1 pr-3">{notification.title}</p> {/* Added pr-3 for spacing */}
                     <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/80">
                       {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) || "Baru saja"}
@@ -205,7 +212,12 @@ function NotificationBell() {
                   </Link>
                 ) : (
                   <div className="w-full">
-                    <p className="font-semibold text-sm line-clamp-1">{notification.title}</p>
+                     {!notification.read && (
+                      <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                      </span>
+                    )}
+                    <p className="font-semibold text-sm line-clamp-1 pr-3">{notification.title}</p> {/* Added pr-3 */}
                     <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/80">
                       {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) || "Baru saja"}
@@ -293,13 +305,20 @@ export function AppHeader() {
   const { isMobile, setOpenMobile } = useSidebar(); 
   const currentNavItem = navItems.find(item => item.href === pathname || (item.href !== "/dashboard" && pathname.startsWith(item.href)));
   const pageTitle = currentNavItem?.title || "Ardalas";
+  const [isHamburgerWiggling, setIsHamburgerWiggling] = useState(false);
+
+  const handleHamburgerClick = () => {
+    setIsHamburgerWiggling(true);
+    setOpenMobile(true);
+    setTimeout(() => setIsHamburgerWiggling(false), 500); // Duration of wiggle animation
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-md px-4 sm:px-8">
       <div className="flex items-center gap-2">
         {isMobile && (
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={() => setOpenMobile(true)} className="md:hidden">
+            <Button variant="ghost" size="icon" onClick={handleHamburgerClick} className={cn("md:hidden", isHamburgerWiggling && "animate-hamburger-wiggle")}>
               <Image 
                 src="/hamburger.png" 
                 alt="Menu" 
