@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as ShadCardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,8 +18,8 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-  DialogDescription, // Added import
-  DialogFooter, // Added import
+  DialogDescription, 
+  DialogFooter, 
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -30,7 +30,7 @@ import {
   AlertDialogFooter as AlertDialogFoot, 
   AlertDialogHeader as AlertDialogHead,
   AlertDialogTitle as AlertDialogT,
-  AlertDialogTrigger, // Added import
+  AlertDialogTrigger, 
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -127,6 +127,7 @@ interface ResultData {
   recordedByName?: string;
   studentSubmissionLink?: string;
   submissionNotes?: string;
+  isSentToStudent?: boolean; // New field
 }
 
 const baseResultFormSchema = z.object({
@@ -596,6 +597,7 @@ export default function ResultsPage() {
         recordedByName: user.displayName || user.email,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        isSentToStudent: false, // Initialize as not sent
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
         delete resultData.meetingNumber;
@@ -638,6 +640,7 @@ export default function ResultsPage() {
         subjectName,
         dateOfAssessment: Timestamp.fromDate(startOfDay(data.dateOfAssessment)),
         updatedAt: serverTimestamp(),
+        // isSentToStudent will not be reset on edit, it's a separate action
     };
     if (data.meetingNumber === undefined || data.meetingNumber === null || isNaN(data.meetingNumber)) {
         resultData.meetingNumber = null;
@@ -923,11 +926,17 @@ export default function ResultsPage() {
     const selectedSubject = subjects.find(s => s.id === exportSubjectId);
 
     let studentsToNotify: StudentMin[] = [];
+    let studentIdsToUpdateResults: string[] = [];
+
     if (exportStudentId && exportStudentId !== "all_students") {
       const student = students.find(s => s.id === exportStudentId);
-      if (student) studentsToNotify.push(student);
+      if (student) {
+        studentsToNotify.push(student);
+        studentIdsToUpdateResults.push(student.id);
+      }
     } else {
       studentsToNotify = students.filter(s => s.classId === exportClassId);
+      studentIdsToUpdateResults = studentsToNotify.map(s => s.id);
     }
 
     if (studentsToNotify.length === 0) {
@@ -943,20 +952,44 @@ export default function ResultsPage() {
       href: "/my-grades",
       read: false,
       createdAt: serverTimestamp(),
-      type: "new_result", // A new type for this specific notification
+      type: "new_result", 
     };
 
     studentsToNotify.forEach(student => {
       const notificationRef = doc(collection(db, "notifications"));
       batch.set(notificationRef, { ...notificationBase, userId: student.id });
     });
+    
+    // Mark corresponding results as sent
+    if (studentIdsToUpdateResults.length > 0) {
+        const resultsToUpdateQuery = query(
+            collection(db, "results"),
+            where("classId", "==", exportClassId),
+            where("subjectId", "==", exportSubjectId),
+            where("assessmentType", "==", exportAssessmentType),
+            where("studentId", "in", studentIdsToUpdateResults)
+        );
+        try {
+            const resultsSnapshot = await getDocs(resultsToUpdateQuery);
+            resultsSnapshot.forEach(resultDoc => {
+                batch.update(resultDoc.ref, { isSentToStudent: true });
+            });
+        } catch (error) {
+            console.error("Error querying results to mark as sent:", error);
+             toast({ title: "Gagal Update Status Hasil", description: "Tidak dapat menandai hasil sebagai terkirim.", variant: "destructive" });
+             setIsSendingResults(false);
+             return; // Prevent committing batch if this fails
+        }
+    }
+
 
     try {
       await batch.commit();
-      toast({ title: "Notifikasi Terkirim", description: `Notifikasi hasil belajar telah dikirim ke ${exportStudentId && exportStudentId !== "all_students" ? 'siswa yang dipilih' : 'semua siswa di kelas tersebut'}.` });
+      toast({ title: "Notifikasi Terkirim", description: `Notifikasi hasil belajar telah dikirim ke ${exportStudentId && exportStudentId !== "all_students" ? 'siswa yang dipilih' : 'semua siswa di kelas tersebut'}. Hasil juga telah ditandai terkirim.` });
+      fetchResults(); // Refresh results table to show updated status if needed
     } catch (error) {
-      console.error("Error sending notifications:", error);
-      toast({ title: "Gagal Mengirim Notifikasi", variant: "destructive" });
+      console.error("Error sending notifications and updating results:", error);
+      toast({ title: "Gagal Mengirim Notifikasi & Update Hasil", variant: "destructive" });
     } finally {
       setIsSendingResults(false);
     }
@@ -1459,7 +1492,7 @@ export default function ResultsPage() {
               <FileDown className="h-6 w-6 text-primary" />
               <span>Ekspor Hasil Belajar Semester</span>
             </CardTitle>
-            <ShadCardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</ShadCardDescription>
+            <CardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
             <div>
@@ -1617,5 +1650,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-

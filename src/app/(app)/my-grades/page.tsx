@@ -57,6 +57,7 @@ interface MyGradeEntry {
   assignmentId?: string;
   meetingNumber?: number;
   submissionLink?: string;
+  isSentToStudent?: boolean; // New field
 }
 
 interface ResultDocData {
@@ -71,6 +72,7 @@ interface ResultDocData {
   feedback?: string;
   assignmentId?: string;
   meetingNumber?: number;
+  isSentToStudent?: boolean; // New field
 }
 
 interface GroupedGradeDisplay {
@@ -169,6 +171,7 @@ export default function MyGradesPage() {
             assignmentId: result.assignmentId,
             meetingNumber: result.meetingNumber,
             submissionLink: submissionLinkEntry,
+            isSentToStudent: result.isSentToStudent ?? false, // Add isSentToStudent
           };
         });
         setAllGrades(finalGradesData);
@@ -431,7 +434,14 @@ export default function MyGradesPage() {
                 </TableHeader>
                 <TableBody>
                   {groupedGrades.map((group, index) => {
-                    const uniqueAssessmentTypes = Array.from(new Set(group.resultsForThisSubject.map(r => r.assessmentType))).filter(Boolean) as AssessmentTypeMyGrades[];
+                    const sentAssessmentTypes = Array.from(
+                      new Set(
+                        group.resultsForThisSubject
+                          .filter(r => r.isSentToStudent === true && r.assessmentType)
+                          .map(r => r.assessmentType)
+                      )
+                    ).filter(Boolean) as AssessmentTypeMyGrades[];
+                    
                     return (
                         <TableRow key={group.subjectName}>
                         <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{index + 1}</TableCell>
@@ -442,7 +452,7 @@ export default function MyGradesPage() {
                             {group.subjectName}
                         </TableCell>
                         <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
-                            {uniqueAssessmentTypes.length > 0 ? (
+                            {sentAssessmentTypes.length > 0 ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${group.subjectName}`}>
@@ -450,14 +460,14 @@ export default function MyGradesPage() {
                                 </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                {uniqueAssessmentTypes.map(type => (
+                                {sentAssessmentTypes.map(type => (
                                     <DropdownMenuItem 
                                         key={type}
                                         onSelect={() => handleDownloadBySubjectAndType(
                                             group.subjectName, 
                                             type, 
                                             group.studentName, 
-                                            group.resultsForThisSubject.filter(r => r.assessmentType === type)
+                                            group.resultsForThisSubject.filter(r => r.assessmentType === type && r.isSentToStudent === true)
                                         )}
                                     >
                                     <Download className="mr-2 h-4 w-4" />
@@ -467,7 +477,7 @@ export default function MyGradesPage() {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                             ) : (
-                                <span className="text-xs text-muted-foreground italic">Belum ada hasil</span>
+                                <span className="text-xs text-muted-foreground italic">Belum ada hasil terkirim</span>
                             )}
                         </TableCell>
                         </TableRow>
