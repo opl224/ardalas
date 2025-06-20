@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Added Input for edit name dialog
+import { Input } from "@/components/ui/input";
 
 const localAvatars = [
     { src: '/avatars/laki-laki.png', hint: 'avatar male', alt: 'Avatar Laki-laki'},
@@ -77,7 +77,6 @@ export default function ProfilePage() {
   const [newName, setNewName] = useState(user?.displayName || "");
   const [isUpdatingName, setIsUpdatingName] = useState(false);
 
-
   useEffect(() => {
     if (user?.photoURL) {
       setSelectedAvatarUrlInDialog(user.photoURL);
@@ -97,7 +96,6 @@ export default function ProfilePage() {
       setNewName(user.displayName);
     }
   }, [user?.displayName]);
-
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -185,14 +183,11 @@ export default function ProfilePage() {
     setIsUpdatingName(true);
     const batch = writeBatch(db);
     try {
-      // Update Firebase Auth display name
       await updateProfile(auth.currentUser, { displayName: newName.trim() });
 
-      // Update 'users' collection
       const userDocRef = doc(db, "users", user.uid);
       batch.update(userDocRef, { name: newName.trim() });
 
-      // If user is a teacher, update 'teachers' collection as well
       if (role === 'guru') {
         const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
@@ -216,7 +211,6 @@ export default function ProfilePage() {
       setIsUpdatingName(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -288,7 +282,7 @@ export default function ProfilePage() {
                   {localAvatars.map((avatar) => (
                     <button
                       key={avatar.src}
-                      onClick={()={() => handleAvatarSelect(avatar.src)} }
+                      onClick={() => handleAvatarSelect(avatar.src)}
                       className={cn(
                         "relative aspect-square rounded-full overflow-hidden border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                         selectedAvatarUrlInDialog === avatar.src ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent hover:border-primary/50"
@@ -470,5 +464,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    
