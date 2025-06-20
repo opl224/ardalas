@@ -77,12 +77,6 @@ export const navItems: NavItem[] = [
     ],
   },
   { 
-    title: "Track Aktivitas", 
-    href: "/admin/track-activity", 
-    icon: ScanSearch,
-    roles: ["admin"] 
-  },
-  { 
     title: "Pengaturan", 
     href: "/settings", 
     icon: Settings,
@@ -92,5 +86,6 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
+
 
 
