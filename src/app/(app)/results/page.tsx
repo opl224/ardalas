@@ -30,7 +30,7 @@ import {
   AlertDialogFooter as AlertDialogFoot, 
   AlertDialogHeader as AlertDialogHead,
   AlertDialogTitle as AlertDialogT,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,8 +66,10 @@ import {
   orderBy,
   where,
   writeBatch,
-  type Query as FirebaseQuery, // Explicitly type FirebaseQuery
-  type DocumentData, // Explicitly type DocumentData
+  type Query as FirebaseQuery, 
+  type DocumentData, 
+  documentId,
+  limit
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -207,32 +209,74 @@ export default function ResultsPage() {
     }
     setIsLoadingData(true);
     try {
-      const [classesSnapshot, studentsAuthSnapshot, subjectsSnapshot, assignmentsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "users"), where("role", "==", "siswa"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "assignments"), orderBy("title", "asc"))),
-      ]);
-      setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        let fetchedClasses: ClassMin[] = [];
+        let fetchedSubjects: SubjectMin[] = [];
 
-      setStudents(studentsAuthSnapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-            id: docSnap.id,
-            name: data.name,
-            classId: data.classId,
-            className: data.className,
-        };
-      }));
+        if (role === "admin") {
+            const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
+            fetchedClasses = classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+            
+            const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
+            fetchedSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        } else if (role === "guru" && user?.uid) {
+            const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+            const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
-      setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setAssignments(assignmentsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        title: doc.data().title,
-        meetingNumber: doc.data().meetingNumber,
-        subjectId: doc.data().subjectId,
-        classId: doc.data().classId,
-      })));
+            if (!teacherProfileSnapshot.empty) {
+                const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+                const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
+                const lessonsSnapshot = await getDocs(lessonsQuery);
+                
+                const uniqueClassIds = new Set<string>();
+                const uniqueSubjectIds = new Set<string>();
+                lessonsSnapshot.docs.forEach(doc => {
+                    uniqueClassIds.add(doc.data().classId);
+                    uniqueSubjectIds.add(doc.data().subjectId);
+                });
+
+                if (uniqueClassIds.size > 0) {
+                    const classChunks = [];
+                    const classIdsArray = Array.from(uniqueClassIds);
+                    for (let i = 0; i < classIdsArray.length; i += 30) { classChunks.push(classIdsArray.slice(i, i + 30)); }
+                    const classPromises = classChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))));
+                    const classSnapshots = await Promise.all(classPromises);
+                    classSnapshots.forEach(snap => snap.docs.forEach(d => fetchedClasses.push({ id: d.id, name: d.data().name })));
+                    fetchedClasses.sort((a, b) => a.name.localeCompare(b.name));
+                }
+
+                if (uniqueSubjectIds.size > 0) {
+                    const subjectChunks = [];
+                    const subjectIdsArray = Array.from(uniqueSubjectIds);
+                    for (let i = 0; i < subjectIdsArray.length; i += 30) { subjectChunks.push(subjectIdsArray.slice(i, i + 30)); }
+                    const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db, "subjects"), where(documentId(), "in", chunk))));
+                    const subjectSnapshots = await Promise.all(subjectPromises);
+                    subjectSnapshots.forEach(snap => snap.docs.forEach(d => fetchedSubjects.push({ id: d.id, name: d.data().name })));
+                    fetchedSubjects.sort((a,b) => a.name.localeCompare(b.name));
+                }
+            }
+        }
+        setClasses(fetchedClasses);
+        setSubjects(fetchedSubjects);
+
+        const studentsAuthSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "siswa"), orderBy("name", "asc")));
+        setStudents(studentsAuthSnapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            return {
+                id: docSnap.id,
+                name: data.name,
+                classId: data.classId,
+                className: data.className,
+            };
+        }));
+        
+        const assignmentsSnapshot = await getDocs(query(collection(db, "assignments"), orderBy("title", "asc")));
+        setAssignments(assignmentsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            title: doc.data().title,
+            meetingNumber: doc.data().meetingNumber,
+            subjectId: doc.data().subjectId,
+            classId: doc.data().classId,
+        })));
 
     } catch (error) {
       console.error("Error fetching dropdown data: ", error);
@@ -702,19 +746,33 @@ export default function ResultsPage() {
   };
 
   const handleExportSemesterResults = async (formatType: 'xlsx' | 'pdf') => {
-    if (!exportClassId || !exportSubjectId || !exportAssessmentType) {
-      toast({ title: "Pilihan Tidak Lengkap", description: "Harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
-      return;
+    let classIdToExport = exportClassId;
+    let subjectIdToExport = exportSubjectId;
+    let assessmentTypeToExport = exportAssessmentType;
+
+    if (role === 'guru') {
+        if (!exportClassId || !exportSubjectId || !exportAssessmentType) {
+          toast({ title: "Pilihan Tidak Lengkap", description: "Guru harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
+          return;
+        }
+    } else if (role === 'admin') {
+        if (!exportClassId || !exportSubjectId || !exportAssessmentType) {
+          toast({ title: "Pilihan Tidak Lengkap", description: "Admin harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
+          return;
+        }
+    } else {
+        return; // Should not happen for other roles
     }
+
     setIsExporting(true);
     
-    const selectedClass = classes.find(c => c.id === exportClassId);
-    const selectedSubject = subjects.find(s => s.id === exportSubjectId);
+    const selectedClass = classes.find(c => c.id === classIdToExport);
+    const selectedSubject = subjects.find(s => s.id === subjectIdToExport);
     
-    const fileNameBase = `Hasil_${selectedClass?.name?.replace(/\s+/g, '_') || 'Kelas'}_${selectedSubject?.name?.replace(/\s+/g, '_') || 'Mapel'}_${exportAssessmentType.replace(/\s+/g, '_')}`;
+    const fileNameBase = `Hasil_${selectedClass?.name?.replace(/\s+/g, '_') || 'Kelas'}_${selectedSubject?.name?.replace(/\s+/g, '_') || 'Mapel'}_${assessmentTypeToExport.replace(/\s+/g, '_')}`;
 
     try {
-      const studentsInClassQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", exportClassId), orderBy("name", "asc"));
+      const studentsInClassQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", classIdToExport), orderBy("name", "asc"));
       const studentsSnapshot = await getDocs(studentsInClassQuery);
       const studentsData = studentsSnapshot.docs.map(doc => ({id: doc.id, name: doc.data().name}));
 
@@ -724,9 +782,9 @@ export default function ResultsPage() {
         const resultsQuery = query(
           collection(db, "results"),
           where("studentId", "==", student.id),
-          where("classId", "==", exportClassId),
-          where("subjectId", "==", exportSubjectId),
-          where("assessmentType", "==", exportAssessmentType),
+          where("classId", "==", classIdToExport!),
+          where("subjectId", "==", subjectIdToExport!),
+          where("assessmentType", "==", assessmentTypeToExport!),
           orderBy("dateOfAssessment", "desc")
         );
         const resultsSnapshot = await getDocs(resultsQuery);
@@ -758,7 +816,6 @@ export default function ResultsPage() {
           return;
       }
 
-
       if (formatType === 'xlsx') {
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
@@ -767,7 +824,7 @@ export default function ResultsPage() {
           [`Laporan Hasil Belajar Semester`],
           [`Kelas: ${selectedClass?.name || '-'}`],
           [`Mata Pelajaran: ${selectedSubject?.name || '-'}`],
-          [`Tipe Asesmen: ${exportAssessmentType}`],
+          [`Tipe Asesmen: ${assessmentTypeToExport}`],
           [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
           [] 
         ], { origin: "A1" });
@@ -782,7 +839,7 @@ export default function ResultsPage() {
         doc.setFontSize(10);
         doc.text(`Kelas: ${selectedClass?.name || '-'}`, 14, 22);
         doc.text(`Mata Pelajaran: ${selectedSubject?.name || '-'}`, 14, 29);
-        doc.text(`Tipe Asesmen: ${exportAssessmentType}`, 14, 36);
+        doc.text(`Tipe Asesmen: ${assessmentTypeToExport}`, 14, 36);
         doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, 43);
 
         autoTable(doc, {
@@ -793,11 +850,11 @@ export default function ResultsPage() {
           headStyles: { fillColor: [22, 160, 133] },
           styles: { fontSize: 8, cellPadding: 1.5 },
           columnStyles: { 
-            0: { cellWidth: 35 }, // Nama Siswa
-            1: { cellWidth: 50 }, // Judul
-            2: { cellWidth: 15 }, // Nilai
-            3: { cellWidth: 25 }, // Tgl
-            4: { cellWidth: 'auto'}, // Feedback
+            0: { cellWidth: 35 }, 
+            1: { cellWidth: 50 }, 
+            2: { cellWidth: 15 }, 
+            3: { cellWidth: 25 }, 
+            4: { cellWidth: 'auto'}, 
           }
         });
         doc.save(`${fileNameBase}.pdf`);
@@ -1293,20 +1350,42 @@ export default function ResultsPage() {
             <ShadCardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</ShadCardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            <div>
-              <Label htmlFor="export-classId">Kelas</Label>
-              <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting}>
-                <SelectTrigger id="export-classId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
-                <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="export-subjectId">Mata Pelajaran</Label>
-              <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting}>
-                <SelectTrigger id="export-subjectId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih mapel"} /></SelectTrigger>
-                <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
+            { (role === 'admin') && (
+              <>
+                <div>
+                  <Label htmlFor="export-classId">Kelas</Label>
+                  <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting}>
+                    <SelectTrigger id="export-classId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
+                    <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="export-subjectId">Mata Pelajaran</Label>
+                  <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting}>
+                    <SelectTrigger id="export-subjectId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih mapel"} /></SelectTrigger>
+                    <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+            { (role === 'guru') && (
+               <>
+                <div>
+                  <Label htmlFor="export-classId-teacher">Kelas (Diajar)</Label>
+                  <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting || classes.length === 0}>
+                    <SelectTrigger id="export-classId-teacher" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : (classes.length === 0 ? "Tidak ada kelas diajar" : "Pilih kelas")} /></SelectTrigger>
+                    <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="export-subjectId-teacher">Mata Pelajaran (Diajar)</Label>
+                  <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting || subjects.length === 0}>
+                    <SelectTrigger id="export-subjectId-teacher" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : (subjects.length === 0 ? "Tidak ada mapel diajar" : "Pilih mapel")} /></SelectTrigger>
+                    <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
             <div>
               <Label htmlFor="export-assessmentType">Tipe Asesmen</Label>
               <Select value={exportAssessmentType} onValueChange={(value) => setExportAssessmentType(value as AssessmentType)} disabled={isExporting}>
@@ -1315,12 +1394,21 @@ export default function ResultsPage() {
               </Select>
             </div>
              <div className="flex flex-col sm:flex-row gap-2 lg:col-span-1 justify-end pt-4">
-                <Button onClick={() => handleExportSemesterResults('xlsx')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
-                {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} Ekspor Excel
-                </Button>
-                <Button onClick={() => handleExportSemesterResults('pdf')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
-                {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} Ekspor PDF
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
+                            {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} <FileDown className="mr-2 h-4 w-4" /> Ekspor Hasil
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleExportSemesterResults('xlsx')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
+                            Excel (.xlsx)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExportSemesterResults('pdf')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
+                            PDF (.pdf)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
           </CardContent>
         </Card>
