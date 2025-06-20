@@ -156,10 +156,10 @@ export default function ResultsPage() {
   const [results, setResults] = useState<ResultData[]>([]);
   const [classes, setClasses] = useState<ClassMin[]>([]);
   const [students, setStudents] = useState<StudentMin[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<StudentMin[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<StudentMin[]>([]); // For form student dropdown
   const [subjects, setSubjects] = useState<SubjectMin[]>([]);
   const [assignments, setAssignments] = useState<AssignmentMin[]>([]);
-  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]);
+  const [filteredAssignments, setFilteredAssignments] = useState<AssignmentMin[]>([]); // For form assignment dropdown
 
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingResults, setIsLoadingResults] = useState(true);
@@ -175,9 +175,12 @@ export default function ResultsPage() {
   const [selectedAssessmentTypeFilter, setSelectedAssessmentTypeFilter] = useState<AssessmentType | "all">("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // States for export section
   const [exportClassId, setExportClassId] = useState<string | undefined>();
   const [exportSubjectId, setExportSubjectId] = useState<string | undefined>();
   const [exportAssessmentType, setExportAssessmentType] = useState<AssessmentType | undefined>();
+  const [exportStudentId, setExportStudentId] = useState<string | undefined>(); // New state for export
+  const [studentsForExportDropdown, setStudentsForExportDropdown] = useState<StudentMin[]>([]); // New state
   const [isExporting, setIsExporting] = useState(false);
 
   const { toast } = useToast();
@@ -413,6 +416,17 @@ export default function ResultsPage() {
   const editWatchClassId = editResultForm.watch("classId");
   const editWatchSubjectId = editResultForm.watch("subjectId");
   const editWatchAssignmentId = editResultForm.watch("assignmentId");
+
+  // Effect for export class change
+  useEffect(() => {
+    if (exportClassId) {
+      setStudentsForExportDropdown(students.filter(s => s.classId === exportClassId));
+    } else {
+      setStudentsForExportDropdown([]);
+    }
+    setExportStudentId(undefined); // Reset student selection when class changes
+  }, [exportClassId, students]);
+
 
   useEffect(() => {
     const currentFormStudentId = addResultForm.getValues("studentId");
@@ -745,40 +759,43 @@ export default function ResultsPage() {
     return pageNumbers;
   };
 
-  const handleExportSemesterResults = async (formatType: 'xlsx' | 'pdf') => {
+  const handleExportSemesterResults = async (formatType: 'xlsx' | 'pdf', studentIdToExport?: string) => {
     let classIdToExport = exportClassId;
     let subjectIdToExport = exportSubjectId;
     let assessmentTypeToExport = exportAssessmentType;
 
-    if (role === 'guru') {
-        if (!exportClassId || !exportSubjectId || !exportAssessmentType) {
-          toast({ title: "Pilihan Tidak Lengkap", description: "Guru harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
-          return;
-        }
-    } else if (role === 'admin') {
-        if (!exportClassId || !exportSubjectId || !exportAssessmentType) {
-          toast({ title: "Pilihan Tidak Lengkap", description: "Admin harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
-          return;
-        }
-    } else {
-        return; // Should not happen for other roles
+    if (!classIdToExport || !subjectIdToExport || !assessmentTypeToExport) {
+        toast({ title: "Pilihan Tidak Lengkap", description: "Harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
+        return;
     }
 
     setIsExporting(true);
     
     const selectedClass = classes.find(c => c.id === classIdToExport);
     const selectedSubject = subjects.find(s => s.id === subjectIdToExport);
+    const studentInfo = studentIdToExport ? students.find(s => s.id === studentIdToExport) : null;
     
-    const fileNameBase = `Hasil_${selectedClass?.name?.replace(/\s+/g, '_') || 'Kelas'}_${selectedSubject?.name?.replace(/\s+/g, '_') || 'Mapel'}_${assessmentTypeToExport.replace(/\s+/g, '_')}`;
+    const fileNameBase = `Hasil_${selectedClass?.name?.replace(/\s+/g, '_') || 'Kelas'}_${selectedSubject?.name?.replace(/\s+/g, '_') || 'Mapel'}_${assessmentTypeToExport.replace(/\s+/g, '_')}${studentInfo ? `_${studentInfo.name.replace(/\s+/g, '_')}` : ''}`;
 
     try {
-      const studentsInClassQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", classIdToExport), orderBy("name", "asc"));
-      const studentsSnapshot = await getDocs(studentsInClassQuery);
-      const studentsData = studentsSnapshot.docs.map(doc => ({id: doc.id, name: doc.data().name}));
+      let studentsToProcess = [];
+      if (studentIdToExport && studentIdToExport !== "all_students") { // "all_students" can be a placeholder value if you add such an option
+        const student = students.find(s => s.id === studentIdToExport);
+        if (student) studentsToProcess.push(student);
+      } else { // Export for all students in the selected class
+        studentsToProcess = students.filter(s => s.classId === classIdToExport);
+      }
+      
+      if (studentsToProcess.length === 0) {
+        toast({ title: "Tidak Ada Siswa", description: "Tidak ada siswa yang cocok dengan kriteria kelas/siswa yang dipilih.", variant: "info" });
+        setIsExporting(false);
+        return;
+      }
+
 
       const dataToExport = [];
 
-      for (const student of studentsData) {
+      for (const student of studentsToProcess) {
         const resultsQuery = query(
           collection(db, "results"),
           where("studentId", "==", student.id),
@@ -825,9 +842,10 @@ export default function ResultsPage() {
           [`Kelas: ${selectedClass?.name || '-'}`],
           [`Mata Pelajaran: ${selectedSubject?.name || '-'}`],
           [`Tipe Asesmen: ${assessmentTypeToExport}`],
+          studentInfo ? [`Siswa: ${studentInfo.name}`] : [],
           [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
           [] 
-        ], { origin: "A1" });
+        ].filter(row => row.length > 0), { origin: "A1" });
         const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
         worksheet['!cols'] = cols;
         XLSX.writeFile(workbook, `${fileNameBase}.xlsx`);
@@ -840,10 +858,11 @@ export default function ResultsPage() {
         doc.text(`Kelas: ${selectedClass?.name || '-'}`, 14, 22);
         doc.text(`Mata Pelajaran: ${selectedSubject?.name || '-'}`, 14, 29);
         doc.text(`Tipe Asesmen: ${assessmentTypeToExport}`, 14, 36);
-        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, 43);
+        if (studentInfo) doc.text(`Siswa: ${studentInfo.name}`, 14, 43);
+        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, studentInfo ? 50 : 43);
 
         autoTable(doc, {
-          startY: 50,
+          startY: studentInfo ? 57 : 50,
           head: [Object.keys(dataToExport[0])],
           body: dataToExport.map(row => Object.values(row)),
           theme: 'grid',
@@ -1349,43 +1368,37 @@ export default function ResultsPage() {
             </CardTitle>
             <ShadCardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</ShadCardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-            { (role === 'admin') && (
-              <>
-                <div>
-                  <Label htmlFor="export-classId">Kelas</Label>
-                  <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting}>
-                    <SelectTrigger id="export-classId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
-                    <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="export-subjectId">Mata Pelajaran</Label>
-                  <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting}>
-                    <SelectTrigger id="export-subjectId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih mapel"} /></SelectTrigger>
-                    <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-            { (role === 'guru') && (
-               <>
-                <div>
-                  <Label htmlFor="export-classId-teacher">Kelas (Diajar)</Label>
-                  <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting || classes.length === 0}>
-                    <SelectTrigger id="export-classId-teacher" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : (classes.length === 0 ? "Tidak ada kelas diajar" : "Pilih kelas")} /></SelectTrigger>
-                    <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="export-subjectId-teacher">Mata Pelajaran (Diajar)</Label>
-                  <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting || subjects.length === 0}>
-                    <SelectTrigger id="export-subjectId-teacher" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : (subjects.length === 0 ? "Tidak ada mapel diajar" : "Pilih mapel")} /></SelectTrigger>
-                    <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+            <div>
+              <Label htmlFor="export-classId">Kelas</Label>
+              <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting}>
+                <SelectTrigger id="export-classId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
+                <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+             <div>
+              <Label htmlFor="export-studentId">Siswa (Opsional)</Label>
+              <Select 
+                value={exportStudentId || "all_students"} 
+                onValueChange={(value) => setExportStudentId(value === "all_students" ? undefined : value)} 
+                disabled={isLoadingData || isExporting || !exportClassId || studentsForExportDropdown.length === 0}
+              >
+                <SelectTrigger id="export-studentId" className="mt-1">
+                  <SelectValue placeholder={!exportClassId ? "Pilih kelas dulu" : (studentsForExportDropdown.length === 0 ? "Tidak ada siswa" : "Pilih siswa (atau semua)")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all_students">Semua Siswa di Kelas Ini</SelectItem>
+                  {studentsForExportDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="export-subjectId">Mata Pelajaran</Label>
+              <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting}>
+                <SelectTrigger id="export-subjectId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih mapel"} /></SelectTrigger>
+                <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <div>
               <Label htmlFor="export-assessmentType">Tipe Asesmen</Label>
               <Select value={exportAssessmentType} onValueChange={(value) => setExportAssessmentType(value as AssessmentType)} disabled={isExporting}>
@@ -1401,10 +1414,10 @@ export default function ResultsPage() {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleExportSemesterResults('xlsx')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
+                        <DropdownMenuItem onClick={() => handleExportSemesterResults('xlsx', exportStudentId)} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
                             Excel (.xlsx)
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExportSemesterResults('pdf')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
+                        <DropdownMenuItem onClick={() => handleExportSemesterResults('pdf', exportStudentId)} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
                             PDF (.pdf)
                         </DropdownMenuItem>
                     </DropdownMenuContent>
