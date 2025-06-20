@@ -71,10 +71,11 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Ujian", href: "/exams", icon: FileText, roles: ["admin", "guru", "siswa", "orangtua"] },
       { title: "Tugas", href: "/assignments", icon: ClipboardCheck, roles: ["admin", "guru", "siswa", "orangtua"] },
-      { title: "Hasil Belajar", href: "/my-grades", icon: GraduationCap, roles: ["siswa", "orangtua"]}, // Changed label
+      { title: "Hasil Belajar", href: "/my-grades", icon: GraduationCap, roles: ["siswa", "orangtua"]},
       { title: "Hasil", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
     ],
   },
+  { title: "Kalender Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
   { 
     title: "Pengaturan", 
     href: "/settings", 
@@ -85,3 +86,4 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
+

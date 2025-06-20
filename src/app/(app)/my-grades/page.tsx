@@ -23,40 +23,30 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Eye, FileDown, Download } from "lucide-react";
+import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Download, FileDown } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useSidebar } from "@/components/ui/sidebar";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 
-// Copied AssessmentType from results/page.tsx, consider moving to a shared config
+
 const ASSESSMENT_TYPES_MY_GRADES = ["UTS", "UAS", "Tugas Harian", "Kuis", "Proyek", "Praktikum", "Lainnya"] as const;
 type AssessmentTypeMyGrades = typeof ASSESSMENT_TYPES_MY_GRADES[number];
 
 interface MyGradeEntry {
-  id: string; // Result document ID
+  id: string; 
   assessmentTitle: string;
   assessmentType?: AssessmentTypeMyGrades;
   subjectName?: string;
@@ -69,7 +59,6 @@ interface MyGradeEntry {
   submissionLink?: string;
 }
 
-// Minimal interface for data structure from "results" collection
 interface ResultDocData {
   id: string;
   studentId: string;
@@ -82,17 +71,21 @@ interface ResultDocData {
   feedback?: string;
   assignmentId?: string;
   meetingNumber?: number;
-  // ... other fields from results if needed
+}
+
+interface GroupedGradeDisplay {
+  subjectName: string;
+  studentName: string;
+  resultsForThisSubject: MyGradeEntry[];
 }
 
 
 export default function MyGradesPage() {
   const { user, loading: authLoading, role } = useAuth();
-  const [grades, setGrades] = useState<MyGradeEntry[]>([]);
+  const [allGrades, setAllGrades] = useState<MyGradeEntry[]>([]);
+  const [groupedGrades, setGroupedGrades] = useState<GroupedGradeDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { isMobile } = useSidebar();
-  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
-  const [selectedGradeForDetail, setSelectedGradeForDetail] = useState<MyGradeEntry | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
@@ -100,7 +93,8 @@ export default function MyGradesPage() {
     const fetchMyGrades = async () => {
       if (authLoading || !user) {
         setIsLoading(false);
-        setGrades([]);
+        setAllGrades([]);
+        setGroupedGrades([]);
         return;
       }
 
@@ -108,7 +102,8 @@ export default function MyGradesPage() {
       
       if (!studentAuthId) {
         setIsLoading(false);
-        setGrades([]);
+        setAllGrades([]);
+        setGroupedGrades([]);
         return;
       }
 
@@ -123,7 +118,8 @@ export default function MyGradesPage() {
         const fetchedResultsData = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ResultDocData));
 
         if (fetchedResultsData.length === 0) {
-          setGrades([]);
+          setAllGrades([]);
+          setGroupedGrades([]);
           setIsLoading(false);
           return;
         }
@@ -175,7 +171,26 @@ export default function MyGradesPage() {
             submissionLink: submissionLinkEntry,
           };
         });
-        setGrades(finalGradesData);
+        setAllGrades(finalGradesData);
+
+        // Group grades by subject
+        const subjectMap = new Map<string, MyGradeEntry[]>();
+        finalGradesData.forEach(grade => {
+          const key = grade.subjectName || "Tanpa Mata Pelajaran";
+          if (!subjectMap.has(key)) {
+            subjectMap.set(key, []);
+          }
+          subjectMap.get(key)!.push(grade);
+        });
+
+        const studentNameDisplay = role === "siswa" ? user?.displayName : user?.linkedStudentName;
+        const newGroupedGrades: GroupedGradeDisplay[] = Array.from(subjectMap.entries()).map(([subject, results]) => ({
+          subjectName: subject,
+          studentName: studentNameDisplay || "Siswa",
+          resultsForThisSubject: results,
+        }));
+        setGroupedGrades(newGroupedGrades);
+
 
       } catch (error) {
         console.error("Error fetching student grades:", error);
@@ -189,52 +204,57 @@ export default function MyGradesPage() {
         fetchMyGrades();
     } else if (!authLoading && !user) {
         setIsLoading(false);
-        setGrades([]);
+        setAllGrades([]);
+        setGroupedGrades([]);
     }
   }, [authLoading, user, role, toast]);
 
-  const openDetailDialog = (grade: MyGradeEntry) => {
-    setSelectedGradeForDetail(grade);
-    setIsDetailDialogOpen(true);
-  };
 
-  const handleDownloadSingleResult = (grade: MyGradeEntry) => {
-    if (!grade.score === undefined) {
-        toast({title: "Belum Dinilai", description: "Hasil belajar ini belum memiliki nilai.", variant: "info"});
+  const handleDownloadBySubjectAndType = (subjectName: string, assessmentType: AssessmentTypeMyGrades, studentName: string, resultsForType: MyGradeEntry[]) => {
+    if (resultsForType.length === 0) {
+        toast({title: "Tidak Ada Data", description: `Tidak ada hasil untuk ${assessmentType} pada mata pelajaran ${subjectName}.`, variant: "info"});
         return;
     }
 
-    const studentName = role === "siswa" ? user?.displayName : user?.linkedStudentName;
-    const fileName = `Hasil_Belajar_${studentName?.replace(/\s+/g, '_') || 'Siswa'}_${grade.assessmentTitle.replace(/\s+/g, '_')}.pdf`;
+    const fileName = `Hasil_${studentName.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${assessmentType.replace(/\s+/g, '_')}.pdf`;
     
     const doc = new jsPDF();
     doc.setFontSize(16);
-    doc.text(`Detail Hasil Belajar - ${studentName || 'Siswa'}`, 14, 20);
+    doc.text(`Hasil Belajar - ${studentName}`, 14, 20);
     doc.setFontSize(12);
+    doc.text(`Mata Pelajaran: ${subjectName}`, 14, 28);
+    doc.text(`Tipe Asesmen: ${assessmentType}`, 14, 36);
+
+    const tableBody = resultsForType.map(grade => [
+        `${grade.assessmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`,
+        grade.score?.toString() || 'Belum Dinilai',
+        grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }) : '-',
+        grade.teacherFeedback || '-',
+        grade.submissionLink || 'N/A'
+    ]);
 
     autoTable(doc, {
-      startY: 30,
-      head: [['Deskripsi', 'Detail']],
-      body: [
-        ['Judul Asesmen/Tugas', `${grade.assessmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`],
-        ['Mata Pelajaran', grade.subjectName || '-'],
-        ['Tipe Asesmen', grade.assessmentType || '-'],
-        ['Tanggal Penilaian', grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : '-'],
-        ['Nilai', grade.score?.toString() || 'Belum Dinilai'],
-        ['Komentar Guru', grade.teacherFeedback || '-'],
-        ['Link Pengumpulan', grade.submissionLink || 'Tidak ada/Belum dikumpulkan'],
-      ],
+      startY: 44,
+      head: [['Judul', 'Nilai', 'Tanggal Penilaian', 'Komentar Guru', 'Link Tugas']],
+      body: tableBody,
       theme: 'grid',
-      headStyles: { fillColor: [64, 149, 237] },
-      columnStyles: { 0: { cellWidth: 60 } }
+      headStyles: { fillColor: [64, 149, 237] }, 
+      columnStyles: { 
+        0: { cellWidth: 50 }, // Judul
+        1: { cellWidth: 15 }, // Nilai
+        2: { cellWidth: 25 }, // Tanggal
+        3: { cellWidth: 'auto' }, // Komentar
+        4: { cellWidth: 30 }, // Link
+      }
     });
 
     doc.save(fileName);
     toast({title: "Unduhan Dimulai", description: `${fileName} sedang diunduh.`});
   };
 
+
   const handleExportAllMyGrades = async (formatType: 'xlsx' | 'pdf') => {
-    if (grades.length === 0) {
+    if (allGrades.length === 0) {
       toast({ title: "Tidak Ada Data", description: "Tidak ada hasil belajar untuk diekspor.", variant: "info" });
       return;
     }
@@ -242,7 +262,7 @@ export default function MyGradesPage() {
     const studentName = role === "siswa" ? user?.displayName : user?.linkedStudentName;
     const fileNameBase = `Semua_Hasil_Belajar_${studentName?.replace(/\s+/g, '_') || 'Siswa'}`;
 
-    const dataToExport = grades.map((grade, index) => ({
+    const dataToExport = allGrades.map((grade, index) => ({
       "No.": index + 1,
       "Judul Asesmen/Tugas": `${grade.assessmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`,
       "Mata Pelajaran": grade.subjectName || "-",
@@ -285,14 +305,14 @@ export default function MyGradesPage() {
           headStyles: { fillColor: [22, 160, 133] },
           styles: { fontSize: 7, cellPadding: 1.5 },
           columnStyles: { 
-            0: { cellWidth: 8 }, // No.
-            1: { cellWidth: 40 }, // Judul
-            2: { cellWidth: 25 }, // Mapel
-            3: { cellWidth: 25 }, // Tipe
-            4: { cellWidth: 12 }, // Nilai
-            5: { cellWidth: 40 }, // Komentar
-            6: { cellWidth: 20 }, // Tgl Dinilai
-            7: { cellWidth: 'auto' }, // Link
+            0: { cellWidth: 8 }, 
+            1: { cellWidth: 40 }, 
+            2: { cellWidth: 25 }, 
+            3: { cellWidth: 25 }, 
+            4: { cellWidth: 12 }, 
+            5: { cellWidth: 40 }, 
+            6: { cellWidth: 20 }, 
+            7: { cellWidth: 'auto' }, 
           }
         });
         doc.save(`${fileNameBase}.pdf`);
@@ -371,7 +391,7 @@ export default function MyGradesPage() {
           <h1 className="text-3xl font-bold font-headline">{pageTitleText}</h1>
           <p className="text-muted-foreground">Daftar nilai dan umpan balik dari semua asesmen.</p>
         </div>
-        {grades.length > 0 && (
+        {allGrades.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" disabled={isExporting}>
@@ -398,68 +418,61 @@ export default function MyGradesPage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {grades.length > 0 ? (
+          {groupedGrades.length > 0 ? (
             <div className="overflow-x-auto mt-4">
               <Table className={cn(isMobile && "table-fixed w-full")}>
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile && "px-2")}>Judul Asesmen/Tugas</TableHead>
-                    <TableHead className={cn(isMobile ? "px-2" : "")}>Mata Pelajaran</TableHead>
-                    {!isMobile && <TableHead>Tipe Asesmen</TableHead>}
-                    {!isMobile && <TableHead>Tanggal Penilaian</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-16 px-1 text-center" : "min-w-[80px]")}>Nilai</TableHead>
-                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "")}>Nama Siswa</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "")}>Mata Pelajaran</TableHead>
+                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-1/4")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {grades.map((grade, index) => (
-                    <TableRow key={grade.id}>
-                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{index + 1}</TableCell>
-                      <TableCell className="font-medium truncate px-2" title={grade.assessmentTitle + (grade.meetingNumber ? ` (P${grade.meetingNumber})` : '')}>
-                          {grade.assessmentTitle}{grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}
-                      </TableCell>
-                      <TableCell className={cn("truncate", isMobile && "px-2")} title={grade.subjectName || undefined}>
-                          {grade.subjectName || "-"}
-                      </TableCell>
-                      {!isMobile && (
-                        <>
-                          <TableCell className="truncate" title={grade.assessmentType || undefined}>{grade.assessmentType || "-"}</TableCell>
-                          <TableCell>
-                            {grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }) : "-"}
-                          </TableCell>
-                        </>
-                      )}
-                      <TableCell className={cn(isMobile ? "text-center px-1" : "")}>
-                        {grade.score !== undefined ? (
-                          grade.score
-                        ) : (
-                          <span className="text-xs text-muted-foreground italic">Belum Dinilai</span>
-                        )}
-                      </TableCell>
-                      <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${grade.assessmentTitle}`}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openDetailDialog(grade)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Lihat Detail
-                            </DropdownMenuItem>
-                             {grade.score !== undefined && (
-                                <DropdownMenuItem onClick={() => handleDownloadSingleResult(grade)}>
-                                <Download className="mr-2 h-4 w-4" />
-                                Download Hasil Ini
-                                </DropdownMenuItem>
+                  {groupedGrades.map((group, index) => {
+                    const uniqueAssessmentTypes = Array.from(new Set(group.resultsForThisSubject.map(r => r.assessmentType))).filter(Boolean) as AssessmentTypeMyGrades[];
+                    return (
+                        <TableRow key={group.subjectName}>
+                        <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{index + 1}</TableCell>
+                        <TableCell className={cn("font-medium", isMobile ? "truncate px-2" : "")} title={group.studentName}>
+                            {group.studentName}
+                        </TableCell>
+                        <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={group.subjectName}>
+                            {group.subjectName}
+                        </TableCell>
+                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
+                            {uniqueAssessmentTypes.length > 0 ? (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${group.subjectName}`}>
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                {uniqueAssessmentTypes.map(type => (
+                                    <DropdownMenuItem 
+                                        key={type}
+                                        onSelect={() => handleDownloadBySubjectAndType(
+                                            group.subjectName, 
+                                            type, 
+                                            group.studentName, 
+                                            group.resultsForThisSubject.filter(r => r.assessmentType === type)
+                                        )}
+                                    >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Unduh Hasil {type}
+                                    </DropdownMenuItem>
+                                ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            ) : (
+                                <span className="text-xs text-muted-foreground italic">Belum ada hasil</span>
                             )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        </TableRow>
+                    );
+                   })}
                 </TableBody>
               </Table>
             </div>
@@ -470,51 +483,7 @@ export default function MyGradesPage() {
           )}
         </CardContent>
       </Card>
-
-      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Detail Hasil Belajar</DialogTitle>
-            <DialogDescription>
-              Informasi lengkap mengenai hasil asesmen yang dipilih.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedGradeForDetail && (
-            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
-              <div><Label className="text-muted-foreground">Judul Asesmen/Tugas:</Label><p className="font-medium">{selectedGradeForDetail.assessmentTitle}{selectedGradeForDetail.meetingNumber ? ` (Pertemuan ${selectedGradeForDetail.meetingNumber})` : ''}</p></div>
-              {selectedGradeForDetail.subjectName && <div><Label className="text-muted-foreground">Mata Pelajaran:</Label><p className="font-medium">{selectedGradeForDetail.subjectName}</p></div>}
-              {selectedGradeForDetail.assessmentType && <div><Label className="text-muted-foreground">Tipe Asesmen:</Label><p className="font-medium">{selectedGradeForDetail.assessmentType}</p></div>}
-              {selectedGradeForDetail.dateOfAssessment && <div><Label className="text-muted-foreground">Tanggal Penilaian:</Label><p className="font-medium">{format(selectedGradeForDetail.dateOfAssessment.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p></div>}
-              
-              <div><Label className="text-muted-foreground">Nilai:</Label><p className="font-semibold text-lg">{selectedGradeForDetail.score ?? "Belum Dinilai"}</p></div>
-              
-              {selectedGradeForDetail.submissionLink ? (
-                 <div>
-                    <Label className="text-muted-foreground">Link Pengumpulan (Jika Terkait Tugas):</Label>
-                    <Button variant="link" asChild className="p-0 h-auto block">
-                        <Link href={selectedGradeForDetail.submissionLink} target="_blank" rel="noopener noreferrer">
-                        <LinkIcon className="inline-block mr-1 h-3.5 w-3.5" />Lihat File Pengumpulan
-                        </Link>
-                    </Button>
-                 </div>
-              ) : (selectedGradeForDetail.assignmentId && 
-                 <div><Label className="text-muted-foreground">Link Pengumpulan (Jika Terkait Tugas):</Label><p className="italic text-muted-foreground">Tidak ada / Belum dikumpulkan</p></div>
-              )}
-
-              <div><Label className="text-muted-foreground">Komentar Guru:</Label>
-                {selectedGradeForDetail.teacherFeedback ? (
-                    <p className="whitespace-pre-line bg-muted/50 p-2 rounded-md">{selectedGradeForDetail.teacherFeedback}</p>
-                ) : (
-                    <p className="italic text-muted-foreground">Tidak ada komentar.</p>
-                )}
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
+
