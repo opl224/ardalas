@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -14,23 +14,20 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogClose,
-} from "@/components/ui/dialog";
+} from "@/components/ui/dialog"; // Removed DialogDescription from here as it's also in Card
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogDesc, // Alias to avoid conflict if DialogDescription from Card is used globally
   AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogHeader as AlertDialogHead, // Alias if needed
+  AlertDialogTitle as AlertDialogT, // Alias if needed
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -93,7 +90,7 @@ import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import *XLSX from 'xlsx';
 
 
 interface ClassMin { id: string; name: string; }
@@ -1226,12 +1223,12 @@ export default function ResultsPage() {
                                   </AlertDialogTrigger>
                                   {selectedResult && selectedResult.id === result.id && (
                                     <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                        <AlertDialogDescription>
+                                      <AlertDialogHead>
+                                        <AlertDialogT>Apakah Anda yakin?</AlertDialogT>
+                                        <AlertDialogDesc>
                                           Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
+                                        </AlertDialogDesc>
+                                      </AlertDialogHead>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel onClick={() => setSelectedResult(null)}>Batal</AlertDialogCancel>
                                         <AlertDialogAction onClick={() => handleDeleteResult(selectedResult.id)}>Ya, Hapus Hasil</AlertDialogAction>
