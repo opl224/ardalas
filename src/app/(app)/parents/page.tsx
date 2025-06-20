@@ -64,7 +64,10 @@ import {
   orderBy,
   where,
   documentId,
-  limit
+  limit,
+  getDoc,
+  deleteField,
+  writeBatch,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -188,7 +191,6 @@ export default function ParentsPage() {
       let classesForDropdown: ClassMin[] = [];
       let fetchedStudentsForDialog: StudentForDialog[] = [];
 
-      // Fetch classes for dropdown and determine responsible classes for guru
       if (authRole === 'admin') {
         const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
         classesForDropdown = classesSnapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name }));
@@ -206,14 +208,13 @@ export default function ParentsPage() {
       setAllClassesForFilter(classesForDropdown);
       setTeacherResponsibleClassIds(responsibleClassIdsForGuru);
 
-      // Fetch students (all for admin, filtered for guru if responsibleClassIdsForGuru is set)
       const usersCollectionRef = collection(db, "users");
 
       if (authRole === 'admin') {
         const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
         fetchedStudentsForDialog = studentsSnapshot.docs.map(docSnap => ({
-            id: docSnap.data().uid,
+            id: docSnap.id, // Student's document ID is their UID
             name: docSnap.data().name,
             classId: docSnap.data().classId,
         }));
@@ -230,7 +231,7 @@ export default function ParentsPage() {
           );
           const studentSnapshots = await Promise.all(studentPromises);
           fetchedStudentsForDialog = studentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
-              id: docSnap.data().uid,
+              id: docSnap.id, // Student's document ID is their UID
               name: docSnap.data().name,
               classId: docSnap.data().classId,
           })));
@@ -239,32 +240,29 @@ export default function ParentsPage() {
          const studentsQuery = query(usersCollectionRef, where("role", "==", "siswa"), orderBy("name", "asc"));
          const studentsSnapshot = await getDocs(studentsQuery);
          fetchedStudentsForDialog = studentsSnapshot.docs.map(docSnap => ({
-            id: docSnap.data().uid,
+            id: docSnap.id, // Student's document ID is their UID
             name: docSnap.data().name,
             classId: docSnap.data().classId,
         }));
       }
       setStudentsForDialog(fetchedStudentsForDialog);
 
-
-      // Fetch auth users with 'orangtua' role (for linking)
       const authOrangtuaQueryInstance = query(usersCollectionRef, where("role", "==", "orangtua"), orderBy("name", "asc"));
       const authOrangtuaSnapshot = await getDocs(authOrangtuaQueryInstance);
       setAuthOrangtuaUsers(authOrangtuaSnapshot.docs.map(docSnap => ({
-        id: docSnap.data().uid,
+        id: docSnap.id, // Parent's document ID is their UID
         name: docSnap.data().name,
         email: docSnap.data().email,
       })));
 
-      // Fetch parents
       const parentsCollectionRef = collection(db, "parents");
       let parentsQuery;
       if (authRole === 'admin') {
         parentsQuery = query(parentsCollectionRef, orderBy("name", "asc"));
       } else if (authRole === 'guru') {
         const studentUidsOfTeacher = fetchedStudentsForDialog
-          .map(s => s.id)
-          .filter((uid): uid is string => typeof uid === 'string' && uid.length > 0); // Ensure UIDs are valid strings
+          .map(s => s.id) // Student's doc ID is their UID
+          .filter((uid): uid is string => typeof uid === 'string' && uid.length > 0);
 
         if (studentUidsOfTeacher.length === 0) {
           setParents([]);
@@ -276,10 +274,10 @@ export default function ParentsPage() {
             studentUidChunks.push(studentUidsOfTeacher.slice(i, i + 30));
         }
         const parentPromises = studentUidChunks.map(chunk => {
-            if (chunk.length > 0) { // Ensure chunk is not empty before querying
+            if (chunk.length > 0) { 
                 return getDocs(query(parentsCollectionRef, where("studentId", "in", chunk), orderBy("name", "asc")));
             }
-            return Promise.resolve({ docs: [] }); // Return an empty snapshot if chunk is empty
+            return Promise.resolve({ docs: [] }); 
         });
         const parentSnapshots = await Promise.all(parentPromises);
         const fetchedParentsForGuru = parentSnapshots.flatMap(snap => snap.docs.map(docSnap => ({
@@ -287,12 +285,11 @@ export default function ParentsPage() {
             ...docSnap.data(),
         } as Parent)));
         setParents(fetchedParentsForGuru);
-
       } else {
-        setParents([]); // Non-admin/guru don't see this management page
+        setParents([]); 
       }
 
-      if (parentsQuery) { // Only if admin query was set
+      if (parentsQuery) { 
         const parentsSnapshot = await getDocs(parentsQuery);
         setParents(parentsSnapshot.docs.map(docSnap => ({
             id: docSnap.id,
@@ -325,8 +322,8 @@ export default function ParentsPage() {
         phone: selectedParent.phone || "",
         address: selectedParent.address || "",
         gender: selectedParent.gender,
-        studentId: selectedParent.studentId,
-        authUserId: selectedParent.uid || undefined,
+        studentId: selectedParent.studentId, // Student's UID
+        authUserId: selectedParent.uid || undefined, // Parent's Auth UID
       });
     }
   }, [selectedParent, isEditDialogOpen, editParentForm]);
@@ -337,7 +334,7 @@ export default function ParentsPage() {
       return;
     }
     addParentForm.clearErrors();
-    const selectedStudent = studentsForDialog.find(s => s.id === data.studentId);
+    const selectedStudent = studentsForDialog.find(s => s.id === data.studentId); // s.id is student's UID
     if (!selectedStudent) {
       toast({ title: "Error", description: "Murid tidak ditemukan.", variant: "destructive" });
       return;
@@ -345,16 +342,23 @@ export default function ParentsPage() {
 
     try {
       const parentsCollectionRef = collection(db, "parents");
-      await addDoc(parentsCollectionRef, {
+      const newParentDocRef = await addDoc(parentsCollectionRef, {
         name: data.name,
         email: data.email || null,
         phone: data.phone || null,
         address: data.address || null,
         gender: data.gender,
-        studentId: data.studentId,
+        studentId: data.studentId, // Student's UID
         studentName: selectedStudent.name,
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Parent's Auth UID
         createdAt: serverTimestamp(),
+      });
+
+      // Update student's user document
+      const studentUserDocRef = doc(db, "users", data.studentId); // Student's UID is the doc ID
+      await updateDoc(studentUserDocRef, {
+        linkedParentId: newParentDocRef.id, // Firestore Doc ID of the parent profile
+        parentName: data.name
       });
 
       toast({ title: "Data Orang Tua Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -377,25 +381,47 @@ export default function ParentsPage() {
     }
     if (!selectedParent) return;
     editParentForm.clearErrors();
-    const selectedStudent = studentsForDialog.find(s => s.id === data.studentId);
+    const selectedStudent = studentsForDialog.find(s => s.id === data.studentId); // s.id is student's UID
     if (!selectedStudent) {
       toast({ title: "Error", description: "Murid tidak ditemukan.", variant: "destructive" });
       return;
     }
 
-    try {
-      const parentDocRef = doc(db, "parents", data.id);
-      await updateDoc(parentDocRef, {
-        name: data.name,
-        email: data.email || null,
-        phone: data.phone || null,
-        address: data.address || null,
-        gender: data.gender,
-        studentId: data.studentId,
-        studentName: selectedStudent.name,
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
-      });
+    const batch = writeBatch(db);
 
+    // Update parent profile document
+    const parentDocRef = doc(db, "parents", data.id);
+    batch.update(parentDocRef, {
+      name: data.name,
+      email: data.email || null,
+      phone: data.phone || null,
+      address: data.address || null,
+      gender: data.gender,
+      studentId: data.studentId, // Student's UID
+      studentName: selectedStudent.name,
+      uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Parent's Auth UID
+    });
+
+    // Handle student link changes
+    // If the student link changed from the original selectedParent
+    if (selectedParent.studentId && selectedParent.studentId !== data.studentId) {
+      // Clear link from old student
+      const oldStudentUserDocRef = doc(db, "users", selectedParent.studentId);
+      batch.update(oldStudentUserDocRef, {
+        linkedParentId: deleteField(),
+        parentName: deleteField()
+      });
+    }
+
+    // Update (or set) link for the new/current student
+    const studentUserDocRef = doc(db, "users", data.studentId); // data.studentId is the student's UID
+    batch.update(studentUserDocRef, {
+      linkedParentId: data.id, // Firestore Doc ID of the parent profile
+      parentName: data.name
+    });
+    
+    try {
+      await batch.commit();
       toast({ title: "Data Orang Tua Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditDialogOpen(false);
       setSelectedParent(null);
@@ -415,7 +441,24 @@ export default function ParentsPage() {
       return;
     }
     try {
-      await deleteDoc(doc(db, "parents", parentId));
+      const parentDocRef = doc(db, "parents", parentId);
+      const parentDocSnap = await getDoc(parentDocRef);
+
+      const batch = writeBatch(db);
+
+      if (parentDocSnap.exists()) {
+          const parentData = parentDocSnap.data();
+          if (parentData.studentId) { // studentId is the student's UID
+              const studentUserDocRef = doc(db, "users", parentData.studentId);
+              batch.update(studentUserDocRef, {
+                  linkedParentId: deleteField(), 
+                  parentName: deleteField()    
+              });
+          }
+      }
+      batch.delete(parentDocRef);
+      await batch.commit();
+      
       toast({ title: "Data Orang Tua Dihapus", description: `${parentName || 'Data'} berhasil dihapus.` });
       setSelectedParent(null);
       fetchPageData();
@@ -456,7 +499,7 @@ export default function ParentsPage() {
     if ((authRole === 'admin' || authRole === 'guru') && selectedClassFilter !== "all") {
       const studentUidsInSelectedClass = studentsForDialog
         .filter(student => student.classId === selectedClassFilter)
-        .map(student => student.id);
+        .map(student => student.id); // student.id is student's UID
       filtered = filtered.filter(parent => studentUidsInSelectedClass.includes(parent.studentId));
     }
 
@@ -638,10 +681,10 @@ export default function ParentsPage() {
                 {isLoadingData && <SelectItem key={`loading-auth-users-${formType}`} value="loading" disabled>Memuat...</SelectItem>}
                 <SelectItem key={`no-auth-user-option-${formType}`} value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Kosongkan</SelectItem>
                 {authOrangtuaUsers
-                  .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
-                  .map((authUser) => (
-                  <SelectItem key={authUser.id} value={authUser.id}>
-                    {authUser.name} ({authUser.email})
+                  .filter(authUserItem => authUserItem && typeof authUserItem.id === 'string' && authUserItem.id.length > 0)
+                  .map((authUserItem) => (
+                  <SelectItem key={authUserItem.id} value={authUserItem.id}>
+                    {authUserItem.name} ({authUserItem.email})
                   </SelectItem>
                 ))}
                 {!isLoadingData && authOrangtuaUsers.length === 0 && (
@@ -970,6 +1013,3 @@ export default function ParentsPage() {
     </div>
   );
 }
-
-
-
