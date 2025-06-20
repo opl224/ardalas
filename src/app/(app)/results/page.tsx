@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarDatePicker } from "@/components/calendar-date-picker";
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical, Eye } from "lucide-react";
+import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical, Eye, FileDown } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -91,6 +91,9 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 
 interface ClassMin { id: string; name: string; }
@@ -165,8 +168,15 @@ export default function ResultsPage() {
   const [selectedResultForDetail, setSelectedResultForDetail] = useState<ResultData | null>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClassFilterForTable, setSelectedClassFilterForTable] = useState<string>("all");
+  const [selectedSubjectFilterForTable, setSelectedSubjectFilterForTable] = useState<string>("all");
   const [selectedAssessmentTypeFilter, setSelectedAssessmentTypeFilter] = useState<AssessmentType | "all">("all");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [exportClassId, setExportClassId] = useState<string | undefined>();
+  const [exportSubjectId, setExportSubjectId] = useState<string | undefined>();
+  const [exportAssessmentType, setExportAssessmentType] = useState<AssessmentType | undefined>();
+  const [isExporting, setIsExporting] = useState(false);
 
   const { toast } = useToast();
 
@@ -606,6 +616,16 @@ export default function ResultsPage() {
 
   const filteredAndSearchedResults = useMemo(() => {
     let tempResults = results;
+
+    if (canManageResults) {
+        if (selectedClassFilterForTable !== "all") {
+            tempResults = tempResults.filter(result => result.classId === selectedClassFilterForTable);
+        }
+        if (selectedSubjectFilterForTable !== "all") {
+            tempResults = tempResults.filter(result => result.subjectId === selectedSubjectFilterForTable);
+        }
+    }
+
     if (selectedAssessmentTypeFilter !== "all") {
       tempResults = tempResults.filter(result => result.assessmentType === selectedAssessmentTypeFilter);
     }
@@ -621,7 +641,7 @@ export default function ResultsPage() {
       );
     }
     return tempResults;
-  }, [results, selectedAssessmentTypeFilter, searchTerm, canManageResults]);
+  }, [results, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter, searchTerm, canManageResults]);
 
   const totalPages = Math.ceil(filteredAndSearchedResults.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -632,7 +652,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedAssessmentTypeFilter]);
+  }, [searchTerm, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter]);
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -680,6 +700,117 @@ export default function ResultsPage() {
     }
     return pageNumbers;
   };
+
+  const handleExportSemesterResults = async (formatType: 'xlsx' | 'pdf') => {
+    if (!exportClassId || !exportSubjectId || !exportAssessmentType) {
+      toast({ title: "Pilihan Tidak Lengkap", description: "Harap pilih kelas, mata pelajaran, dan tipe asesmen untuk ekspor.", variant: "warning" });
+      return;
+    }
+    setIsExporting(true);
+    
+    const selectedClass = classes.find(c => c.id === exportClassId);
+    const selectedSubject = subjects.find(s => s.id === exportSubjectId);
+    
+    const fileNameBase = `Hasil_${selectedClass?.name?.replace(/\s+/g, '_') || 'Kelas'}_${selectedSubject?.name?.replace(/\s+/g, '_') || 'Mapel'}_${exportAssessmentType.replace(/\s+/g, '_')}`;
+
+    try {
+      const studentsInClassQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", exportClassId), orderBy("name", "asc"));
+      const studentsSnapshot = await getDocs(studentsInClassQuery);
+      const studentsData = studentsSnapshot.docs.map(doc => ({id: doc.id, name: doc.data().name}));
+
+      const dataToExport = [];
+
+      for (const student of studentsData) {
+        const resultsQuery = query(
+          collection(db, "results"),
+          where("studentId", "==", student.id),
+          where("classId", "==", exportClassId),
+          where("subjectId", "==", exportSubjectId),
+          where("assessmentType", "==", exportAssessmentType),
+          orderBy("dateOfAssessment", "desc")
+        );
+        const resultsSnapshot = await getDocs(resultsQuery);
+        if (resultsSnapshot.empty) {
+            dataToExport.push({
+                "Nama Siswa": student.name,
+                "Judul Asesmen": "-",
+                "Nilai": "-",
+                "Tanggal Penilaian": "-",
+                "Feedback": "Belum ada hasil",
+            });
+        } else {
+            resultsSnapshot.forEach(doc => {
+                const result = doc.data() as ResultData;
+                dataToExport.push({
+                    "Nama Siswa": result.studentName,
+                    "Judul Asesmen": `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : ''}`,
+                    "Nilai": result.score,
+                    "Tanggal Penilaian": format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }),
+                    "Feedback": result.feedback || "-",
+                });
+            });
+        }
+      }
+      
+      if (dataToExport.length === 0) {
+          toast({ title: "Tidak Ada Data", description: "Tidak ada hasil yang cocok dengan kriteria ekspor.", variant: "info" });
+          setIsExporting(false);
+          return;
+      }
+
+
+      if (formatType === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Semester");
+         XLSX.utils.sheet_add_aoa(worksheet, [
+          [`Laporan Hasil Belajar Semester`],
+          [`Kelas: ${selectedClass?.name || '-'}`],
+          [`Mata Pelajaran: ${selectedSubject?.name || '-'}`],
+          [`Tipe Asesmen: ${exportAssessmentType}`],
+          [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
+          [] 
+        ], { origin: "A1" });
+        const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
+        worksheet['!cols'] = cols;
+        XLSX.writeFile(workbook, `${fileNameBase}.xlsx`);
+        toast({ title: "Ekspor Excel Berhasil", description: `${fileNameBase}.xlsx telah diunduh.` });
+      } else if (formatType === 'pdf') {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(14);
+        doc.text(`Laporan Hasil Belajar Semester`, 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Kelas: ${selectedClass?.name || '-'}`, 14, 22);
+        doc.text(`Mata Pelajaran: ${selectedSubject?.name || '-'}`, 14, 29);
+        doc.text(`Tipe Asesmen: ${exportAssessmentType}`, 14, 36);
+        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, 43);
+
+        autoTable(doc, {
+          startY: 50,
+          head: [Object.keys(dataToExport[0])],
+          body: dataToExport.map(row => Object.values(row)),
+          theme: 'grid',
+          headStyles: { fillColor: [22, 160, 133] },
+          styles: { fontSize: 8, cellPadding: 1.5 },
+          columnStyles: { 
+            0: { cellWidth: 35 }, // Nama Siswa
+            1: { cellWidth: 50 }, // Judul
+            2: { cellWidth: 15 }, // Nilai
+            3: { cellWidth: 25 }, // Tgl
+            4: { cellWidth: 'auto'}, // Feedback
+          }
+        });
+        doc.save(`${fileNameBase}.pdf`);
+        toast({ title: "Ekspor PDF Berhasil", description: `${fileNameBase}.pdf telah diunduh.` });
+      }
+    } catch (error) {
+      console.error("Error exporting semester results:", error);
+      toast({ title: `Gagal Mengekspor ke ${formatType.toUpperCase()}`, variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
 
   if (authLoading || (isLoadingData && (role === "admin" || role === "guru"))) {
     return (
@@ -915,8 +1046,8 @@ export default function ResultsPage() {
         </CardHeader>
         <CardContent>
          { (role === "admin" || role === "guru") && (
-            <div className="my-4 flex flex-col sm:flex-row items-center gap-2 w-full">
-                <div className="relative w-full sm:w-auto flex-grow">
+            <div className="my-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 items-end">
+                <div className="relative md:col-span-2">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Cari siswa, kelas, mapel, asesmen..."
@@ -925,21 +1056,44 @@ export default function ResultsPage() {
                     className="pl-8 w-full"
                   />
                 </div>
-                <Select
-                  value={selectedAssessmentTypeFilter}
-                  onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
-                >
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                      <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                      <SelectValue placeholder="Filter Tipe Asesmen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="all">Semua Tipe</SelectItem>
-                      {ASSESSMENT_TYPES.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                 <div className="w-full">
+                    <Label htmlFor="filter-class" className="sr-only">Filter Kelas</Label>
+                    <Select value={selectedClassFilterForTable} onValueChange={setSelectedClassFilterForTable} disabled={isLoadingData}>
+                        <SelectTrigger id="filter-class"><SelectValue placeholder="Filter Kelas" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Kelas</SelectItem>
+                            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="w-full">
+                    <Label htmlFor="filter-subject" className="sr-only">Filter Mata Pelajaran</Label>
+                    <Select value={selectedSubjectFilterForTable} onValueChange={setSelectedSubjectFilterForTable} disabled={isLoadingData}>
+                        <SelectTrigger id="filter-subject"><SelectValue placeholder="Filter Mapel" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Mapel</SelectItem>
+                            {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="w-full sm:col-span-2 md:col-span-4">
+                  <Label htmlFor="filter-assessment-type" className="sr-only">Filter Tipe Asesmen</Label>
+                  <Select
+                    value={selectedAssessmentTypeFilter}
+                    onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+                  >
+                    <SelectTrigger id="filter-assessment-type">
+                        <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Filter Tipe Asesmen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Semua Tipe</SelectItem>
+                        {ASSESSMENT_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
             </div>
             )}
           {isLoadingResults ? (
@@ -1121,12 +1275,56 @@ export default function ResultsPage() {
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
                  (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." :
-                 searchTerm || selectedAssessmentTypeFilter !== "all" ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian Anda." :
-                 "Belum ada data hasil belajar yang sesuai."}
+                 searchTerm || selectedAssessmentTypeFilter !== "all" || selectedClassFilterForTable !== "all" || selectedSubjectFilterForTable !== "all"
+                 ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian Anda."
+                 : "Belum ada data hasil belajar yang sesuai."}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {canManageResults && (
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <FileDown className="h-6 w-6 text-primary" />
+              <span>Ekspor Hasil Belajar Semester</span>
+            </CardTitle>
+            <CardDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+            <div>
+              <Label htmlFor="export-classId">Kelas</Label>
+              <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting}>
+                <SelectTrigger id="export-classId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
+                <SelectContent>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="export-subjectId">Mata Pelajaran</Label>
+              <Select value={exportSubjectId} onValueChange={setExportSubjectId} disabled={isLoadingData || isExporting}>
+                <SelectTrigger id="export-subjectId" className="mt-1"><SelectValue placeholder={isLoadingData ? "Memuat..." : "Pilih mapel"} /></SelectTrigger>
+                <SelectContent>{subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="export-assessmentType">Tipe Asesmen</Label>
+              <Select value={exportAssessmentType} onValueChange={(value) => setExportAssessmentType(value as AssessmentType)} disabled={isExporting}>
+                <SelectTrigger id="export-assessmentType" className="mt-1"><SelectValue placeholder="Pilih tipe asesmen" /></SelectTrigger>
+                <SelectContent>{ASSESSMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+             <div className="flex flex-col sm:flex-row gap-2 lg:col-span-1 justify-end pt-4">
+                <Button onClick={() => handleExportSemesterResults('xlsx')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
+                {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} Ekspor Excel
+                </Button>
+                <Button onClick={() => handleExportSemesterResults('pdf')} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
+                {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} Ekspor PDF
+                </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {canManageResults && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {

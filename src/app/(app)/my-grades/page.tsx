@@ -23,7 +23,7 @@ import {
   orderBy,
 } from "firebase/firestore";
 import { useState, useEffect, useMemo } from "react";
-import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Eye } from "lucide-react";
+import { BarChart3, AlertCircle, Link as LinkIcon, MoreVertical, Eye, FileDown } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -46,6 +46,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import { useToast } from "@/hooks/use-toast";
+
 
 interface MyGradeEntry {
   assignmentId: string;
@@ -67,6 +72,8 @@ export default function MyGradesPage() {
   const { isMobile } = useSidebar();
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedGradeForDetail, setSelectedGradeForDetail] = useState<MyGradeEntry | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchMyGrades = async () => {
@@ -190,6 +197,77 @@ export default function MyGradesPage() {
     setIsDetailDialogOpen(true);
   };
 
+  const handleExportMyGrades = async (formatType: 'xlsx' | 'pdf') => {
+    if (grades.length === 0) {
+      toast({ title: "Tidak Ada Data", description: "Tidak ada nilai untuk diekspor.", variant: "info" });
+      return;
+    }
+    setIsExporting(true);
+    const studentName = role === "siswa" ? user?.displayName : user?.linkedStudentName;
+    const fileNameBase = `Hasil_Belajar_${studentName?.replace(/\s+/g, '_') || 'Siswa'}`;
+
+    const dataToExport = grades.map((grade, index) => ({
+      "No.": index + 1,
+      "Judul Tugas/Asesmen": `${grade.assignmentTitle}${grade.meetingNumber ? ` (P${grade.meetingNumber})` : ''}`,
+      "Mata Pelajaran": grade.subjectName || "-",
+      "Nilai": grade.score ?? "Belum Dinilai",
+      "Komentar Guru": grade.teacherFeedback || "-",
+      "Tanggal Dinilai": grade.dateOfAssessment ? format(grade.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }) : "-",
+      "Link Tugas": grade.submissionLink || "Tidak Ada",
+    }));
+
+    try {
+      if (formatType === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Hasil Belajar");
+        
+        XLSX.utils.sheet_add_aoa(worksheet, [
+          [`Laporan Hasil Belajar - ${studentName || 'Siswa'}`],
+          [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
+          [] 
+        ], { origin: "A1" });
+        
+        const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(20, key.length + 5) }));
+        worksheet['!cols'] = cols;
+
+        XLSX.writeFile(workbook, `${fileNameBase}.xlsx`);
+        toast({ title: "Ekspor Excel Berhasil", description: `${fileNameBase}.xlsx telah diunduh.` });
+      } else if (formatType === 'pdf') {
+        const doc = new jsPDF({ orientation: 'landscape' });
+        doc.setFontSize(16);
+        doc.text(`Laporan Hasil Belajar - ${studentName || 'Siswa'}`, 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, 22);
+
+        autoTable(doc, {
+          startY: 30,
+          head: [Object.keys(dataToExport[0])],
+          body: dataToExport.map(row => Object.values(row)),
+          theme: 'grid',
+          headStyles: { fillColor: [22, 160, 133] }, // Example primary color
+          styles: { fontSize: 8, cellPadding: 2 },
+          columnStyles: { 
+            0: { cellWidth: 10 }, // No.
+            1: { cellWidth: 40 }, // Judul
+            2: { cellWidth: 30 }, // Mapel
+            3: { cellWidth: 15 }, // Nilai
+            4: { cellWidth: 50 }, // Komentar
+            5: { cellWidth: 25 }, // Tgl Dinilai
+            6: { cellWidth: 'auto' }, // Link
+          }
+        });
+        doc.save(`${fileNameBase}.pdf`);
+        toast({ title: "Ekspor PDF Berhasil", description: `${fileNameBase}.pdf telah diunduh.` });
+      }
+    } catch (error) {
+      console.error("Error exporting grades:", error);
+      toast({ title: `Gagal Mengekspor ke ${formatType.toUpperCase()}`, variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
 
   if (authLoading || isLoading) {
     return (
@@ -249,9 +327,29 @@ export default function MyGradesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold font-headline">{pageTitleText}</h1>
-        <p className="text-muted-foreground">Daftar nilai dari tugas-tugas yang telah dikerjakan dan dinilai.</p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">{pageTitleText}</h1>
+          <p className="text-muted-foreground">Daftar nilai dari tugas-tugas yang telah dikerjakan dan dinilai.</p>
+        </div>
+        {grades.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={isExporting}>
+                {isExporting && <LottieLoader width={16} height={16} className="mr-2" />}
+                <FileDown className="mr-2 h-4 w-4" /> Ekspor Nilai
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportMyGrades('xlsx')} disabled={isExporting}>
+                Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportMyGrades('pdf')} disabled={isExporting}>
+                PDF (.pdf)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader>
