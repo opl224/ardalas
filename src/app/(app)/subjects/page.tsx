@@ -451,51 +451,51 @@ export default function SubjectsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-xl">
             <BookOpen className="h-6 w-6 text-primary" />
             <span>Daftar Mata Pelajaran</span>
           </CardTitle>
-          {role === "admin" && (
-            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-              setIsAddDialogOpen(isOpen);
-              if (!isOpen) {
-                addSubjectForm.reset();
-                addSubjectForm.clearErrors();
-              } else {
-                if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Mata Pelajaran
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Tambah Mata Pelajaran Baru</DialogTitle>
-                  <DialogDescription>
-                    Isi detail mata pelajaran baru.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  {renderSubjectFormFields(addSubjectForm, 'add')}
-                  <DialogFooter>
-                    <DialogClose asChild>
-                       <Button type="button" variant="outline">Batal</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
-                      {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Mata Pelajaran"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
         </CardHeader>
         <CardContent>
-          {role === 'admin' && (
-            <div className="my-4">
+          {role === "admin" && (
+            <div className="my-4 flex flex-col gap-4">
+              <div className="flex sm:justify-end">
+                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                  setIsAddDialogOpen(isOpen);
+                  if (!isOpen) {
+                    addSubjectForm.reset();
+                    addSubjectForm.clearErrors();
+                  } else {
+                    if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="w-full sm:w-auto">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Mata Pelajaran
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Tambah Mata Pelajaran Baru</DialogTitle>
+                      <DialogDescription>
+                        Isi detail mata pelajaran baru.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                      {renderSubjectFormFields(addSubjectForm, 'add')}
+                      <DialogFooter>
+                        <DialogClose asChild>
+                           <Button type="button" variant="outline">Batal</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
+                          {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Mata Pelajaran"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
