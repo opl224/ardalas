@@ -31,6 +31,11 @@ import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 
 const localAvatars = [
     { src: '/avatars/laki-laki.png', hint: 'avatar male', alt: 'Avatar Laki-laki'},
@@ -62,6 +67,16 @@ interface DetailedStudentData {
   createdAt?: Timestamp;
 }
 
+const GENDERS_OPTIONS = ["laki-laki", "perempuan"] as const;
+
+const adminDetailFormSchema = z.object({
+  phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
+  gender: z.enum(GENDERS_OPTIONS, { errorMap: () => ({ message: "Pilih jenis kelamin yang valid."}) }).optional(),
+  address: z.string().trim().optional(),
+});
+type AdminDetailFormValues = z.infer<typeof adminDetailFormSchema>;
+
+
 export default function ProfilePage() {
   const { user, loading, role, refreshUser } = useAuth();
   const { toast } = useToast();
@@ -76,6 +91,22 @@ export default function ProfilePage() {
   const [isEditNameDialogOpen, setIsEditNameDialogOpen] = useState(false);
   const [newName, setNewName] = useState(user?.displayName || "");
   const [isUpdatingName, setIsUpdatingName] = useState(false);
+
+  // Admin details state
+  const [isAdminDetailDialogOpen, setIsAdminDetailDialogOpen] = useState(false);
+  const [adminDetails, setAdminDetails] = useState<{ phone?: string; gender?: "laki-laki" | "perempuan"; address?: string; } | null>(null);
+  const [isLoadingAdminDetails, setIsLoadingAdminDetails] = useState(false);
+  const [isUpdatingAdminDetails, setIsUpdatingAdminDetails] = useState(false);
+
+  const adminDetailForm = useForm<AdminDetailFormValues>({
+    resolver: zodResolver(adminDetailFormSchema),
+    defaultValues: {
+      phone: "",
+      gender: undefined,
+      address: "",
+    },
+  });
+
 
   useEffect(() => {
     if (user?.photoURL) {
@@ -211,6 +242,67 @@ export default function ProfilePage() {
       setIsUpdatingName(false);
     }
   };
+
+  const fetchAdminDetails = async () => {
+    if (!user || role !== 'admin') return;
+    setIsLoadingAdminDetails(true);
+    try {
+      const adminDocRef = doc(db, "users", user.uid);
+      const adminDocSnap = await getDoc(adminDocRef);
+      if (adminDocSnap.exists()) {
+        const data = adminDocSnap.data();
+        const details = {
+          phone: data.phone || "",
+          gender: data.gender as "laki-laki" | "perempuan" | undefined,
+          address: data.address || "",
+        };
+        setAdminDetails(details);
+        adminDetailForm.reset(details);
+      } else {
+        toast({ title: "Data Tidak Ditemukan", description: "Detail data admin tidak ditemukan.", variant: "destructive" });
+        setAdminDetails(null);
+        adminDetailForm.reset({ phone: "", gender: undefined, address: "" });
+      }
+    } catch (error) {
+      console.error("Error fetching admin details:", error);
+      toast({ title: "Error", description: "Gagal memuat detail data admin.", variant: "destructive" });
+      setAdminDetails(null);
+      adminDetailForm.reset({ phone: "", gender: undefined, address: "" });
+    } finally {
+      setIsLoadingAdminDetails(false);
+    }
+  };
+
+  const handleOpenAdminDetailDialog = () => {
+    fetchAdminDetails();
+    setIsAdminDetailDialogOpen(true);
+  };
+
+  const handleSaveAdminDetails: SubmitHandler<AdminDetailFormValues> = async (data) => {
+    if (!user || role !== 'admin') {
+      toast({ title: "Aksi Ditolak", variant: "destructive" });
+      return;
+    }
+    setIsUpdatingAdminDetails(true);
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      await updateDoc(userDocRef, {
+        phone: data.phone || null,
+        gender: data.gender || null,
+        address: data.address || null,
+      });
+      toast({ title: "Sukses", description: "Detail admin berhasil diperbarui." });
+      setAdminDetails(data); 
+      if (refreshUser) await refreshUser(); // Refresh context if needed
+      setIsAdminDetailDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating admin details:", error);
+      toast({ title: "Error", description: "Gagal memperbarui detail admin.", variant: "destructive" });
+    } finally {
+      setIsUpdatingAdminDetails(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -406,6 +498,12 @@ export default function ProfilePage() {
                 Lihat Detail Data Saya
             </Button>
           )}
+          {role === 'admin' && (
+            <Button onClick={handleOpenAdminDetailDialog} variant="outline" className="w-full mt-4">
+                <UserSquare2 className="mr-2 h-4 w-4" />
+                Lihat Detail Admin Saya
+            </Button>
+          )}
 
            <p className="text-xs text-muted-foreground text-center pt-2">
             Untuk perubahan data sensitif lainnya, silakan hubungi Administrator.
@@ -461,6 +559,82 @@ export default function ProfilePage() {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog for Admin Details */}
+      <Dialog open={isAdminDetailDialogOpen} onOpenChange={(open) => {
+          setIsAdminDetailDialogOpen(open);
+          if (!open) {
+              adminDetailForm.reset({
+                  phone: adminDetails?.phone || "",
+                  gender: adminDetails?.gender,
+                  address: adminDetails?.address || "",
+              });
+          }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detail Data Admin</DialogTitle>
+            <DialogDescription>
+              Informasi tambahan untuk profil admin.
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingAdminDetails ? (
+            <div className="flex justify-center items-center py-8">
+                <LottieLoader width={48} height={48} />
+                <span className="ml-2">Memuat detail admin...</span>
+            </div>
+          ) : (
+            <form onSubmit={adminDetailForm.handleSubmit(handleSaveAdminDetails)} className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div>
+                <Label htmlFor="admin-phone">Nomor Telepon</Label>
+                <Input id="admin-phone" {...adminDetailForm.register("phone")} className="mt-1" />
+                {adminDetailForm.formState.errors.phone && (
+                  <p className="text-sm text-destructive mt-1">{adminDetailForm.formState.errors.phone.message}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="admin-gender">Jenis Kelamin</Label>
+                <Controller
+                  name="gender"
+                  control={adminDetailForm.control}
+                  render={({ field }) => (
+                    <Select
+                      onValueChange={(value) => field.onChange(value as "laki-laki" | "perempuan" | undefined)}
+                      value={field.value || undefined}
+                    >
+                      <SelectTrigger id="admin-gender" className="mt-1">
+                        <SelectValue placeholder="Pilih jenis kelamin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="laki-laki">Laki-laki</SelectItem>
+                        <SelectItem value="perempuan">Perempuan</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                 {adminDetailForm.formState.errors.gender && (
+                  <p className="text-sm text-destructive mt-1">{adminDetailForm.formState.errors.gender.message}</p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="admin-address">Alamat</Label>
+                <Textarea id="admin-address" {...adminDetailForm.register("address")} className="mt-1" />
+                 {adminDetailForm.formState.errors.address && (
+                  <p className="text-sm text-destructive mt-1">{adminDetailForm.formState.errors.address.message}</p>
+                )}
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                <Button type="submit" disabled={isUpdatingAdminDetails}>
+                  {isUpdatingAdminDetails && <LottieLoader width={16} height={16} className="mr-2" />}
+                  {isUpdatingAdminDetails ? "Menyimpan..." : "Simpan Detail Admin"}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
+
