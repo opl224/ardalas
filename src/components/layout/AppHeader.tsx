@@ -160,7 +160,7 @@ function NotificationBell() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative rounded-full" data-unread={unreadCount > 0}>
+        <Button variant="ghost" size="icon" className="relative rounded-full focus-visible:ring-0 focus-visible:ring-offset-0" data-unread={unreadCount > 0}>
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute top-0 right-0 flex h-2 w-2">
@@ -191,10 +191,10 @@ function NotificationBell() {
               <DropdownMenuItem 
                 key={notification.id} 
                 className={cn(
-                  "flex flex-col items-start gap-0.5 p-2 cursor-pointer focus:bg-accent/80 relative", // Added relative positioning
+                  "flex flex-col items-start gap-0.5 p-2 cursor-pointer focus:bg-accent/80 relative", 
                   !notification.read && "bg-accent/50 hover:bg-accent/70"
                 )}
-                onClick={() => handleMarkAsRead(notification.id)} // Mark as read on click
+                onClick={() => handleMarkAsRead(notification.id)} 
                 asChild={!!notification.href}
               >
                 {notification.href ? (
@@ -204,7 +204,7 @@ function NotificationBell() {
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                       </span>
                     )}
-                    <p className="font-semibold text-sm line-clamp-1 pr-3">{notification.title}</p> {/* Added pr-3 for spacing */}
+                    <p className="font-semibold text-sm line-clamp-1 pr-3">{notification.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/80">
                       {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) || "Baru saja"}
@@ -217,7 +217,7 @@ function NotificationBell() {
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                       </span>
                     )}
-                    <p className="font-semibold text-sm line-clamp-1 pr-3">{notification.title}</p> {/* Added pr-3 */}
+                    <p className="font-semibold text-sm line-clamp-1 pr-3">{notification.title}</p>
                     <p className="text-xs text-muted-foreground line-clamp-2">{notification.description}</p>
                     <p className="text-xs text-muted-foreground/80">
                       {notification.createdAt?.toDate().toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) || "Baru saja"}
@@ -268,7 +268,7 @@ function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0">
+        <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 focus-visible:ring-0 focus-visible:ring-offset-0">
           <Avatar className="h-9 w-9">
             <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile picture"/>
             <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
@@ -310,7 +310,7 @@ export function AppHeader() {
   const handleHamburgerClick = () => {
     setIsHamburgerWiggling(true);
     setOpenMobile(true);
-    setTimeout(() => setIsHamburgerWiggling(false), 500); // Duration of wiggle animation
+    setTimeout(() => setIsHamburgerWiggling(false), 500); 
   };
 
   return (
