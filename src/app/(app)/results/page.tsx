@@ -18,8 +18,8 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-  DialogDescription,
-  DialogFooter, 
+  DialogDescription, // Added import
+  DialogFooter, // Added import
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -30,7 +30,7 @@ import {
   AlertDialogFooter as AlertDialogFoot, 
   AlertDialogHeader as AlertDialogHead,
   AlertDialogTitle as AlertDialogT,
-  AlertDialogTrigger,
+  AlertDialogTrigger, // Added import
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,13 +43,13 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarDatePicker } from "@/components/calendar-date-picker";
-import { BarChart3, PlusCircle, Edit, Trash2, CalendarIcon, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical, Eye, FileDown } from "lucide-react";
+import { BarChart3, PlusCircle, Edit, Trash2, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical, Eye, FileDown, Send } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, startOfDay } from "date-fns";
+import { format, startOfDay, getMonth } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -173,15 +173,22 @@ export default function ResultsPage() {
   const [selectedClassFilterForTable, setSelectedClassFilterForTable] = useState<string>("all");
   const [selectedSubjectFilterForTable, setSelectedSubjectFilterForTable] = useState<string>("all");
   const [selectedAssessmentTypeFilter, setSelectedAssessmentTypeFilter] = useState<AssessmentType | "all">("all");
+  const [semesterFilter, setSemesterFilter] = useState<"all" | "1" | "2">("all");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [teacherUniqueClassCount, setTeacherUniqueClassCount] = useState<number | null>(null);
+  const [teacherUniqueSubjectCount, setTeacherUniqueSubjectCount] = useState<number | null>(null);
+
 
   // States for export section
   const [exportClassId, setExportClassId] = useState<string | undefined>();
   const [exportSubjectId, setExportSubjectId] = useState<string | undefined>();
   const [exportAssessmentType, setExportAssessmentType] = useState<AssessmentType | undefined>();
-  const [exportStudentId, setExportStudentId] = useState<string | undefined>(); // New state for export
-  const [studentsForExportDropdown, setStudentsForExportDropdown] = useState<StudentMin[]>([]); // New state
+  const [exportStudentId, setExportStudentId] = useState<string | undefined>(); 
+  const [studentsForExportDropdown, setStudentsForExportDropdown] = useState<StudentMin[]>([]); 
   const [isExporting, setIsExporting] = useState(false);
+  const [isSendingResults, setIsSendingResults] = useState(false);
+
 
   const { toast } = useToast();
 
@@ -221,6 +228,8 @@ export default function ResultsPage() {
             
             const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
             fetchedSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+            setTeacherUniqueClassCount(null); // Not applicable for admin
+            setTeacherUniqueSubjectCount(null);
         } else if (role === "guru" && user?.uid) {
             const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
@@ -236,6 +245,9 @@ export default function ResultsPage() {
                     uniqueClassIds.add(doc.data().classId);
                     uniqueSubjectIds.add(doc.data().subjectId);
                 });
+
+                setTeacherUniqueClassCount(uniqueClassIds.size);
+                setTeacherUniqueSubjectCount(uniqueSubjectIds.size);
 
                 if (uniqueClassIds.size > 0) {
                     const classChunks = [];
@@ -256,6 +268,9 @@ export default function ResultsPage() {
                     subjectSnapshots.forEach(snap => snap.docs.forEach(d => fetchedSubjects.push({ id: d.id, name: d.data().name })));
                     fetchedSubjects.sort((a,b) => a.name.localeCompare(b.name));
                 }
+            } else {
+                 setTeacherUniqueClassCount(0);
+                 setTeacherUniqueSubjectCount(0);
             }
         }
         setClasses(fetchedClasses);
@@ -687,6 +702,16 @@ export default function ResultsPage() {
     if (selectedAssessmentTypeFilter !== "all") {
       tempResults = tempResults.filter(result => result.assessmentType === selectedAssessmentTypeFilter);
     }
+    
+    if (semesterFilter !== "all") {
+      tempResults = tempResults.filter(result => {
+        const month = getMonth(result.dateOfAssessment.toDate()); // 0-11
+        if (semesterFilter === "1") return month >= 6 && month <= 11; // July - Dec
+        if (semesterFilter === "2") return month >= 0 && month <= 5; // Jan - June
+        return true;
+      });
+    }
+
 
     if (canManageResults && searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
@@ -699,7 +724,7 @@ export default function ResultsPage() {
       );
     }
     return tempResults;
-  }, [results, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter, searchTerm, canManageResults]);
+  }, [results, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter, semesterFilter, searchTerm, canManageResults]);
 
   const totalPages = Math.ceil(filteredAndSearchedResults.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -710,7 +735,7 @@ export default function ResultsPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter]);
+  }, [searchTerm, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter, semesterFilter]);
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -779,10 +804,10 @@ export default function ResultsPage() {
 
     try {
       let studentsToProcess = [];
-      if (studentIdToExport && studentIdToExport !== "all_students") { // "all_students" can be a placeholder value if you add such an option
+      if (studentIdToExport && studentIdToExport !== "all_students") { 
         const student = students.find(s => s.id === studentIdToExport);
         if (student) studentsToProcess.push(student);
-      } else { // Export for all students in the selected class
+      } else { 
         studentsToProcess = students.filter(s => s.classId === classIdToExport);
       }
       
@@ -884,6 +909,56 @@ export default function ResultsPage() {
       toast({ title: `Gagal Mengekspor ke ${formatType.toUpperCase()}`, variant: "destructive" });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleSendResultsToStudents = async () => {
+    if (!exportClassId || !exportSubjectId || !exportAssessmentType || !user) {
+      toast({ title: "Pilihan Tidak Lengkap", description: "Harap pilih kelas, mata pelajaran, dan tipe asesmen.", variant: "warning" });
+      return;
+    }
+    setIsSendingResults(true);
+
+    const selectedClass = classes.find(c => c.id === exportClassId);
+    const selectedSubject = subjects.find(s => s.id === exportSubjectId);
+
+    let studentsToNotify: StudentMin[] = [];
+    if (exportStudentId && exportStudentId !== "all_students") {
+      const student = students.find(s => s.id === exportStudentId);
+      if (student) studentsToNotify.push(student);
+    } else {
+      studentsToNotify = students.filter(s => s.classId === exportClassId);
+    }
+
+    if (studentsToNotify.length === 0) {
+      toast({ title: "Tidak Ada Siswa Target", description: "Tidak ada siswa yang cocok untuk dikirimi notifikasi.", variant: "info" });
+      setIsSendingResults(false);
+      return;
+    }
+
+    const batch = writeBatch(db);
+    const notificationBase = {
+      title: `Hasil Belajar Baru: ${selectedSubject?.name || 'Mapel'} - ${exportAssessmentType}`,
+      description: `Hasil belajar Anda untuk ${selectedSubject?.name || 'Mata Pelajaran Ini'} - ${exportAssessmentType} telah dicatat/diperbarui.`,
+      href: "/my-grades",
+      read: false,
+      createdAt: serverTimestamp(),
+      type: "new_result", // A new type for this specific notification
+    };
+
+    studentsToNotify.forEach(student => {
+      const notificationRef = doc(collection(db, "notifications"));
+      batch.set(notificationRef, { ...notificationBase, userId: student.id });
+    });
+
+    try {
+      await batch.commit();
+      toast({ title: "Notifikasi Terkirim", description: `Notifikasi hasil belajar telah dikirim ke ${exportStudentId && exportStudentId !== "all_students" ? 'siswa yang dipilih' : 'semua siswa di kelas tersebut'}.` });
+    } catch (error) {
+      console.error("Error sending notifications:", error);
+      toast({ title: "Gagal Mengirim Notifikasi", variant: "destructive" });
+    } finally {
+      setIsSendingResults(false);
     }
   };
 
@@ -1122,8 +1197,8 @@ export default function ResultsPage() {
         </CardHeader>
         <CardContent>
          { (role === "admin" || role === "guru") && (
-            <div className="my-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 items-end">
-                <div className="relative md:col-span-2">
+            <div className="my-4 flex flex-wrap gap-2 items-end">
+                <div className="relative flex-grow min-w-[200px] sm:min-w-[250px]">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Cari siswa, kelas, mapel, asesmen..."
@@ -1132,27 +1207,7 @@ export default function ResultsPage() {
                     className="pl-8 w-full"
                   />
                 </div>
-                 <div className="w-full">
-                    <Label htmlFor="filter-class" className="sr-only">Filter Kelas</Label>
-                    <Select value={selectedClassFilterForTable} onValueChange={setSelectedClassFilterForTable} disabled={isLoadingData}>
-                        <SelectTrigger id="filter-class"><SelectValue placeholder="Filter Kelas" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Semua Kelas</SelectItem>
-                            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="w-full">
-                    <Label htmlFor="filter-subject" className="sr-only">Filter Mata Pelajaran</Label>
-                    <Select value={selectedSubjectFilterForTable} onValueChange={setSelectedSubjectFilterForTable} disabled={isLoadingData}>
-                        <SelectTrigger id="filter-subject"><SelectValue placeholder="Filter Mapel" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Semua Mapel</SelectItem>
-                            {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="w-full sm:col-span-2 md:col-span-4">
+                <div className="flex-grow min-w-[180px]">
                   <Label htmlFor="filter-assessment-type" className="sr-only">Filter Tipe Asesmen</Label>
                   <Select
                     value={selectedAssessmentTypeFilter}
@@ -1170,6 +1225,44 @@ export default function ResultsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                 <div className="flex-grow min-w-[180px]">
+                    <Label htmlFor="filter-semester" className="sr-only">Filter Semester</Label>
+                    <Select value={semesterFilter} onValueChange={(value) => setSemesterFilter(value as "all" | "1" | "2")}>
+                        <SelectTrigger id="filter-semester">
+                            <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <SelectValue placeholder="Filter Semester" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Semester</SelectItem>
+                            <SelectItem value="1">Semester 1 (Jul-Des)</SelectItem>
+                            <SelectItem value="2">Semester 2 (Jan-Jun)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                {(role === "admin" || (role === "guru" && teacherUniqueClassCount !== null && teacherUniqueClassCount > 1)) && (
+                  <div className="flex-grow min-w-[180px]">
+                    <Label htmlFor="filter-class-table" className="sr-only">Filter Kelas</Label>
+                    <Select value={selectedClassFilterForTable} onValueChange={setSelectedClassFilterForTable} disabled={isLoadingData || (role === "guru" && teacherUniqueClassCount === 0)}>
+                        <SelectTrigger id="filter-class-table"><SelectValue placeholder="Filter Kelas" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Kelas</SelectItem>
+                            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {(role === "admin" || (role === "guru" && teacherUniqueSubjectCount !== null && teacherUniqueSubjectCount > 1)) && (
+                  <div className="flex-grow min-w-[180px]">
+                    <Label htmlFor="filter-subject-table" className="sr-only">Filter Mata Pelajaran</Label>
+                    <Select value={selectedSubjectFilterForTable} onValueChange={setSelectedSubjectFilterForTable} disabled={isLoadingData || (role === "guru" && teacherUniqueSubjectCount === 0)}>
+                        <SelectTrigger id="filter-subject-table"><SelectValue placeholder="Filter Mapel" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Mapel</SelectItem>
+                            {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                  </div>
+                )}
             </div>
             )}
           {isLoadingResults ? (
@@ -1351,7 +1444,7 @@ export default function ResultsPage() {
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
                  (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." :
-                 searchTerm || selectedAssessmentTypeFilter !== "all" || selectedClassFilterForTable !== "all" || selectedSubjectFilterForTable !== "all"
+                 searchTerm || selectedAssessmentTypeFilter !== "all" || selectedClassFilterForTable !== "all" || selectedSubjectFilterForTable !== "all" || semesterFilter !== "all"
                  ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian Anda."
                  : "Belum ada data hasil belajar yang sesuai."}
             </div>
@@ -1406,7 +1499,7 @@ export default function ResultsPage() {
                 <SelectContent>{ASSESSMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-             <div className="flex flex-col sm:flex-row gap-2 lg:col-span-1 justify-end pt-4">
+             <div className="flex flex-col sm:flex-row gap-2 lg:col-span-1 justify-end items-end">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
@@ -1422,6 +1515,16 @@ export default function ResultsPage() {
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+                 <Button 
+                  onClick={handleSendResultsToStudents} 
+                  disabled={isSendingResults || isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} 
+                  className="w-full sm:w-auto"
+                  variant="outline"
+                >
+                  {isSendingResults && <LottieLoader width={16} height={16} className="mr-2" />}
+                  <Send className="mr-2 h-4 w-4" />
+                  Kirim ke Siswa
+                </Button>
             </div>
           </CardContent>
         </Card>
@@ -1514,4 +1617,5 @@ export default function ResultsPage() {
     </div>
   );
 }
+
 
