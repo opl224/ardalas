@@ -122,7 +122,7 @@ body {
 
 /* Custom styles for react-big-calendar */
 .rbc-calendar {
-  @apply rounded-md border-border bg-card/50 text-foreground font-body;
+  @apply overflow-hidden rounded-md border-border bg-card/50 text-foreground font-body;
 }
 
 .rbc-toolbar {
@@ -142,7 +142,7 @@ body {
 }
 
 .rbc-header {
-  @apply text-center font-semibold p-2;
+  @apply border-0 text-center font-semibold p-2;
 }
 
 /* Override event styles to remove the box and position dot container */
