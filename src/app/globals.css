@@ -146,7 +146,7 @@ body {
 }
 
 .rbc-event.rbc-selected {
-  @apply bg-primary/20 ring-2 ring-ring;
+  @apply bg-transparent ring-0;
 }
 
 .rbc-agenda-view table {
