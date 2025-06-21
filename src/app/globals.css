@@ -129,25 +129,43 @@ body {
   @apply mb-4 gap-2;
 }
 
-.rbc-toolbar .rbc-btn-group button {
-  @apply text-foreground bg-card border-border hover:bg-accent focus:ring-ring focus:ring-2 focus:z-10 transition-colors;
+.rbc-toolbar button {
+  @apply cursor-pointer text-foreground;
 }
 
-.rbc-toolbar .rbc-btn-group button.rbc-active {
-  @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm;
+.rbc-toolbar .rbc-toolbar-label {
+  @apply text-xl font-semibold text-center capitalize;
+}
+
+.rbc-btn-group button {
+  @apply text-foreground bg-card border-border hover:bg-accent focus:ring-ring focus:ring-2 focus:z-10 transition-colors;
 }
 
 .rbc-header {
   @apply border-b border-border text-center font-semibold p-2;
 }
 
+/* Override event styles to remove the box and position dot container */
 .rbc-event {
-  @apply bg-transparent border-none p-0;
+  background-color: transparent !important;
+  border: none !important;
+  padding: 1px 4px !important; /* Small padding to place the dot correctly */
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .rbc-event.rbc-selected {
-  @apply bg-transparent ring-0;
+  background-color: transparent !important; /* Ensure selected events are also transparent */
 }
+
+.rbc-event:focus {
+    outline: none !important;
+}
+
+.rbc-event-label {
+  display: none !important; /* Hide original text label from the library */
+}
+
 
 .rbc-agenda-view table {
   @apply border-border;

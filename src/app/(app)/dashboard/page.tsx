@@ -380,7 +380,7 @@ export default function DashboardPage() {
         const q = query(eventsRef, orderBy("date", "desc"));
         const querySnapshot = await getDocs(q);
 
-        const fetchedEvents = querySnapshot.docs.reduce((acc: CalendarEvent[], doc) => {
+        const fetchedEvents = querySnapshot.reduce((acc: CalendarEvent[], doc) => {
           const data = doc.data();
           const title = data.title;
           const date = data.date?.toDate(); 
@@ -450,10 +450,9 @@ export default function DashboardPage() {
   };
   
   const CustomMonthEvent = ({ event }: { event: CalendarEvent }) => (
-    <span
-      className="w-2 h-2 bg-primary rounded-full block mx-auto my-0.5"
-      title={event.title}
-    ></span>
+    <div className="w-full h-full flex items-end justify-start" title={event.title}>
+      <span className="w-2 h-2 bg-primary rounded-full"></span>
+    </div>
   );
 
 
