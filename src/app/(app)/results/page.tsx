@@ -14,6 +14,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -1409,8 +1410,7 @@ export default function ResultsPage() {
                           <TableCell className="px-2 text-center">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                           <TableCell className="font-medium truncate px-2" title={(role === 'siswa' || role === 'orangtua') ? result.assessmentTitle : result.studentName}>
                             {(role === 'siswa' || role === 'orangtua')
-                              ? `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : ''}`
-                              : result.studentName
+                              ? `${result.assessmentTitle}${result.meetingNumber ? ` (P${result.meetingNumber})` : result.studentName
                             }
                           </TableCell>
                           <TableCell className="truncate px-2" title={result.subjectName || undefined}>
@@ -1712,3 +1712,5 @@ export default function ResultsPage() {
     </div>
   );
 }
+
+    
