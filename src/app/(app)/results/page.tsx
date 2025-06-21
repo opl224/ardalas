@@ -19,6 +19,7 @@ import {
   DialogTrigger,
   DialogClose,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -739,12 +740,23 @@ export default function ResultsPage() {
   
   const hasDataForSend = useMemo(() => {
     if (!exportClassId || !exportSubjectId || !exportAssessmentType) return false;
-    return filteredAndSearchedResults.some(result =>
-        result.classId === exportClassId &&
-        result.subjectId === exportSubjectId &&
-        result.assessmentType === exportAssessmentType
-    );
-  }, [filteredAndSearchedResults, exportClassId, exportSubjectId, exportAssessmentType]);
+    
+    return filteredAndSearchedResults.some(result => {
+        const semesterMatch = (() => {
+            if (semesterFilter === 'all') return true;
+            if (!result.dateOfAssessment) return false;
+            const month = getMonth(result.dateOfAssessment.toDate());
+            if (semesterFilter === "1") return month >= 6 && month <= 11; // Juli - Desember
+            if (semesterFilter === "2") return month >= 0 && month <= 5;  // Januari - Juni
+            return false;
+        })();
+        
+        return result.classId === exportClassId &&
+               result.subjectId === exportSubjectId &&
+               result.assessmentType === exportAssessmentType &&
+               semesterMatch;
+    });
+  }, [filteredAndSearchedResults, exportClassId, exportSubjectId, exportAssessmentType, semesterFilter]);
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -1543,7 +1555,7 @@ export default function ResultsPage() {
               <FileDown className="h-6 w-6 text-primary" />
               <span>Ekspor & Kirim Hasil Semester</span>
             </CardTitle>
-            <DialogDescription>Pilih kriteria, lalu ekspor atau kirim notifikasi ke siswa.</DialogDescription>
+            <CardDescription>Pilih kriteria, lalu ekspor atau kirim notifikasi ke siswa.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
@@ -1701,6 +1713,4 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-
 
