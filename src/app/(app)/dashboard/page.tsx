@@ -75,9 +75,9 @@ const locales = {
   'id': id,
 };
 const localizer = dateFnsLocalizer({
-  format: (date, formatStr, locale) => format(date, formatStr, { locale }),
+  format,
   parse,
-  startOfWeek: () => startOfWeek(new Date(), { locale: id }),
+  startOfWeek,
   getDay,
   locales,
 });
@@ -576,6 +576,7 @@ export default function DashboardPage() {
             ) : (
                 <div className="h-[600px] text-sm">
                 <Calendar
+                    culture="id"
                     localizer={localizer}
                     events={calendarEvents}
                     startAccessor="start"
