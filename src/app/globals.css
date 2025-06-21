@@ -142,11 +142,11 @@ body {
 }
 
 .rbc-event {
-  @apply bg-primary/80 text-primary-foreground rounded-md p-1 text-xs border-none hover:bg-primary;
+  @apply bg-transparent text-foreground rounded-md p-0.5 text-xs border-none;
 }
 
 .rbc-event.rbc-selected {
-  @apply bg-primary ring-2 ring-ring;
+  @apply bg-primary/20 ring-2 ring-ring;
 }
 
 .rbc-agenda-view table {

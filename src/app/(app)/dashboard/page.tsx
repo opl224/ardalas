@@ -448,6 +448,13 @@ export default function DashboardPage() {
       </div>
     );
   };
+  
+  const CustomMonthEvent = ({ event }: { event: CalendarEvent }) => (
+    <div className="flex items-center text-xs whitespace-nowrap overflow-hidden">
+      <span className="w-1.5 h-1.5 bg-primary rounded-full mr-1.5 shrink-0"></span>
+      <span className="truncate">{event.title}</span>
+    </div>
+  );
 
 
   return (
@@ -615,6 +622,9 @@ export default function DashboardPage() {
                     }}
                     components={{
                       toolbar: CustomCalendarToolbar,
+                      month: {
+                        event: CustomMonthEvent,
+                      },
                     }}
                     view="month"
                     views={['month']}
