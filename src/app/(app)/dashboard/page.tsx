@@ -4,15 +4,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck, UserCircle } from "lucide-react";
+import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck, UserCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
-import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
 import { parse, startOfWeek, getDay } from 'date-fns';
 import id from 'date-fns/locale/id';
 import "react-big-calendar/lib/css/react-big-calendar.css";
@@ -384,8 +384,8 @@ export default function DashboardPage() {
           const data = doc.data();
           const title = data.title;
           const date = data.date?.toDate(); 
-
-          if (title && date && !isNaN(date.getTime())) {
+          
+          if (title && date && isValid(date)) {
             let start = new Date(date);
             let end = new Date(date);
 
@@ -429,6 +429,25 @@ export default function DashboardPage() {
     
     fetchEventsForCalendar();
   }, [authLoading]);
+
+  const CustomCalendarToolbar = (toolbar: any) => {
+    const goToBack = () => toolbar.onNavigate('PREV');
+    const goToNext = () => toolbar.onNavigate('NEXT');
+  
+    return (
+      <div className="flex justify-center items-center gap-4 mb-4">
+        <Button variant="outline" size="icon" onClick={goToBack} aria-label="Bulan sebelumnya">
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <h2 className="text-xl font-semibold text-center capitalize min-w-[180px]">
+          {toolbar.label}
+        </h2>
+        <Button variant="outline" size="icon" onClick={goToNext} aria-label="Bulan berikutnya">
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+    );
+  };
 
 
   return (
@@ -594,6 +613,11 @@ export default function DashboardPage() {
                         noEventsInRange: 'Tidak ada acara dalam rentang ini.',
                         showMore: total => `+${total} lainnya`
                     }}
+                    components={{
+                      toolbar: CustomCalendarToolbar,
+                    }}
+                    view="month"
+                    views={['month']}
                 />
                 </div>
             )}
