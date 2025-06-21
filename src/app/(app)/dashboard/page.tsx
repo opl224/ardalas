@@ -12,6 +12,11 @@ import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentI
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
+import { parse, startOfWeek, getDay } from 'date-fns';
+import id from 'date-fns/locale/id';
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import LottieLoader from "@/components/ui/LottieLoader";
 
 interface StatCardProps {
   title: string;
@@ -59,6 +64,25 @@ interface Announcement {
   createdById?: string;
 }
 
+interface CalendarEvent {
+  title: string;
+  start: Date;
+  end: Date;
+  allDay?: boolean;
+}
+
+const locales = {
+  'id': id,
+};
+const localizer = dateFnsLocalizer({
+  format: (date, formatStr, locale) => format(date, formatStr, { locale }),
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { locale: id }),
+  getDay,
+  locales,
+});
+
+
 interface DashboardStats {
   // Admin specific
   adminTotalStudents: number;
@@ -101,6 +125,9 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [recentAnnouncements, setRecentAnnouncements] = useState<Announcement[]>([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [loadingCalendar, setLoadingCalendar] = useState(true);
+
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -343,6 +370,66 @@ export default function DashboardPage() {
 
   }, [user, role, authLoading]);
 
+  useEffect(() => {
+    if (authLoading) return;
+
+    const fetchEventsForCalendar = async () => {
+      setLoadingCalendar(true);
+      try {
+        const eventsRef = collection(db, "events");
+        const q = query(eventsRef, orderBy("date", "desc"));
+        const querySnapshot = await getDocs(q);
+
+        const fetchedEvents = querySnapshot.docs.reduce((acc: CalendarEvent[], doc) => {
+          const data = doc.data();
+          const title = data.title;
+          const date = data.date?.toDate(); 
+
+          if (title && date && !isNaN(date.getTime())) {
+            let start = new Date(date);
+            let end = new Date(date);
+
+            if (data.startTime && typeof data.startTime === 'string' && data.startTime.includes(':')) {
+                const [hours, minutes] = data.startTime.split(':').map(Number);
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                    start.setHours(hours, minutes);
+                }
+            } else {
+                start.setHours(0,0,0,0);
+            }
+
+            if (data.endTime && typeof data.endTime === 'string' && data.endTime.includes(':')) {
+                const [hours, minutes] = data.endTime.split(':').map(Number);
+                 if (!isNaN(hours) && !isNaN(minutes)) {
+                    end.setHours(hours, minutes);
+                 }
+            } else {
+                end = new Date(start.getTime() + 60 * 60 * 1000); // Default 1 hour
+            }
+            
+            if (start > end) { // Simple validation
+              end = new Date(start.getTime() + 60 * 60 * 1000);
+            }
+
+            acc.push({
+              title,
+              start,
+              end,
+            });
+          }
+          return acc;
+        }, []);
+        setCalendarEvents(fetchedEvents);
+      } catch (error) {
+        console.error("Error fetching events for calendar:", error);
+      } finally {
+        setLoadingCalendar(false);
+      }
+    };
+    
+    fetchEventsForCalendar();
+  }, [authLoading]);
+
 
   return (
     <div className="space-y-8">
@@ -472,8 +559,46 @@ export default function DashboardPage() {
           </Card>
         )}
       </section>
+
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-semibold font-headline">Kalender Acara</h2>
+          <Button variant="link" asChild className="text-primary">
+            <Link href="/events">Lihat Semua Acara</Link>
+          </Button>
+        </div>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+          <CardContent className="p-4">
+            {loadingCalendar ? (
+              <div className="flex items-center justify-center h-[600px]">
+                <LottieLoader width={64} height={64} />
+              </div>
+            ) : (
+                <div className="h-[600px] text-sm">
+                <Calendar
+                    localizer={localizer}
+                    events={calendarEvents}
+                    startAccessor="start"
+                    endAccessor="end"
+                    style={{ height: '100%' }}
+                    messages={{
+                        week: 'Minggu',
+                        work_week: 'Minggu Kerja',
+                        day: 'Hari',
+                        month: 'Bulan',
+                        previous: '‹',
+                        next: '›',
+                        today: 'Hari Ini',
+                        agenda: 'Agenda',
+                        noEventsInRange: 'Tidak ada acara dalam rentang ini.',
+                        showMore: total => `+${total} lainnya`
+                    }}
+                />
+                </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
-
-    

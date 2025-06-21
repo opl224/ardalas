@@ -119,3 +119,48 @@ body {
 .hide-password-reveal-icon::-ms-reveal {
   display: none;
 }
+
+/* Custom styles for react-big-calendar */
+.rbc-calendar {
+  @apply rounded-md border-border bg-card/50 text-foreground font-body;
+}
+
+.rbc-toolbar {
+  @apply mb-4 gap-2;
+}
+
+.rbc-toolbar .rbc-btn-group button {
+  @apply text-foreground bg-card border-border hover:bg-accent focus:ring-ring focus:ring-2 focus:z-10 transition-colors;
+}
+
+.rbc-toolbar .rbc-btn-group button.rbc-active {
+  @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm;
+}
+
+.rbc-header {
+  @apply border-b border-border text-center font-semibold p-2;
+}
+
+.rbc-event {
+  @apply bg-primary/80 text-primary-foreground rounded-md p-1 text-xs border-none hover:bg-primary;
+}
+
+.rbc-event.rbc-selected {
+  @apply bg-primary ring-2 ring-ring;
+}
+
+.rbc-agenda-view table {
+  @apply border-border;
+}
+
+.rbc-agenda-view table thead th {
+ @apply border-b border-border;
+}
+
+.rbc-agenda-view table tbody tr td {
+ @apply border-b border-border/50;
+}
+
+.rbc-day-slot .rbc-time-slot {
+  @apply border-t border-border/50;
+}
