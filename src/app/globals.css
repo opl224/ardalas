@@ -142,7 +142,7 @@ body {
 }
 
 .rbc-header {
-  @apply border-b border-border text-center font-semibold p-2;
+  @apply text-center font-semibold p-2;
 }
 
 /* Override event styles to remove the box and position dot container */
