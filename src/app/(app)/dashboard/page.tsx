@@ -380,7 +380,7 @@ export default function DashboardPage() {
         const q = query(eventsRef, orderBy("date", "desc"));
         const querySnapshot = await getDocs(q);
 
-        const fetchedEvents = querySnapshot.reduce((acc: CalendarEvent[], doc) => {
+        const fetchedEvents = querySnapshot.docs.reduce((acc: CalendarEvent[], doc) => {
           const data = doc.data();
           const title = data.title;
           const date = data.date?.toDate(); 
