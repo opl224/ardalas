@@ -10,13 +10,15 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { format, isValid } from "date-fns";
+import { format, isValid, addMonths, subMonths, startOfMonth, endOfMonth } from "date-fns"; // Import date-fns functions
 import { id as indonesiaLocale } from "date-fns/locale";
 import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
 import { parse, startOfWeek, getDay } from 'date-fns';
 import id from 'date-fns/locale/id';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import LottieLoader from "@/components/ui/LottieLoader";
+import { cn } from "@/lib/utils";
+
 
 interface StatCardProps {
   title: string;
@@ -127,6 +129,7 @@ export default function DashboardPage() {
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
 
 
   useEffect(() => {
@@ -431,18 +434,38 @@ export default function DashboardPage() {
   }, [authLoading]);
 
   const CustomCalendarToolbar = (toolbar: any) => {
-    const goToBack = () => toolbar.onNavigate('PREV');
-    const goToNext = () => toolbar.onNavigate('NEXT');
+    const today = new Date();
+    const minDate = startOfMonth(subMonths(today, 3));
+    const maxDate = endOfMonth(addMonths(today, 3));
+
+    const goToBack = () => {
+      const newDate = subMonths(toolbar.date, 1);
+      if (newDate >= minDate) {
+        toolbar.onNavigate('PREV');
+        setCurrentCalendarDate(newDate);
+      }
+    };
+
+    const goToNext = () => {
+      const newDate = addMonths(toolbar.date, 1);
+      if (newDate <= maxDate) {
+        toolbar.onNavigate('NEXT');
+        setCurrentCalendarDate(newDate);
+      }
+    };
+
+    const isBackDisabled = toolbar.date <= minDate;
+    const isNextDisabled = toolbar.date >= maxDate;
   
     return (
       <div className="flex justify-center items-center gap-4 mb-4">
-        <Button variant="ghost" size="icon" onClick={goToBack} aria-label="Bulan sebelumnya">
+        <Button variant="ghost" size="icon" onClick={goToBack} disabled={isBackDisabled} aria-label="Bulan sebelumnya">
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2 className="text-xl font-semibold text-center capitalize min-w-[180px]">
           {toolbar.label}
         </h2>
-        <Button variant="ghost" size="icon" onClick={goToNext} aria-label="Bulan berikutnya">
+        <Button variant="ghost" size="icon" onClick={goToNext} disabled={isNextDisabled} aria-label="Bulan berikutnya">
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
@@ -606,6 +629,8 @@ export default function DashboardPage() {
                     events={calendarEvents}
                     startAccessor="start"
                     endAccessor="end"
+                    date={currentCalendarDate} // Control the displayed date
+                    onNavigate={(date) => setCurrentCalendarDate(date)} // Handle navigation
                     style={{ height: '100%' }}
                     messages={{
                         week: 'Minggu',
