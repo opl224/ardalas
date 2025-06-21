@@ -963,7 +963,7 @@ export default function ResultsPage() {
     setIsSendingResults(true);
 
     const selectedClass = classes.find(c => c.id === exportClassId);
-    const selectedSubject = subjects.find(c => c.id === exportSubjectId);
+    const selectedSubject = subjects.find(s => s.id === exportSubjectId);
 
     let studentsToNotify: StudentMin[] = [];
     let studentIdsToUpdateResults: string[] = [];
@@ -1058,52 +1058,7 @@ export default function ResultsPage() {
     }
   };
 
-
-  if (authLoading || (isLoadingData && (role === "admin" || role === "guru"))) {
-    return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Manajemen Hasil Belajar</h1>
-        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-center p-8">
-              <LottieLoader width={32} height={32} className="mr-2" />
-              Memuat data pendukung...
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!role || !["admin", "guru", "siswa", "orangtua"].includes(role)) {
-    return (
-         <div className="space-y-6">
-            <h1 className="text-3xl font-bold font-headline">Hasil Belajar</h1>
-             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-                <CardContent className="pt-6">
-                    <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                        <AlertCircle className="w-12 h-12 mb-4 text-destructive" />
-                        <p className="font-semibold">Akses Ditolak.</p>
-                        <p>Anda tidak memiliki izin untuk mengakses halaman ini.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    );
-  }
-
-  let pageTitle = "Manajemen Hasil Belajar";
-  let pageDescription = "Catat, lihat, dan kelola nilai serta rapor siswa.";
-  if (role === "siswa") {
-      pageTitle = `Hasil Belajar Saya (${user?.displayName || 'Siswa'})`;
-      pageDescription = "Lihat daftar nilai dan hasil asesmen Anda.";
-  } else if (role === "orangtua") {
-      pageTitle = `Hasil Belajar Anak (${user?.linkedStudentName || 'Siswa'})`;
-      pageDescription = `Lihat daftar nilai dan hasil asesmen ${user?.linkedStudentName || 'anak Anda'}.`;
-      if (!user?.linkedStudentId) {
-           pageDescription = "Akun Anda belum terhubung dengan data siswa. Hubungi admin sekolah.";
-      }
-  }
+  const studentNameForTitle = role === "siswa" ? user?.displayName : (role === "orangtua" ? user?.linkedStudentName : null);
 
   const renderResultFormFields = (formInstance: typeof addResultForm | typeof editResultForm, dialogType: 'add' | 'edit') => {
     const currentClassId = formInstance.watch("classId");
@@ -1242,7 +1197,51 @@ export default function ResultsPage() {
     );
   };
 
-  const studentNameForTitle = role === "siswa" ? user?.displayName : (role === "orangtua" ? user?.linkedStudentName : null);
+  if (authLoading || (isLoadingData && (role === "admin" || role === "guru"))) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold font-headline">Manajemen Hasil Belajar</h1>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center p-8">
+              <LottieLoader width={32} height={32} className="mr-2" />
+              Memuat data pendukung...
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!role || !["admin", "guru", "siswa", "orangtua"].includes(role)) {
+    return (
+         <div className="space-y-6">
+            <h1 className="text-3xl font-bold font-headline">Hasil Belajar</h1>
+             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                <CardContent className="pt-6">
+                    <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                        <AlertCircle className="w-12 h-12 mb-4 text-destructive" />
+                        <p className="font-semibold">Akses Ditolak.</p>
+                        <p>Anda tidak memiliki izin untuk mengakses halaman ini.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+  }
+
+  let pageTitle = "Manajemen Hasil Belajar";
+  let pageDescription = "Catat, lihat, dan kelola nilai serta rapor siswa.";
+  if (role === "siswa") {
+      pageTitle = `Hasil Belajar Saya (${user?.displayName || 'Siswa'})`;
+      pageDescription = "Lihat daftar nilai dan hasil asesmen Anda.";
+  } else if (role === "orangtua") {
+      pageTitle = `Hasil Belajar Anak (${user?.linkedStudentName || 'Siswa'})`;
+      pageDescription = `Lihat daftar nilai dan hasil asesmen ${user?.linkedStudentName || 'anak Anda'}.`;
+      if (!user?.linkedStudentId) {
+           pageDescription = "Akun Anda belum terhubung dengan data siswa. Hubungi admin sekolah.";
+      }
+  }
 
   return (
     <div className="space-y-6">
@@ -1315,7 +1314,7 @@ export default function ResultsPage() {
                         <SelectContent>
                             <SelectItem value="all">Semua Tipe</SelectItem>
                             {ASSESSMENT_TYPES.map(type => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                            <SelectItem key={type} value={type}>{type}</SelectItem>))}
                         </SelectContent>
                     </Select>
                  </div>
@@ -1710,5 +1709,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-    
