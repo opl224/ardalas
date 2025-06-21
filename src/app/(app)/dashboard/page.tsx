@@ -10,14 +10,24 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
-import { format, isValid, addMonths, subMonths, startOfMonth, endOfMonth } from "date-fns"; // Import date-fns functions
+import { format, isValid, addMonths, subMonths, startOfMonth, endOfMonth, isSameDay } from "date-fns"; 
 import { id as indonesiaLocale } from "date-fns/locale";
-import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
+import { Calendar, dateFnsLocalizer } from 'react-big-calendar';
 import { parse, startOfWeek, getDay } from 'date-fns';
 import id from 'date-fns/locale/id';
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 interface StatCardProps {
@@ -71,15 +81,17 @@ interface CalendarEvent {
   start: Date;
   end: Date;
   allDay?: boolean;
+  category?: string;
 }
 
 const locales = {
   'id': id,
 };
+
 const localizer = dateFnsLocalizer({
   format,
   parse,
-  startOfWeek,
+  startOfWeek: (date) => startOfWeek(date, { locale: id }),
   getDay,
   locales,
 });
@@ -130,6 +142,9 @@ export default function DashboardPage() {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date());
+
+  const [selectedDateEvents, setSelectedDateEvents] = useState<CalendarEvent[]>([]);
+  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
 
 
   useEffect(() => {
@@ -387,6 +402,7 @@ export default function DashboardPage() {
           const data = doc.data();
           const title = data.title;
           const date = data.date?.toDate(); 
+          const category = data.category;
           
           if (title && date && isValid(date)) {
             let start = new Date(date);
@@ -418,6 +434,7 @@ export default function DashboardPage() {
               title,
               start,
               end,
+              category,
             });
           }
           return acc;
@@ -477,6 +494,17 @@ export default function DashboardPage() {
       <span className="w-2 h-2 bg-primary rounded-full"></span>
     </div>
   );
+
+  const handleSelectSlot = (slotInfo: { start: Date }) => {
+    const eventsForDay = calendarEvents.filter(event =>
+      isSameDay(event.start, slotInfo.start)
+    );
+
+    if (eventsForDay.length > 0) {
+      setSelectedDateEvents(eventsForDay);
+      setIsEventDialogOpen(true);
+    }
+  };
 
 
   return (
@@ -632,6 +660,8 @@ export default function DashboardPage() {
                     date={currentCalendarDate} // Control the displayed date
                     onNavigate={(date) => setCurrentCalendarDate(date)} // Handle navigation
                     style={{ height: '100%' }}
+                    onSelectSlot={handleSelectSlot}
+                    selectable
                     messages={{
                         week: 'Minggu',
                         work_week: 'Minggu Kerja',
@@ -658,6 +688,41 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Dialog open={isEventDialogOpen} onOpenChange={setIsEventDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Acara pada {selectedDateEvents.length > 0 && format(selectedDateEvents[0].start, "dd MMMM yyyy", { locale: indonesiaLocale })}
+            </DialogTitle>
+            <DialogDescription>
+              Berikut adalah daftar acara untuk tanggal yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-4 py-2">
+              {selectedDateEvents.map((event, index) => (
+                <div key={index} className="p-3 border rounded-md bg-muted/30">
+                  <h4 className="font-semibold text-primary">{event.title}</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Waktu: {format(event.start, "HH:mm")} - {format(event.end, "HH:mm")}
+                  </p>
+                  {event.category && (
+                    <p className="text-sm text-muted-foreground">
+                      Kategori: {event.category}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="mt-4">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Tutup</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
