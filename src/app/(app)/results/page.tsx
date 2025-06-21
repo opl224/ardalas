@@ -1592,7 +1592,7 @@ export default function ResultsPage() {
               </Select>
             </div>
           </CardContent>
-          <CardFooter className="flex justify-end gap-2">
+          <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
               <Button 
                 onClick={handleSendResultsToStudents} 
                 disabled={!hasDataForSend || isSendingResults || isExporting} 
