@@ -436,13 +436,13 @@ export default function DashboardPage() {
   
     return (
       <div className="flex justify-center items-center gap-4 mb-4">
-        <Button variant="outline" size="icon" onClick={goToBack} aria-label="Bulan sebelumnya">
+        <Button variant="ghost" size="icon" onClick={goToBack} aria-label="Bulan sebelumnya">
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2 className="text-xl font-semibold text-center capitalize min-w-[180px]">
           {toolbar.label}
         </h2>
-        <Button variant="outline" size="icon" onClick={goToNext} aria-label="Bulan berikutnya">
+        <Button variant="ghost" size="icon" onClick={goToNext} aria-label="Bulan berikutnya">
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
