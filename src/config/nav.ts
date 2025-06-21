@@ -32,6 +32,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
   { title: "Pengumuman", href: "/announcements", icon: Megaphone },
+  { title: "Kegiatan", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
   { 
     title: "Administrasi Pengguna",
     href: "/admin/user-administration", 
@@ -75,7 +76,6 @@ export const navItems: NavItem[] = [
       { title: "Hasil", href: "/results", icon: BarChart3, roles: ["admin", "guru"] },
     ],
   },
-  { title: "Kalender Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
   { 
     title: "Pengaturan", 
     href: "/settings", 
@@ -86,4 +86,3 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
-
