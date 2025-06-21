@@ -963,7 +963,7 @@ export default function ResultsPage() {
     setIsSendingResults(true);
 
     const selectedClass = classes.find(c => c.id === exportClassId);
-    const selectedSubject = subjects.find(s => s.id === exportSubjectId);
+    const selectedSubject = subjects.find(c => c.id === exportSubjectId);
 
     let studentsToNotify: StudentMin[] = [];
     let studentIdsToUpdateResults: string[] = [];
@@ -1315,8 +1315,7 @@ export default function ResultsPage() {
                         <SelectContent>
                             <SelectItem value="all">Semua Tipe</SelectItem>
                             {ASSESSMENT_TYPES.map(type => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                            ))}
+                            <SelectItem key={type} value={type}>{type}</SelectItem>)}
                         </SelectContent>
                     </Select>
                  </div>
