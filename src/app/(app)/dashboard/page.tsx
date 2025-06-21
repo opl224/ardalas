@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck, UserCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
@@ -506,6 +506,26 @@ export default function DashboardPage() {
     }
   };
 
+  const CustomDateCellWrapper = ({ children, value }: { children: React.ReactNode; value: Date }) => {
+    const hasEvents = useMemo(
+      () => calendarEvents.some(event => isSameDay(event.start, value)),
+      [value, calendarEvents]
+    );
+
+    const handleCellClick = (e: React.MouseEvent) => {
+      if (hasEvents) {
+        e.stopPropagation();
+        handleSelectSlot({ start: value });
+      }
+    };
+
+    return (
+      <div onClick={handleCellClick} className={cn("h-full", hasEvents ? "cursor-pointer" : "cursor-default")}>
+        {children}
+      </div>
+    );
+  };
+
 
   return (
     <div className="space-y-8">
@@ -679,6 +699,7 @@ export default function DashboardPage() {
                       month: {
                         event: CustomMonthEvent,
                       },
+                      dateCellWrapper: CustomDateCellWrapper,
                     }}
                     view="month"
                     views={['month']}

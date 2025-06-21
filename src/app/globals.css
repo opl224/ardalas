@@ -122,7 +122,7 @@ body {
 
 /* Custom styles for react-big-calendar */
 .rbc-calendar {
-  @apply overflow-hidden rounded-md border-border bg-card/50 text-foreground font-body;
+  @apply bg-card/50 text-foreground font-body overflow-hidden rounded-md;
 }
 
 .rbc-toolbar {
@@ -181,4 +181,42 @@ body {
 
 .rbc-day-slot .rbc-time-slot {
   @apply border-t border-border/50;
+}
+
+/* Force horizontal layout for events within a day cell */
+.rbc-day-slot .rbc-event-content {
+    display: none; /* Hide the default event content which includes text */
+}
+
+.rbc-day-slot .rbc-row-content {
+    display: flex;
+    flex-direction: row !important; /* Use important to override library inline styles */
+    flex-wrap: wrap;
+    align-items: flex-end; /* Align to the bottom */
+    justify-content: flex-start; /* Align to the left */
+    gap: 2px;
+    padding-bottom: 2px;
+    padding-left: 2px;
+}
+
+.rbc-day-slot .rbc-event {
+    position: relative !important;
+    display: block !important;
+    width: auto !important; /* Let the content (dot) define the width */
+    height: auto !important; /* Let the content (dot) define the height */
+    padding: 0 !important; /* Remove all padding */
+    margin: 0 !important; /* Remove all margin */
+}
+
+.rbc-day-bg.rbc-selected-cell {
+  background-color: hsl(var(--accent)) !important;
+  opacity: 0.7;
+}
+
+.rbc-day-bg {
+    border-right: 1px solid hsl(var(--border) / 0.3);
+}
+
+.rbc-month-row + .rbc-month-row {
+    border-top: 1px solid hsl(var(--border) / 0.3);
 }
