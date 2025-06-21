@@ -1117,7 +1117,6 @@ export default function ResultsPage() {
     const assignmentsForDropdown = (currentClassId && currentSubjectId)
         ? assignments.filter(a => a.classId === currentClassId && a.subjectId === currentSubjectId)
         : [];
-
     return (
         <>
             <div>
