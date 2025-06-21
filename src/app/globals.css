@@ -142,7 +142,7 @@ body {
 }
 
 .rbc-event {
-  @apply bg-transparent text-foreground rounded-md p-0.5 text-xs border-none;
+  @apply bg-transparent border-none p-0;
 }
 
 .rbc-event.rbc-selected {

@@ -450,10 +450,10 @@ export default function DashboardPage() {
   };
   
   const CustomMonthEvent = ({ event }: { event: CalendarEvent }) => (
-    <div className="flex items-center text-xs whitespace-nowrap overflow-hidden">
-      <span className="w-1.5 h-1.5 bg-primary rounded-full mr-1.5 shrink-0"></span>
-      <span className="truncate">{event.title}</span>
-    </div>
+    <span
+      className="w-2 h-2 bg-primary rounded-full block mx-auto my-0.5"
+      title={event.title}
+    ></span>
   );
 
 
