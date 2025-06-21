@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,8 +18,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogClose,
-  DialogDescription as ShadDialogDescription, // Renamed to avoid conflict
-  DialogFooter, 
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -49,7 +48,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, startOfDay, getMonth } from "date-fns";
+import { format, startOfDay, getMonth, getYear } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -705,6 +704,7 @@ export default function ResultsPage() {
     
     if (semesterFilter !== "all") {
       tempResults = tempResults.filter(result => {
+        if (!result.dateOfAssessment) return false;
         const month = getMonth(result.dateOfAssessment.toDate()); 
         if (semesterFilter === "1") return month >= 6 && month <= 11; 
         if (semesterFilter === "2") return month >= 0 && month <= 5; 
@@ -736,6 +736,15 @@ export default function ResultsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedClassFilterForTable, selectedSubjectFilterForTable, selectedAssessmentTypeFilter, semesterFilter]);
+  
+  const hasDataForSend = useMemo(() => {
+    if (!exportClassId || !exportSubjectId || !exportAssessmentType) return false;
+    return filteredAndSearchedResults.some(result =>
+        result.classId === exportClassId &&
+        result.subjectId === exportSubjectId &&
+        result.assessmentType === exportAssessmentType
+    );
+  }, [filteredAndSearchedResults, exportClassId, exportSubjectId, exportAssessmentType]);
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -819,17 +828,35 @@ export default function ResultsPage() {
 
 
       const dataToExport = [];
+      const currentYear = getYear(new Date());
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+
+      if (semesterFilter === "1") { // Juli - Desember
+          startDate = new Date(currentYear, 6, 1);
+          endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+      } else if (semesterFilter === "2") { // Januari - Juni
+          startDate = new Date(currentYear, 0, 1);
+          endDate = new Date(currentYear, 5, 30, 23, 59, 59);
+      }
+
 
       for (const student of studentsToProcess) {
-        const resultsQuery = query(
-          collection(db, "results"),
+        let resultsQueryConstraints = [
           where("studentId", "==", student.id),
           where("classId", "==", classIdToExport!),
           where("subjectId", "==", subjectIdToExport!),
           where("assessmentType", "==", assessmentTypeToExport!),
           orderBy("dateOfAssessment", "desc")
-        );
-        const resultsSnapshot = await getDocs(resultsQuery);
+        ];
+        if (startDate && endDate) {
+            resultsQueryConstraints.push(where("dateOfAssessment", ">=", Timestamp.fromDate(startDate)));
+            resultsQueryConstraints.push(where("dateOfAssessment", "<=", Timestamp.fromDate(endDate)));
+        }
+
+        const resultsQueryInstance = query(collection(db, "results"), ...resultsQueryConstraints);
+        const resultsSnapshot = await getDocs(resultsQueryInstance);
+
         if (resultsSnapshot.empty) {
             dataToExport.push({
                 "Nama Siswa": student.name,
@@ -867,6 +894,7 @@ export default function ResultsPage() {
           [`Kelas: ${selectedClass?.name || '-'}`],
           [`Mata Pelajaran: ${selectedSubject?.name || '-'}`],
           [`Tipe Asesmen: ${assessmentTypeToExport}`],
+          semesterFilter !== "all" ? [`Semester: ${semesterFilter}`] : [],
           studentInfo ? [`Siswa: ${studentInfo.name}`] : [],
           [`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`],
           [] 
@@ -880,14 +908,17 @@ export default function ResultsPage() {
         doc.setFontSize(14);
         doc.text(`Laporan Hasil Belajar Semester`, 14, 15);
         doc.setFontSize(10);
-        doc.text(`Kelas: ${selectedClass?.name || '-'}`, 14, 22);
-        doc.text(`Mata Pelajaran: ${selectedSubject?.name || '-'}`, 14, 29);
-        doc.text(`Tipe Asesmen: ${assessmentTypeToExport}`, 14, 36);
-        if (studentInfo) doc.text(`Siswa: ${studentInfo.name}`, 14, 43);
-        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, studentInfo ? 50 : 43);
+        let yPos = 22;
+        doc.text(`Kelas: ${selectedClass?.name || '-'}`, 14, yPos); yPos += 7;
+        doc.text(`Mata Pelajaran: ${selectedSubject?.name || '-'}`, 14, yPos); yPos += 7;
+        doc.text(`Tipe Asesmen: ${assessmentTypeToExport}`, 14, yPos); yPos += 7;
+        if (semesterFilter !== "all") { doc.text(`Semester: ${semesterFilter}`, 14, yPos); yPos += 7;}
+        if (studentInfo) { doc.text(`Siswa: ${studentInfo.name}`, 14, yPos); yPos += 7; }
+        doc.text(`Tanggal Ekspor: ${format(new Date(), "dd MMMM yyyy HH:mm", { locale: indonesiaLocale })}`, 14, yPos); yPos += 7;
+
 
         autoTable(doc, {
-          startY: studentInfo ? 57 : 50,
+          startY: yPos,
           head: [Object.keys(dataToExport[0])],
           body: dataToExport.map(row => Object.values(row)),
           theme: 'grid',
@@ -945,7 +976,7 @@ export default function ResultsPage() {
     const batch = writeBatch(db);
     const notificationBase = {
       title: `Nilai Semester Tersedia: ${selectedSubject?.name || 'Mapel'}`,
-      description: `Guru Anda telah mengirimkan nilai semester untuk mata pelajaran ${selectedSubject?.name || 'Mata Pelajaran Ini'}, asesmen tipe: ${exportAssessmentType}. Silakan periksa di halaman Hasil Belajar.`,
+      description: `Guru Anda telah mengirimkan nilai semester untuk mata pelajaran ${selectedSubject?.name || 'Mata Pelajaran Ini'}. Silakan periksa di halaman Hasil Belajar.`,
       href: "/my-grades",
       read: false,
       createdAt: serverTimestamp(),
@@ -958,15 +989,39 @@ export default function ResultsPage() {
     });
     
     if (studentIdsToUpdateResults.length > 0) {
-        const resultsToUpdateQuery = query(
-            collection(db, "results"),
+        const currentYear = getYear(new Date());
+        let startDate: Date | undefined;
+        let endDate: Date | undefined;
+
+        if (semesterFilter === "1") {
+            startDate = new Date(currentYear, 6, 1);
+            endDate = new Date(currentYear, 11, 31, 23, 59, 59);
+        } else if (semesterFilter === "2") {
+            startDate = new Date(currentYear, 0, 1);
+            endDate = new Date(currentYear, 5, 30, 23, 59, 59);
+        }
+        
+        let resultsToUpdateQueryConstraints = [
             where("classId", "==", exportClassId),
             where("subjectId", "==", exportSubjectId),
             where("assessmentType", "==", exportAssessmentType),
             where("studentId", "in", studentIdsToUpdateResults)
-        );
+        ];
+
+        if (startDate && endDate) {
+            resultsToUpdateQueryConstraints.push(where("dateOfAssessment", ">=", Timestamp.fromDate(startDate)));
+            resultsToUpdateQueryConstraints.push(where("dateOfAssessment", "<=", Timestamp.fromDate(endDate)));
+        }
+
+        const resultsToUpdateQuery = query(collection(db, "results"), ...resultsToUpdateQueryConstraints);
+
         try {
             const resultsSnapshot = await getDocs(resultsToUpdateQuery);
+            if (resultsSnapshot.empty) {
+                toast({ title: "Tidak Ada Hasil", description: "Tidak ada hasil belajar yang cocok dengan kriteria untuk dikirim.", variant: "info" });
+                setIsSendingResults(false);
+                return;
+            }
             resultsSnapshot.forEach(resultDoc => {
                 batch.update(resultDoc.ref, { isSentToStudent: true });
             });
@@ -1203,7 +1258,7 @@ export default function ResultsPage() {
                 <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-lg">
                   <DialogHeader>
                       <DialogTitle>Tambah Hasil Belajar Baru</DialogTitle>
-                      <ShadDialogDescription>Isi detail nilai siswa.</ShadDialogDescription>
+                      <DialogDescription>Isi detail nilai siswa.</DialogDescription>
                   </DialogHeader>
                   <Form {...addResultForm}>
                       <form
@@ -1236,24 +1291,24 @@ export default function ResultsPage() {
                     className="pl-8 w-full"
                   />
                 </div>
-                <div className="flex-grow min-w-[180px]">
-                  <Label htmlFor="filter-assessment-type" className="sr-only">Filter Tipe Asesmen</Label>
-                  <Select
-                    value={selectedAssessmentTypeFilter}
-                    onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
-                  >
-                    <SelectTrigger id="filter-assessment-type">
-                        <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <SelectValue placeholder="Filter Tipe Asesmen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Semua Tipe</SelectItem>
-                        {ASSESSMENT_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                 <div className="flex-grow min-w-[180px]">
+                    <Label htmlFor="filter-assessment-type" className="sr-only">Filter Tipe Asesmen</Label>
+                    <Select
+                        value={selectedAssessmentTypeFilter}
+                        onValueChange={(value) => setSelectedAssessmentTypeFilter(value as AssessmentType | "all")}
+                    >
+                        <SelectTrigger id="filter-assessment-type">
+                            <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
+                            <SelectValue placeholder="Filter Tipe Asesmen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Semua Tipe</SelectItem>
+                            {ASSESSMENT_TYPES.map(type => (
+                            <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                 </div>
                  <div className="flex-grow min-w-[180px]">
                     <Label htmlFor="filter-semester" className="sr-only">Filter Semester</Label>
                     <Select value={semesterFilter} onValueChange={(value) => setSemesterFilter(value as "all" | "1" | "2")}>
@@ -1486,11 +1541,11 @@ export default function ResultsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
               <FileDown className="h-6 w-6 text-primary" />
-              <span>Ekspor Hasil Belajar Semester</span>
+              <span>Ekspor & Kirim Hasil Semester</span>
             </CardTitle>
-            <ShadDialogDescription>Pilih kriteria untuk mengekspor laporan hasil belajar per kelas.</ShadDialogDescription>
+            <DialogDescription>Pilih kriteria, lalu ekspor atau kirim notifikasi ke siswa.</DialogDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+          <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
               <Label htmlFor="export-classId">Kelas</Label>
               <Select value={exportClassId} onValueChange={setExportClassId} disabled={isLoadingData || isExporting}>
@@ -1528,34 +1583,34 @@ export default function ResultsPage() {
                 <SelectContent>{ASSESSMENT_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-             <div className="flex flex-col sm:flex-row gap-2 lg:col-span-1 justify-end items-end">
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
-                            {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} <FileDown className="mr-2 h-4 w-4" /> Ekspor Hasil
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleExportSemesterResults('xlsx', exportStudentId)} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
-                            Excel (.xlsx)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExportSemesterResults('pdf', exportStudentId)} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
-                            PDF (.pdf)
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                 <Button 
-                  onClick={handleSendResultsToStudents} 
-                  disabled={isSendingResults || isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} 
-                  className="w-full sm:w-auto"
-                  variant="outline"
-                >
-                  {isSendingResults && <LottieLoader width={16} height={16} className="mr-2" />}
-                  <Send className="mr-2 h-4 w-4" />
-                  Kirim ke Siswa
-                </Button>
-            </div>
           </CardContent>
+          <CardFooter className="flex justify-end gap-2">
+              <Button 
+                onClick={handleSendResultsToStudents} 
+                disabled={!hasDataForSend || isSendingResults || isExporting} 
+                className="w-full sm:w-auto"
+                variant="outline"
+              >
+                {isSendingResults && <LottieLoader width={16} height={16} className="mr-2" />}
+                <Send className="mr-2 h-4 w-4" />
+                Kirim ke Siswa
+              </Button>
+              <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                      <Button disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType} className="w-full sm:w-auto">
+                          {isExporting && <LottieLoader width={16} height={16} className="mr-2" />} <FileDown className="mr-2 h-4 w-4" /> Ekspor Hasil
+                      </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleExportSemesterResults('xlsx', exportStudentId)} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
+                          Excel (.xlsx)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExportSemesterResults('pdf', exportStudentId)} disabled={isExporting || !exportClassId || !exportSubjectId || !exportAssessmentType}>
+                          PDF (.pdf)
+                      </DropdownMenuItem>
+                  </DropdownMenuContent>
+              </DropdownMenu>
+          </CardFooter>
         </Card>
       )}
 
@@ -1567,7 +1622,7 @@ export default function ResultsPage() {
           <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-lg">
             <DialogHeader>
                 <DialogTitle>Edit Hasil Belajar</DialogTitle>
-                <ShadDialogDescription>Perbarui detail nilai siswa.</ShadDialogDescription>
+                <DialogDescription>Perbarui detail nilai siswa.</DialogDescription>
             </DialogHeader>
             {selectedResult && (
                 <Form {...editResultForm}>
@@ -1598,7 +1653,7 @@ export default function ResultsPage() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Detail Hasil Belajar</DialogTitle>
-            <ShadDialogDescription>Informasi lengkap mengenai hasil asesmen.</ShadDialogDescription>
+            <DialogDescription>Informasi lengkap mengenai hasil asesmen.</DialogDescription>
           </DialogHeader>
           {selectedResultForDetail && (
             <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
@@ -1646,4 +1701,6 @@ export default function ResultsPage() {
     </div>
   );
 }
+
+
 
