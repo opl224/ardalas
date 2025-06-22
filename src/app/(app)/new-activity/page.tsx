@@ -26,10 +26,8 @@ export default function NewActivityPage() {
             <span>Folder Kegiatan</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-center">
-            <div style={{ height: '600px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-              <Folder size={2} color="#8784EB" className="custom-folder" items={folderItems} />
-            </div>
+        <CardContent className="flex items-center justify-center p-16">
+            <Folder color="#8784EB" className="custom-folder" items={folderItems} />
         </CardContent>
       </Card>
     </div>
