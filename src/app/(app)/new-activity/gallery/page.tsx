@@ -264,10 +264,11 @@ function GalleryContent() {
                           />
                       </div>
                       {photoUploadMethod === 'file' ? (
-                          <div>
+                          <div key="file-upload">
                               <Label htmlFor="media-file">Pilih File Foto</Label>
                               <Input 
                                   id="media-file"
+                                  key="file-input"
                                   type="file"
                                   accept="image/*"
                                   onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
@@ -276,10 +277,11 @@ function GalleryContent() {
                               />
                           </div>
                       ) : (
-                          <div>
+                          <div key="url-upload">
                               <Label htmlFor="media-url-photo">URL Foto</Label>
                               <Input 
                                   id="media-url-photo" 
+                                  key="url-input"
                                   value={newMediaUrl} 
                                   onChange={(e) => setNewMediaUrl(e.target.value)} 
                                   placeholder={"https://contoh.com/gambar.jpg"} 
@@ -290,10 +292,11 @@ function GalleryContent() {
                   </div>
                 )}
                 {newMediaType === 'video' && (
-                  <div>
+                  <div key="video-upload">
                     <Label htmlFor="media-url-video">URL Video Embed</Label>
                     <Input 
                       id="media-url-video" 
+                      key="video-input"
                       value={newMediaUrl} 
                       onChange={(e) => setNewMediaUrl(e.target.value)} 
                       placeholder={"https://www.youtube.com/embed/..."} 
