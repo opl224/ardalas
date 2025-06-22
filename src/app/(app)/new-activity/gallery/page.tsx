@@ -126,20 +126,21 @@ function GalleryContent() {
         
         if (result.error) {
           toast({
-            title: "Gagal Mengunggah",
-            description: result.error.includes("Bucket not found")
-              ? "Bucket 'activities' tidak ditemukan di Supabase. Harap buat bucket publik dengan nama 'activities' di dasbor Supabase Anda."
-              : result.error,
+            title: "Gagal Mengunggah Foto",
+            description: result.error,
             variant: "destructive",
             duration: 9000,
           });
           setIsSubmitting(false);
           return;
         }
+
         if (result.url) {
           mediaUrl = result.url;
         } else {
-            throw new Error("Gagal mendapatkan URL setelah upload.");
+            toast({ title: "Gagal Mengunggah", description: "URL media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
         }
       } else if (newMediaType === 'video') {
           if (!newMediaUrl) {
