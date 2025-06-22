@@ -89,7 +89,12 @@ export const navItems: NavItem[] = [
     title: "Pengaturan", 
     href: "/settings", 
     icon: Settings,
-  }, 
+  },
+  { 
+    title: "Profil Saya", 
+    href: "/settings/profile", 
+    icon: UserCircle,
+  },
 ];
 
 export const bottomNavItems: NavItem[] = [
