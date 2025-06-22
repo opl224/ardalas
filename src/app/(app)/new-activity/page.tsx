@@ -1,8 +1,16 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FolderKanban } from "lucide-react";
 import Folder from "@/components/ui/Folder";
+import Image from "next/image";
+
+const folderItems = [
+    <Image key="img1" src="https://placehold.co/100x80.png" alt="Kegiatan 1" layout="fill" objectFit="cover" data-ai-hint="school event" />,
+    <Image key="img2" src="https://placehold.co/100x80.png" alt="Kegiatan 2" layout="fill" objectFit="cover" data-ai-hint="student activity" />,
+    <Image key="img3" src="https://placehold.co/100x80.png" alt="Kegiatan 3" layout="fill" objectFit="cover" data-ai-hint="sports day" />,
+];
 
 export default function NewActivityPage() {
   return (
@@ -20,7 +28,7 @@ export default function NewActivityPage() {
         </CardHeader>
         <CardContent className="flex items-center justify-center">
             <div style={{ height: '600px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-              <Folder size={2} color="#8784EB" className="custom-folder" />
+              <Folder size={2} color="#8784EB" className="custom-folder" items={folderItems} />
             </div>
         </CardContent>
       </Card>
