@@ -1454,7 +1454,7 @@ export default function AssignmentsPage() {
                                 {submissionsForCurrentAssignment.map((sub, index) => (
                                     <TableRow key={sub.id}>
                                         <TableCell>{index + 1}</TableCell>
-                                        <TableCell>{sub.studentName}</TableCell>
+                                        <TableCell className="truncate" title={sub.studentName}>{sub.studentName}</TableCell>
                                         <TableCell>
                                             <Button variant="link" asChild className="p-0 h-auto text-sm">
                                                 <NextLink href={sub.submissionLink} target="_blank" rel="noopener noreferrer">Lihat File</NextLink>
@@ -1584,12 +1584,3 @@ export default function AssignmentsPage() {
     </div>
   );
 }
-
-    
-
-
-
-
-
-
-

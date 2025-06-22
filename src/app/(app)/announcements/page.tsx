@@ -608,7 +608,7 @@ export default function AnnouncementsPage() {
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
-                  <CardTitle className="text-xl">{announcement.title}</CardTitle>
+                  <CardTitle className="text-xl truncate" title={announcement.title}>{announcement.title}</CardTitle>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1 flex-wrap">
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
@@ -705,4 +705,3 @@ export default function AnnouncementsPage() {
     </div>
   );
 }
-

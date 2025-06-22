@@ -248,7 +248,7 @@ export default function MyAssignmentResultsPage() {
                 <TableBody>
                   {grades.map((grade) => (
                     <TableRow key={grade.assignmentId}>
-                      <TableCell className="font-medium min-w-[200px]">
+                      <TableCell className="font-medium min-w-[200px] truncate" title={grade.assignmentTitle}>
                         {grade.assignmentTitle}
                         {grade.subjectName && <p className="text-xs text-muted-foreground">{grade.subjectName}</p>}
                          {grade.dateOfAssessment && (
@@ -268,7 +268,7 @@ export default function MyAssignmentResultsPage() {
                           <span className="text-xs text-muted-foreground italic">Belum dikumpulkan</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-[250px] whitespace-pre-line min-w-[200px]">
+                      <TableCell className="max-w-[250px] truncate min-w-[200px]" title={grade.teacherFeedback}>
                         {grade.teacherFeedback || "-"}
                       </TableCell>
                       <TableCell className="min-w-[80px]">
@@ -293,5 +293,3 @@ export default function MyAssignmentResultsPage() {
     </div>
   );
 }
-
-    

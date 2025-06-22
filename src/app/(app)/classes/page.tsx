@@ -571,7 +571,7 @@ export default function ClassesPage() {
                     <TableRow key={classItem.id}>
                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className={cn("font-medium", isMobile ? "truncate px-2" : "")} title={classItem.name}>{classItem.name}</TableCell>
-                      <TableCell className={cn(isMobile ? "truncate px-2" : "")} title={classItem.teacherName || "-"}>{classItem.teacherName || "-"}</TableCell>
+                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={classItem.teacherName || "-"}>{classItem.teacherName || "-"}</TableCell>
                       <TableCell className={cn("text-right", isMobile && "px-1")}>
                         {authRole === "guru" || authRole === "orangtua" ? (
                            <Button
@@ -777,8 +777,8 @@ export default function ClassesPage() {
                   {studentsInClass.map((student, index) => (
                     <TableRow key={student.id}>
                       <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      {authRole !== 'orangtua' && <TableCell>{student.nis}</TableCell>}
+                      <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
+                      {authRole !== 'orangtua' && <TableCell className="truncate" title={student.nis}>{student.nis}</TableCell>}
                       <TableCell>{student.attendanceNumber ?? "-"}</TableCell>
                     </TableRow>
                   ))}
@@ -799,4 +799,3 @@ export default function ClassesPage() {
     </div>
   );
 }
-    

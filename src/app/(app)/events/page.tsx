@@ -511,7 +511,7 @@ export default function EventsPage() {
                         <TableCell className="font-medium truncate" title={event.title}>{event.title}</TableCell>
                         <TableCell>{format(event.date.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
                         {!isMobile && <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : (event.startTime ? ' - Selesai' : '-')}</TableCell>}
-                        {!isMobile && <TableCell className="truncate">{event.category || "-"}</TableCell>}
+                        {!isMobile && <TableCell className="truncate" title={event.category || "-"}>{event.category || "-"}</TableCell>}
                         {!isMobile && <TableCell className="truncate" title={event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>}
                         <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                           {role === 'admin' ? (
