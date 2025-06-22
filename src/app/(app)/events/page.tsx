@@ -39,7 +39,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CalendarDays, PlusCircle, Edit, Trash2, MoreVertical } from "lucide-react";
+import { CalendarDays, PlusCircle, Edit, Trash2, MoreVertical, Eye } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -69,6 +69,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Pagination,
@@ -145,6 +146,8 @@ export default function EventsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
+  const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
+  const [selectedEventForView, setSelectedEventForView] = useState<EventData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const { isMobile } = useSidebar();
 
@@ -267,6 +270,11 @@ export default function EventsPage() {
       console.error("Error deleting event:", error);
       toast({ title: "Gagal Menghapus Acara", variant: "destructive" });
     }
+  };
+
+  const openViewDialog = (event: EventData) => {
+    setSelectedEventForView(event);
+    setIsViewDetailDialogOpen(true);
   };
 
   const openEditDialog = (event: EventData) => {
@@ -493,7 +501,7 @@ export default function EventsPage() {
                       {!isMobile && <TableHead className="min-w-[120px]">Waktu</TableHead>}
                       {!isMobile && <TableHead className="min-w-[150px]">Kategori</TableHead>}
                       {!isMobile && <TableHead className="min-w-[150px]">Target</TableHead>}
-                      {canManageEvents && <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>}
+                      <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -505,8 +513,8 @@ export default function EventsPage() {
                         {!isMobile && <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : (event.startTime ? ' - Selesai' : '-')}</TableCell>}
                         {!isMobile && <TableCell className="truncate">{event.category || "-"}</TableCell>}
                         {!isMobile && <TableCell className="truncate" title={event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>}
-                        {canManageEvents && (
-                          <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
+                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
+                          {role === 'admin' ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${event.title}`}>
@@ -514,6 +522,10 @@ export default function EventsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openViewDialog(event)}>
+                                  <Eye className="mr-2 h-4 w-4" /> Lihat Detail
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => openEditDialog(event)}>
                                   <Edit className="mr-2 h-4 w-4" /> Edit
                                 </DropdownMenuItem>
@@ -535,8 +547,12 @@ export default function EventsPage() {
                                 </AlertDialog>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </TableCell>
-                        )}
+                          ) : (
+                            <Button variant="ghost" size="icon" onClick={() => openViewDialog(event)} aria-label={`Lihat detail ${event.title}`}>
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -571,6 +587,44 @@ export default function EventsPage() {
           )}
         </CardContent>
       </Card>
+      
+      <Dialog open={isViewDetailDialogOpen} onOpenChange={setIsViewDetailDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Detail Acara: {selectedEventForView?.title}</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap mengenai acara yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedEventForView && (
+            <div className="space-y-3 py-4 max-h-[60vh] overflow-y-auto pr-2 text-sm">
+                <div><Label className="text-muted-foreground">Judul:</Label><p className="font-medium">{selectedEventForView.title}</p></div>
+                <div><Label className="text-muted-foreground">Tanggal:</Label><p className="font-medium">{format(selectedEventForView.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p></div>
+                <div><Label className="text-muted-foreground">Waktu:</Label><p className="font-medium">{selectedEventForView.startTime}{selectedEventForView.endTime ? ` - ${selectedEventForView.endTime}` : (selectedEventForView.startTime ? ' - Selesai' : '-')}</p></div>
+                <div><Label className="text-muted-foreground">Lokasi:</Label><p className="font-medium">{selectedEventForView.location || "-"}</p></div>
+                <div><Label className="text-muted-foreground">Kategori:</Label><p className="font-medium">{selectedEventForView.category || "-"}</p></div>
+                <div>
+                  <Label className="text-muted-foreground">Target Audiens:</Label>
+                  <p className="font-medium">
+                    {selectedEventForView.targetAudience && selectedEventForView.targetAudience.length > 0 
+                      ? selectedEventForView.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") 
+                      : "Semua"}
+                  </p>
+                </div>
+                {selectedEventForView.description && (
+                  <div><Label className="text-muted-foreground">Deskripsi:</Label><p className="font-medium whitespace-pre-line">{selectedEventForView.description}</p></div>
+                )}
+                {role === 'admin' && selectedEventForView.createdByName && (
+                   <div><Label className="text-muted-foreground">Dibuat Oleh:</Label><p className="font-medium">{selectedEventForView.createdByName}</p></div>
+                )}
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {canManageEvents && selectedEvent && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
