@@ -6,6 +6,12 @@ import Folder from "@/components/ui/Folder";
 import Link from "next/link";
 
 export default function NewActivityPage() {
+  const activities = [
+    { date: "17 Agustus 2024", color: "#EB5757", href: "/new-activity/gallery" },
+    { date: "25 September 2024", color: "#8784EB", href: "/new-activity/gallery" },
+    { date: "10 November 2024", color: "#2F80ED", href: "/new-activity/gallery" },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -19,10 +25,15 @@ export default function NewActivityPage() {
             <span>Galeri Kegiatan</span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-center p-16">
-          <Link href="/new-activity/gallery">
-            <Folder color="#8784EB" size={2} />
-          </Link>
+        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8 md:p-16">
+          {activities.map((activity, index) => (
+            <div key={index} className="flex flex-col items-center gap-4">
+              <Link href={activity.href}>
+                <Folder color={activity.color} size={2} />
+              </Link>
+              <p className="text-sm font-medium text-muted-foreground">{activity.date}</p>
+            </div>
+          ))}
         </CardContent>
       </Card>
     </div>
