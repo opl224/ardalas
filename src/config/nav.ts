@@ -32,7 +32,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
   { title: "Pengumuman", href: "/announcements", icon: Megaphone },
-  { title: "Kegiatan", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
+  { title: "Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
   { 
     title: "Administrasi Pengguna",
     href: "/admin/user-administration", 
