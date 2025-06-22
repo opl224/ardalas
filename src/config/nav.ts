@@ -17,7 +17,7 @@ import {
   Settings,
   UserCog,
   GraduationCap,
-  ClipboardList, // Added for new menu item
+  FolderKanban, 
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -39,7 +39,7 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Pengumuman", href: "/announcements", icon: Megaphone },
       { title: "Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
-      { title: "Kegiatan Baru", href: "#", icon: ClipboardList },
+      { title: "Kegiatan Baru", href: "/new-activity", icon: FolderKanban },
     ],
   },
   { 
