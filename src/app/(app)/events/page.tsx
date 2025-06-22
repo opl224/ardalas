@@ -39,9 +39,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CalendarDays, PlusCircle, Edit, Trash2, AlertCircle, Save } from "lucide-react";
+import { CalendarDays, PlusCircle, Edit, Trash2, MoreVertical } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -64,6 +64,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { ROLES, Role, roleDisplayNames } from "@/config/roles";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 const EVENT_CATEGORIES = ["Akademik", "Olahraga", "Seni & Budaya", "Libur Nasional", "Peringatan Sekolah", "Rapat", "Lainnya"] as const;
 type EventCategory = typeof EVENT_CATEGORIES[number];
@@ -119,6 +136,8 @@ const editEventFormSchema = _baseEventObjectSchema.extend({ id: z.string() }).re
 });
 type EditEventFormValues = z.infer<typeof editEventFormSchema>;
 
+const ITEMS_PER_PAGE = 10;
+
 export default function EventsPage() {
   const { user, role, loading: authLoading } = useAuth();
   const [events, setEvents] = useState<EventData[]>([]);
@@ -126,6 +145,8 @@ export default function EventsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const { isMobile } = useSidebar();
 
   const { toast } = useToast();
 
@@ -224,8 +245,6 @@ export default function EventsPage() {
         ...data,
         date: Timestamp.fromDate(startOfDay(data.date)),
         targetAudience: data.targetAudience || [],
-        // createdById: user.uid, // Keep original creator or update, policy decision. For now, update.
-        // createdByName: user.displayName || user.email || "N/A",
         updatedAt: serverTimestamp(),
       });
       toast({ title: "Acara Diperbarui", description: `${data.title} berhasil diperbarui.` });
@@ -260,6 +279,60 @@ export default function EventsPage() {
   };
 
   const canManageEvents = role === "admin" || role === "guru";
+
+  const totalPages = Math.ceil(events.length / ITEMS_PER_PAGE);
+  const currentTableData = useMemo(() => {
+    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
+    return events.slice(firstPageIndex, lastPageIndex);
+  }, [currentPage, events]);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
 
   if (authLoading) {
     return (
@@ -367,7 +440,6 @@ export default function EventsPage() {
     </>
   );
 
-
   return (
     <div className="space-y-6">
       <div>
@@ -408,50 +480,90 @@ export default function EventsPage() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-2 mt-4">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
-          ) : events.length > 0 ? (
-            <div className="overflow-x-auto mt-4">
-              <Table className="w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[200px]">Judul</TableHead>
-                    <TableHead className="min-w-[120px]">Tanggal</TableHead>
-                    <TableHead className="min-w-[120px]">Waktu</TableHead>
-                    <TableHead className="min-w-[150px]">Kategori</TableHead>
-                    <TableHead className="min-w-[150px]">Target</TableHead>
-                    {canManageEvents && <TableHead className="text-right min-w-[100px]">Aksi</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {events.map((event) => (
-                    <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.title}</TableCell>
-                      <TableCell>{format(event.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
-                      <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : (event.startTime ? ' - Selesai' : '-')}</TableCell>
-                      <TableCell>{event.category || "-"}</TableCell>
-                      <TableCell>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>
-                      {canManageEvents && (
-                        <TableCell className="text-right space-x-2">
-                          <Button variant="outline" size="icon" onClick={() => openEditDialog(event)} aria-label={`Edit acara ${event.title}`}><Edit className="h-4 w-4" /></Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild><Button variant="destructive" size="icon" onClick={() => openDeleteDialog(event)} aria-label={`Hapus acara ${event.title}`}><Trash2 className="h-4 w-4" /></Button></AlertDialogTrigger>
-                            {selectedEvent && selectedEvent.id === event.id && (
-                              <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus acara <span className="font-semibold">{selectedEvent?.title}</span>.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel onClick={() => setSelectedEvent(null)}>Batal</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}>Ya, Hapus Acara</AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            )}
-                          </AlertDialog>
-                        </TableCell>
-                      )}
+            <div className="space-y-2 mt-4">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : currentTableData.length > 0 ? (
+            <>
+              <div className="overflow-x-auto mt-4">
+                <Table className={cn("w-full", isMobile && "table-fixed")}>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={cn("w-[50px]", isMobile && "w-10 px-2 text-center")}>No.</TableHead>
+                      <TableHead className={cn(isMobile ? "w-1/2" : "min-w-[200px]")}>Judul</TableHead>
+                      <TableHead className={cn(isMobile ? "w-1/2" : "min-w-[120px]")}>Tanggal</TableHead>
+                      {!isMobile && <TableHead className="min-w-[120px]">Waktu</TableHead>}
+                      {!isMobile && <TableHead className="min-w-[150px]">Kategori</TableHead>}
+                      {!isMobile && <TableHead className="min-w-[150px]">Target</TableHead>}
+                      {canManageEvents && <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {currentTableData.map((event, index) => (
+                      <TableRow key={event.id}>
+                        <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                        <TableCell className="font-medium truncate" title={event.title}>{event.title}</TableCell>
+                        <TableCell>{format(event.date.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                        {!isMobile && <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : (event.startTime ? ' - Selesai' : '-')}</TableCell>}
+                        {!isMobile && <TableCell className="truncate">{event.category || "-"}</TableCell>}
+                        {!isMobile && <TableCell className="truncate" title={event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>}
+                        {canManageEvents && (
+                          <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${event.title}`}>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditDialog(event)}>
+                                  <Edit className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(event); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  {selectedEvent && selectedEvent.id === event.id && (
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus acara <span className="font-semibold">{selectedEvent?.title}</span>.</AlertDialogDescription></AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel onClick={() => setSelectedEvent(null)}>Batal</AlertDialogCancel>
+                                        <AlertDialogAction onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}>Ya, Hapus Acara</AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  )}
+                                </AlertDialog>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <Pagination className="mt-6">
+                    <PaginationContent>
+                        <PaginationItem>
+                        <PaginationPrevious
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            aria-disabled={currentPage === 1}
+                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                        {renderPageNumbers()}
+                        <PaginationItem>
+                        <PaginationNext
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            aria-disabled={currentPage === totalPages}
+                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                        />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+              )}
+            </>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               Belum ada acara yang dijadwalkan.
@@ -485,7 +597,3 @@ export default function EventsPage() {
     </div>
   );
 }
-
-
-
-
