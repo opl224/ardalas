@@ -36,6 +36,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import { uploadActivityMedia } from '@/app/actions/uploadActions';
+import { Switch } from '@/components/ui/switch'; // Ditambahkan
 
 interface Activity {
   id: string;
@@ -68,6 +69,7 @@ function GalleryContent() {
   const [newMediaCaption, setNewMediaCaption] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [photoUploadMethod, setPhotoUploadMethod] = useState<'file' | 'url'>('file'); // State untuk switch
 
   useEffect(() => {
     if (!activityId) {
@@ -114,33 +116,42 @@ function GalleryContent() {
       let mediaUrl = newMediaUrl;
 
       if (newMediaType === 'photo') {
-        if (!selectedFile) {
-          toast({ title: "File foto harus dipilih", variant: "destructive" });
-          setIsSubmitting(false);
-          return;
-        }
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        
-        const result = await uploadActivityMedia(activityId, formData);
-        
-        if (result.error) {
-          toast({
-            title: "Gagal Mengunggah Foto",
-            description: result.error,
-            variant: "destructive",
-            duration: 9000,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (result.url) {
-          mediaUrl = result.url;
-        } else {
-            toast({ title: "Gagal Mengunggah", description: "URL media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
+        if (photoUploadMethod === 'file') {
+          if (!selectedFile) {
+            toast({ title: "File foto harus dipilih", variant: "destructive" });
             setIsSubmitting(false);
             return;
+          }
+          const formData = new FormData();
+          formData.append('file', selectedFile);
+          
+          const result = await uploadActivityMedia(activityId, formData);
+          
+          if (result.error) {
+            toast({
+              title: "Gagal Mengunggah Foto",
+              description: result.error,
+              variant: "destructive",
+              duration: 9000,
+            });
+            setIsSubmitting(false);
+            return;
+          }
+
+          if (result.url) {
+            mediaUrl = result.url;
+          } else {
+              toast({ title: "Gagal Mengunggah", description: "URL media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
+              setIsSubmitting(false);
+              return;
+          }
+        } else { // 'url' method for photos
+            if (!newMediaUrl) {
+                toast({ title: "URL foto tidak boleh kosong", variant: "destructive" });
+                setIsSubmitting(false);
+                return;
+            }
+            // mediaUrl is already set from newMediaUrl state
         }
       } else if (newMediaType === 'video') {
           if (!newMediaUrl) {
@@ -164,7 +175,9 @@ function GalleryContent() {
 
       toast({ title: "Media berhasil ditambahkan" });
       setIsAddMediaOpen(false);
+      // Reset all related states
       setNewMediaType('photo');
+      setPhotoUploadMethod('file'); 
       setNewMediaUrl('');
       setNewMediaCaption('');
       setSelectedFile(null);
@@ -236,23 +249,51 @@ function GalleryContent() {
                      </SelectContent>
                    </Select>
                  </div>
-                {newMediaType === 'photo' ? (
-                  <div>
-                    <Label htmlFor="media-file">Pilih File Foto</Label>
-                    <Input 
-                      id="media-file"
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
-                      className="mt-1"
-                      required
-                    />
+                {newMediaType === 'photo' && (
+                  <div className="space-y-4 rounded-md border p-4">
+                      <div className="flex items-center justify-between">
+                          <Label htmlFor="upload-method-switch" className="flex flex-col space-y-0.5">
+                            <span>Unggah File</span>
+                            <span className="text-xs font-normal text-muted-foreground">Matikan untuk menggunakan link URL.</span>
+                          </Label>
+                          <Switch
+                              id="upload-method-switch"
+                              checked={photoUploadMethod === 'file'}
+                              onCheckedChange={(checked) => setPhotoUploadMethod(checked ? 'file' : 'url')}
+                              aria-label="Toggle upload method"
+                          />
+                      </div>
+                      {photoUploadMethod === 'file' ? (
+                          <div>
+                              <Label htmlFor="media-file">Pilih File Foto</Label>
+                              <Input 
+                                  id="media-file"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                                  className="mt-1"
+                                  required
+                              />
+                          </div>
+                      ) : (
+                          <div>
+                              <Label htmlFor="media-url-photo">URL Foto</Label>
+                              <Input 
+                                  id="media-url-photo" 
+                                  value={newMediaUrl} 
+                                  onChange={(e) => setNewMediaUrl(e.target.value)} 
+                                  placeholder={"https://contoh.com/gambar.jpg"} 
+                                  required 
+                              />
+                          </div>
+                      )}
                   </div>
-                ) : (
+                )}
+                {newMediaType === 'video' && (
                   <div>
-                    <Label htmlFor="media-url">URL Video Embed</Label>
+                    <Label htmlFor="media-url-video">URL Video Embed</Label>
                     <Input 
-                      id="media-url" 
+                      id="media-url-video" 
                       value={newMediaUrl} 
                       onChange={(e) => setNewMediaUrl(e.target.value)} 
                       placeholder={"https://www.youtube.com/embed/..."} 
