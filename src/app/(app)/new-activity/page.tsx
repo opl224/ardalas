@@ -26,11 +26,11 @@ export default function NewActivityPage() {
           </CardTitle>
         </CardHeader>
         {/* Use flex for mobile horizontal scroll, and grid for md and up */}
-        <CardContent className="flex flex-row gap-12 p-6 overflow-x-auto md:grid md:grid-cols-3 md:gap-8 md:p-12 md:overflow-x-visible justify-start md:justify-center">
+        <CardContent className="flex flex-row gap-8 p-6 overflow-x-auto md:grid md:grid-cols-3 md:gap-8 md:p-12 md:overflow-x-visible justify-start md:justify-center">
           {activities.map((activity, index) => (
             <div key={index} className="flex flex-col items-center gap-4 flex-shrink-0">
               <Link href={activity.href}>
-                <Folder color={activity.color} size={1.2} />
+                <Folder color={activity.color} size={1} />
               </Link>
               <p className="text-sm font-medium text-muted-foreground">{activity.date}</p>
             </div>
