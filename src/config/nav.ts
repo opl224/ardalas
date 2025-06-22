@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Settings,
   UserCog,
-  GraduationCap, 
+  GraduationCap,
+  ClipboardList, // Added for new menu item
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -31,8 +32,16 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Pengumuman", href: "/announcements", icon: Megaphone },
-  { title: "Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
+  {
+    title: "Sekolah",
+    href: "#",
+    icon: School,
+    children: [
+      { title: "Pengumuman", href: "/announcements", icon: Megaphone },
+      { title: "Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
+      { title: "Kegiatan Baru", href: "#", icon: ClipboardList },
+    ],
+  },
   { 
     title: "Administrasi Pengguna",
     href: "/admin/user-administration", 
