@@ -1,11 +1,8 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FolderKanban } from "lucide-react";
-import type { Metadata } from 'next';
-
-export const metadata: Metadata = {
-  title: 'Kegiatan Baru - Ardalas',
-  description: 'Area untuk mengelola kegiatan baru di sekolah.',
-};
+import Folder from "@/components/ui/Folder";
 
 export default function NewActivityPage() {
   return (
@@ -21,15 +18,10 @@ export default function NewActivityPage() {
             <span>Folder Kegiatan</span>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-            <p>
-              Area ini akan digunakan untuk menampilkan dan mengelola folder-folder kegiatan sekolah.
-            </p>
-            <p className="text-sm mt-2">
-              (Fitur sedang dalam pengembangan)
-            </p>
-          </div>
+        <CardContent className="flex items-center justify-center">
+            <div style={{ height: '600px', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+              <Folder size={2} color="#8784EB" className="custom-folder" />
+            </div>
         </CardContent>
       </Card>
     </div>
