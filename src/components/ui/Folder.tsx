@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState } from "react";
 
@@ -139,7 +138,7 @@ const Folder: React.FC<FolderProps> = ({
                 key={i}
                 onMouseMove={(e) => handlePaperMouseMove(e, i)}
                 onMouseLeave={(e) => handlePaperMouseLeave(e, i)}
-                className={`relative overflow-hidden absolute z-20 bottom-[10%] left-1/2 transition-all duration-300 ease-in-out ${
+                className={`absolute z-20 bottom-[10%] left-1/2 transition-all duration-300 ease-in-out ${
                   !open
                     ? "transform -translate-x-1/2 translate-y-[10%] group-hover:translate-y-0"
                     : "hover:scale-110"
@@ -150,7 +149,9 @@ const Folder: React.FC<FolderProps> = ({
                   borderRadius: "10px",
                 }}
               >
-                {open && item}
+                <div className="relative w-full h-full overflow-hidden rounded-[10px]">
+                  {open && item}
+                </div>
               </div>
             );
           })}

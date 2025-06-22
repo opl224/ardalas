@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +26,7 @@ export default function NewActivityPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center p-16">
-            <Folder color="#8784EB" className="custom-folder" items={folderItems} />
+            <Folder color="#8784EB" items={folderItems} />
         </CardContent>
       </Card>
     </div>
