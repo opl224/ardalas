@@ -35,6 +35,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
+import { uploadActivityMedia } from '@/app/actions/uploadActions';
 
 interface Activity {
   id: string;
@@ -66,6 +67,7 @@ function GalleryContent() {
   const [newMediaUrl, setNewMediaUrl] = useState('');
   const [newMediaCaption, setNewMediaCaption] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!activityId) {
@@ -105,26 +107,60 @@ function GalleryContent() {
   
   const handleAddMedia = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!activityId || !newMediaUrl) {
-      toast({ title: "URL tidak boleh kosong", variant: "destructive" });
-      return;
-    }
+    if (!activityId) return;
+
     setIsSubmitting(true);
     try {
+      let mediaUrl = newMediaUrl;
+
+      if (newMediaType === 'photo') {
+        if (!selectedFile) {
+          toast({ title: "File foto harus dipilih", variant: "destructive" });
+          setIsSubmitting(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        const result = await uploadActivityMedia(activityId, formData);
+        
+        if (result.error) {
+          throw new Error(result.error);
+        }
+        if (result.url) {
+          mediaUrl = result.url;
+        } else {
+            throw new Error("Gagal mendapatkan URL setelah upload.");
+        }
+      } else if (newMediaType === 'video') {
+          if (!newMediaUrl) {
+            toast({ title: "URL video tidak boleh kosong", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+          }
+          if (!mediaUrl.startsWith("https://www.youtube.com/embed/")) {
+              toast({ title: "Format URL Video Salah", description: "Harap gunakan format embed YouTube (e.g., https://www.youtube.com/embed/...)", variant: "destructive" });
+              setIsSubmitting(false);
+              return;
+          }
+      }
+
       await addDoc(collection(db, "activities", activityId, "media"), {
         type: newMediaType,
-        url: newMediaUrl,
+        url: mediaUrl,
         caption: newMediaCaption,
         createdAt: serverTimestamp(),
       });
+
       toast({ title: "Media berhasil ditambahkan" });
       setIsAddMediaOpen(false);
       setNewMediaType('photo');
       setNewMediaUrl('');
       setNewMediaCaption('');
-    } catch (error) {
+      setSelectedFile(null);
+    } catch (error: any) {
       console.error("Error adding media: ", error);
-      toast({ title: "Gagal menambahkan media", variant: "destructive" });
+      toast({ title: "Gagal menambahkan media", description: error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -176,7 +212,11 @@ function GalleryContent() {
               <form onSubmit={handleAddMedia} className="space-y-4">
                  <div>
                    <Label htmlFor="media-type">Tipe Media</Label>
-                   <Select value={newMediaType} onValueChange={(value) => setNewMediaType(value as 'photo' | 'video')}>
+                   <Select value={newMediaType} onValueChange={(value) => {
+                      setNewMediaType(value as 'photo' | 'video');
+                      setNewMediaUrl('');
+                      setSelectedFile(null);
+                   }}>
                      <SelectTrigger id="media-type" className="mt-1">
                        <SelectValue placeholder="Pilih tipe media" />
                      </SelectTrigger>
@@ -186,16 +226,30 @@ function GalleryContent() {
                      </SelectContent>
                    </Select>
                  </div>
-                 <div>
-                   <Label htmlFor="media-url">URL Media</Label>
-                   <Input 
-                     id="media-url" 
-                     value={newMediaUrl} 
-                     onChange={(e) => setNewMediaUrl(e.target.value)} 
-                     placeholder={newMediaType === 'photo' ? "https://placehold.co/600x400.png" : "https://www.youtube.com/embed/..."} 
-                     required 
-                   />
-                 </div>
+                {newMediaType === 'photo' ? (
+                  <div>
+                    <Label htmlFor="media-file">Pilih File Foto</Label>
+                    <Input 
+                      id="media-file"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                      className="mt-1"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <Label htmlFor="media-url">URL Video Embed</Label>
+                    <Input 
+                      id="media-url" 
+                      value={newMediaUrl} 
+                      onChange={(e) => setNewMediaUrl(e.target.value)} 
+                      placeholder={"https://www.youtube.com/embed/..."} 
+                      required 
+                    />
+                  </div>
+                )}
                  <div>
                    <Label htmlFor="media-caption">Keterangan (Opsional)</Label>
                    <Textarea 
