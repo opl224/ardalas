@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,14 +26,14 @@ export default function NewActivityPage() {
             <span>Galeri Kegiatan</span>
           </CardTitle>
         </CardHeader>
-        {/* Use flex for mobile horizontal scroll, and grid for md and up */}
-        <CardContent className="flex flex-row gap-8 p-6 overflow-x-auto md:grid md:grid-cols-3 md:gap-8 md:p-12 md:overflow-x-visible justify-start md:justify-center">
+        {/* Use flex for mobile horizontal scroll, and grid for md and up. Adjusted padding and gap for mobile. */}
+        <CardContent className="flex flex-row gap-6 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-8 md:p-12 md:overflow-x-visible justify-start md:justify-center">
           {activities.map((activity, index) => (
-            <div key={index} className="flex flex-col items-center gap-4 flex-shrink-0">
+            <div key={index} className="flex flex-col items-center gap-2 flex-shrink-0">
               <Link href={activity.href}>
                 <Folder color={activity.color} size={1} />
               </Link>
-              <p className="text-sm font-medium text-muted-foreground">{activity.date}</p>
+              <p className="text-xs font-medium text-muted-foreground">{activity.date}</p>
             </div>
           ))}
         </CardContent>

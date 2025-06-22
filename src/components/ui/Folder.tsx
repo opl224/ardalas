@@ -1,3 +1,4 @@
+
 "use client";
 import React from "react";
 
@@ -55,46 +56,46 @@ const Folder: React.FC<FolderProps> = ({
         style={folderStyle}
       >
         <div
-          className="relative w-[100px] h-[80px] rounded-tl-0 rounded-tr-[10px] rounded-br-[10px] rounded-bl-[10px]"
+          className="relative w-[80px] h-[64px] rounded-tl-0 rounded-tr-[8px] rounded-br-[8px] rounded-bl-[8px]"
           style={{ backgroundColor: folderBackColor }}
         >
           <span
-            className="absolute z-0 bottom-[98%] left-0 w-[30px] h-[10px] rounded-tl-[5px] rounded-tr-[5px] rounded-bl-0 rounded-br-0"
+            className="absolute z-0 bottom-[98%] left-0 w-[24px] h-[8px] rounded-tl-[4px] rounded-tr-[4px] rounded-bl-0 rounded-br-0"
             style={{ backgroundColor: folderBackColor }}
           ></span>
           <div
             className="absolute z-20 bottom-[10%] left-1/2 w-[70%] h-[80%] transform -translate-x-1/2 translate-y-[10%] group-hover:translate-y-0 transition-all duration-300 ease-in-out"
             style={{
               backgroundColor: "var(--paper-1)",
-              borderRadius: "10px",
+              borderRadius: "8px",
             }}
           ></div>
           <div
             className="absolute z-20 bottom-[10%] left-1/2 w-[80%] h-[70%] transform -translate-x-1/2 translate-y-[10%] group-hover:translate-y-0 transition-all duration-300 ease-in-out"
             style={{
               backgroundColor: "var(--paper-2)",
-              borderRadius: "10px",
+              borderRadius: "8px",
             }}
           ></div>
           <div
             className="absolute z-20 bottom-[10%] left-1/2 w-[90%] h-[60%] transform -translate-x-1/2 translate-y-[10%] group-hover:translate-y-0 transition-all duration-300 ease-in-out"
             style={{
               backgroundColor: "var(--paper-3)",
-              borderRadius: "10px",
+              borderRadius: "8px",
             }}
           ></div>
           <div
             className="absolute z-30 w-full h-full origin-bottom group-hover:[transform:skew(15deg)_scaleY(0.6)] transition-all duration-300 ease-in-out"
             style={{
               backgroundColor: "var(--folder-color)",
-              borderRadius: "5px 10px 10px 10px",
+              borderRadius: "4px 8px 8px 8px",
             }}
           ></div>
           <div
             className="absolute z-30 w-full h-full origin-bottom group-hover:[transform:skew(-15deg)_scaleY(0.6)] transition-all duration-300 ease-in-out"
             style={{
               backgroundColor: "var(--folder-color)",
-              borderRadius: "5px 10px 10px 10px",
+              borderRadius: "4px 8px 8px 8px",
             }}
           ></div>
         </div>
