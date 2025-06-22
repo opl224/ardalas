@@ -506,24 +506,12 @@ export default function DashboardPage() {
     }
   };
 
-  const CustomDateCellWrapper = ({ children, value }: { children: React.ReactNode; value: Date }) => {
-    const hasEvents = useMemo(
-      () => calendarEvents.some(event => isSameDay(event.start, value)),
-      [value, calendarEvents]
-    );
-
-    const handleCellClick = (e: React.MouseEvent) => {
-      if (hasEvents) {
-        e.stopPropagation();
-        handleSelectSlot({ start: value });
-      }
-    };
-
-    return (
-      <div onClick={handleCellClick} className={cn("h-full", hasEvents ? "cursor-pointer" : "cursor-default")}>
-        {children}
-      </div>
-    );
+  const handleEventClick = (event: CalendarEvent) => {
+    const eventsForDay = calendarEvents.filter(e => isSameDay(e.start, event.start));
+    if (eventsForDay.length > 0) {
+      setSelectedDateEvents(eventsForDay);
+      setIsEventDialogOpen(true);
+    }
   };
 
 
@@ -681,6 +669,7 @@ export default function DashboardPage() {
                     onNavigate={(date) => setCurrentCalendarDate(date)} // Handle navigation
                     style={{ height: '100%' }}
                     onSelectSlot={handleSelectSlot}
+                    onSelectEvent={handleEventClick}
                     selectable
                     messages={{
                         week: 'Minggu',
@@ -699,7 +688,6 @@ export default function DashboardPage() {
                       month: {
                         event: CustomMonthEvent,
                       },
-                      dateCellWrapper: CustomDateCellWrapper,
                     }}
                     view="month"
                     views={['month']}
