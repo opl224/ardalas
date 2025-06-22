@@ -4,7 +4,7 @@
 import { useSearchParams } from 'next/navigation';
 import React, { Suspense, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Camera, Video, ArrowLeft, ImagePlus } from "lucide-react";
+import { Camera, Video, ArrowLeft, ImagePlus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,17 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,8 +46,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
-import { uploadActivityMedia } from '@/app/actions/uploadActions';
-import { Switch } from '@/components/ui/switch'; // Ditambahkan
+import { uploadActivityMedia, deleteActivityMedia } from '@/app/actions/uploadActions';
+import { Switch } from '@/components/ui/switch'; 
 
 interface Activity {
   id: string;
@@ -69,7 +80,11 @@ function GalleryContent() {
   const [newMediaCaption, setNewMediaCaption] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [photoUploadMethod, setPhotoUploadMethod] = useState<'file' | 'url'>('file'); // State untuk switch
+  const [photoUploadMethod, setPhotoUploadMethod] = useState<'file' | 'url'>('file');
+
+  const [selectedMediaForDeletion, setSelectedMediaForDeletion] = useState<MediaItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
 
   useEffect(() => {
     if (!activityId) {
@@ -115,43 +130,34 @@ function GalleryContent() {
     try {
       let mediaUrl = newMediaUrl;
 
-      if (newMediaType === 'photo') {
-        if (photoUploadMethod === 'file') {
-          if (!selectedFile) {
-            toast({ title: "File foto harus dipilih", variant: "destructive" });
-            setIsSubmitting(false);
-            return;
-          }
-          const formData = new FormData();
-          formData.append('file', selectedFile);
-          
-          const result = await uploadActivityMedia(activityId, formData);
-          
-          if (result.error) {
-            toast({
-              title: "Gagal Mengunggah Foto",
-              description: result.error,
-              variant: "destructive",
-              duration: 9000,
-            });
-            setIsSubmitting(false);
-            return;
-          }
+      if (newMediaType === 'photo' && photoUploadMethod === 'file') {
+        if (!selectedFile) {
+          toast({ title: "File foto harus dipilih", variant: "destructive" });
+          setIsSubmitting(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        const result = await uploadActivityMedia(activityId, formData);
+        
+        if (result.error) {
+          toast({
+            title: "Gagal Mengunggah Foto",
+            description: result.error,
+            variant: "destructive",
+            duration: 9000,
+          });
+          setIsSubmitting(false);
+          return;
+        }
 
-          if (result.url) {
-            mediaUrl = result.url;
-          } else {
-              toast({ title: "Gagal Mengunggah", description: "URL media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
-              setIsSubmitting(false);
-              return;
-          }
-        } else { // 'url' method for photos
-            if (!newMediaUrl) {
-                toast({ title: "URL foto tidak boleh kosong", variant: "destructive" });
-                setIsSubmitting(false);
-                return;
-            }
-            // mediaUrl is already set from newMediaUrl state
+        if (result.url) {
+          mediaUrl = result.url;
+        } else {
+            toast({ title: "Gagal Mengunggah", description: "URL media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
         }
       } else if (newMediaType === 'video') {
           if (!newMediaUrl) {
@@ -164,6 +170,12 @@ function GalleryContent() {
               setIsSubmitting(false);
               return;
           }
+      } else if (newMediaType === 'photo' && photoUploadMethod === 'url') {
+           if (!newMediaUrl) {
+                toast({ title: "URL foto tidak boleh kosong", variant: "destructive" });
+                setIsSubmitting(false);
+                return;
+            }
       }
 
       await addDoc(collection(db, "activities", activityId, "media"), {
@@ -175,7 +187,6 @@ function GalleryContent() {
 
       toast({ title: "Media berhasil ditambahkan" });
       setIsAddMediaOpen(false);
-      // Reset all related states
       setNewMediaType('photo');
       setPhotoUploadMethod('file'); 
       setNewMediaUrl('');
@@ -186,6 +197,23 @@ function GalleryContent() {
       toast({ title: "Gagal menambahkan media", description: error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteMedia = async (activityId: string, mediaId: string) => {
+    setIsDeleting(true);
+    try {
+      const result = await deleteActivityMedia(activityId, mediaId);
+      if (result.error) {
+        toast({ title: "Gagal Menghapus", description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: "Media Dihapus", description: "Media berhasil dihapus dari galeri." });
+      }
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setSelectedMediaForDeletion(null);
+      setIsDeleting(false);
     }
   };
   
@@ -207,187 +235,243 @@ function GalleryContent() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="icon" asChild>
-          <Link href="/new-activity">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">Kembali</span>
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold font-headline">{activity.title}</h1>
-          <p className="text-muted-foreground">
-            Galeri kegiatan pada tanggal {activity.date ? format(activity.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : '...'}
-          </p>
+      <AlertDialog>
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" asChild>
+            <Link href="/new-activity">
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Kembali</span>
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold font-headline">{activity.title}</h1>
+            <p className="text-muted-foreground">
+              Galeri kegiatan pada tanggal {activity.date ? format(activity.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : '...'}
+            </p>
+          </div>
+          {role === 'admin' && (
+            <Dialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen}>
+              <DialogTrigger asChild>
+                <Button className="ml-auto">
+                  <ImagePlus className="mr-2 h-4 w-4" /> Tambah Media
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Tambah Media Baru</DialogTitle>
+                  <DialogDescription>Tambahkan foto atau video ke galeri kegiatan ini.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddMedia} className="space-y-4">
+                   <div>
+                     <Label htmlFor="media-type">Tipe Media</Label>
+                     <Select value={newMediaType} onValueChange={(value) => {
+                        setNewMediaType(value as 'photo' | 'video');
+                        setNewMediaUrl('');
+                        setSelectedFile(null);
+                     }}>
+                       <SelectTrigger id="media-type" className="mt-1">
+                         <SelectValue placeholder="Pilih tipe media" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="photo">Foto</SelectItem>
+                         <SelectItem value="video">Video (YouTube Embed)</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                  {newMediaType === 'photo' && (
+                    <div className="space-y-4 rounded-md border p-4">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="upload-method-switch" className="flex flex-col space-y-0.5">
+                              <span>Unggah File</span>
+                              <span className="text-xs font-normal text-muted-foreground">Matikan untuk menggunakan link URL.</span>
+                            </Label>
+                            <Switch
+                                id="upload-method-switch"
+                                checked={photoUploadMethod === 'file'}
+                                onCheckedChange={(checked) => setPhotoUploadMethod(checked ? 'file' : 'url')}
+                                aria-label="Toggle upload method"
+                            />
+                        </div>
+                        {photoUploadMethod === 'file' ? (
+                            <div key="file-upload">
+                                <Label htmlFor="media-file">Pilih File Foto</Label>
+                                <Input 
+                                    id="media-file"
+                                    key="file-input"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                                    className="mt-1"
+                                    required
+                                />
+                            </div>
+                        ) : (
+                            <div key="url-upload">
+                                <Label htmlFor="media-url-photo">URL Foto</Label>
+                                <Input 
+                                    id="media-url-photo" 
+                                    key="url-input"
+                                    value={newMediaUrl} 
+                                    onChange={(e) => setNewMediaUrl(e.target.value)} 
+                                    placeholder={"https://contoh.com/gambar.jpg"} 
+                                    required 
+                                />
+                            </div>
+                        )}
+                    </div>
+                  )}
+                  {newMediaType === 'video' && (
+                    <div key="video-upload">
+                      <Label htmlFor="media-url-video">URL Video Embed</Label>
+                      <Input 
+                        id="media-url-video" 
+                        key="video-input"
+                        value={newMediaUrl} 
+                        onChange={(e) => setNewMediaUrl(e.target.value)} 
+                        placeholder={"https://www.youtube.com/embed/..."} 
+                        required 
+                      />
+                    </div>
+                  )}
+                   <div>
+                     <Label htmlFor="media-caption">Keterangan (Opsional)</Label>
+                     <Textarea 
+                        id="media-caption"
+                        value={newMediaCaption}
+                        onChange={(e) => setNewMediaCaption(e.target.value)}
+                        placeholder="Deskripsi singkat tentang media ini"
+                     />
+                   </div>
+                   <DialogFooter>
+                     <DialogClose asChild><Button variant="outline" type="button">Batal</Button></DialogClose>
+                     <Button type="submit" disabled={isSubmitting}>
+                       {isSubmitting ? 'Menyimpan...' : 'Simpan Media'}
+                     </Button>
+                   </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
-        {role === 'admin' && (
-          <Dialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen}>
-            <DialogTrigger asChild>
-              <Button className="ml-auto">
-                <ImagePlus className="mr-2 h-4 w-4" /> Tambah Media
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Tambah Media Baru</DialogTitle>
-                <DialogDescription>Tambahkan foto atau video ke galeri kegiatan ini.</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddMedia} className="space-y-4">
-                 <div>
-                   <Label htmlFor="media-type">Tipe Media</Label>
-                   <Select value={newMediaType} onValueChange={(value) => {
-                      setNewMediaType(value as 'photo' | 'video');
-                      setNewMediaUrl('');
-                      setSelectedFile(null);
-                   }}>
-                     <SelectTrigger id="media-type" className="mt-1">
-                       <SelectValue placeholder="Pilih tipe media" />
-                     </SelectTrigger>
-                     <SelectContent>
-                       <SelectItem value="photo">Foto</SelectItem>
-                       <SelectItem value="video">Video (YouTube Embed)</SelectItem>
-                     </SelectContent>
-                   </Select>
-                 </div>
-                {newMediaType === 'photo' && (
-                  <div className="space-y-4 rounded-md border p-4">
-                      <div className="flex items-center justify-between">
-                          <Label htmlFor="upload-method-switch" className="flex flex-col space-y-0.5">
-                            <span>Unggah File</span>
-                            <span className="text-xs font-normal text-muted-foreground">Matikan untuk menggunakan link URL.</span>
-                          </Label>
-                          <Switch
-                              id="upload-method-switch"
-                              checked={photoUploadMethod === 'file'}
-                              onCheckedChange={(checked) => setPhotoUploadMethod(checked ? 'file' : 'url')}
-                              aria-label="Toggle upload method"
-                          />
-                      </div>
-                      {photoUploadMethod === 'file' ? (
-                          <div key="file-upload">
-                              <Label htmlFor="media-file">Pilih File Foto</Label>
-                              <Input 
-                                  id="media-file"
-                                  key="file-input"
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
-                                  className="mt-1"
-                                  required
-                              />
-                          </div>
-                      ) : (
-                          <div key="url-upload">
-                              <Label htmlFor="media-url-photo">URL Foto</Label>
-                              <Input 
-                                  id="media-url-photo" 
-                                  key="url-input"
-                                  value={newMediaUrl} 
-                                  onChange={(e) => setNewMediaUrl(e.target.value)} 
-                                  placeholder={"https://contoh.com/gambar.jpg"} 
-                                  required 
-                              />
-                          </div>
-                      )}
-                  </div>
-                )}
-                {newMediaType === 'video' && (
-                  <div key="video-upload">
-                    <Label htmlFor="media-url-video">URL Video Embed</Label>
-                    <Input 
-                      id="media-url-video" 
-                      key="video-input"
-                      value={newMediaUrl} 
-                      onChange={(e) => setNewMediaUrl(e.target.value)} 
-                      placeholder={"https://www.youtube.com/embed/..."} 
-                      required 
+
+        <section>
+          <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <Camera className="h-6 w-6 text-primary" />
+              <span>Foto Kegiatan</span>
+          </h2>
+          {isLoadingMedia ? <Skeleton className="h-48 w-full" /> : photos.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {photos.map((image) => (
+                <Card key={image.id} className="overflow-hidden group transition-all duration-300 hover:shadow-xl relative">
+                  {role === 'admin' && (
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedMediaForDeletion(image);
+                        }}
+                        aria-label={`Hapus foto ${image.caption || ''}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                  )}
+                  <div className="aspect-video relative">
+                    <Image
+                      src={image.url}
+                      alt={image.caption || activity.title}
+                      layout="fill"
+                      objectFit="cover"
+                      className="group-hover:scale-105 transition-transform duration-300"
+                      data-ai-hint="school activity"
                     />
                   </div>
-                )}
-                 <div>
-                   <Label htmlFor="media-caption">Keterangan (Opsional)</Label>
-                   <Textarea 
-                      id="media-caption"
-                      value={newMediaCaption}
-                      onChange={(e) => setNewMediaCaption(e.target.value)}
-                      placeholder="Deskripsi singkat tentang media ini"
-                   />
-                 </div>
-                 <DialogFooter>
-                   <DialogClose asChild><Button variant="outline" type="button">Batal</Button></DialogClose>
-                   <Button type="submit" disabled={isSubmitting}>
-                     {isSubmitting ? 'Menyimpan...' : 'Simpan Media'}
-                   </Button>
-                 </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        )}
-      </div>
+                  {image.caption && (
+                    <CardContent className="p-3">
+                      <p className="text-sm font-medium truncate">{image.caption}</p>
+                    </CardContent>
+                  )}
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground italic">Belum ada foto untuk kegiatan ini.</p>
+          )}
+        </section>
 
-      <section>
-        <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-            <Camera className="h-6 w-6 text-primary" />
-            <span>Foto Kegiatan</span>
-        </h2>
-        {isLoadingMedia ? <Skeleton className="h-48 w-full" /> : photos.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {photos.map((image) => (
-              <Card key={image.id} className="overflow-hidden group transition-all duration-300 hover:shadow-xl">
-                <div className="aspect-video relative">
-                  <Image
-                    src={image.url}
-                    alt={image.caption || activity.title}
-                    layout="fill"
-                    objectFit="cover"
-                    className="group-hover:scale-105 transition-transform duration-300"
-                    data-ai-hint="school activity"
-                  />
-                </div>
-                {image.caption && (
-                  <CardContent className="p-3">
-                    <p className="text-sm font-medium truncate">{image.caption}</p>
+        <section>
+          <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
+              <Video className="h-6 w-6 text-primary" />
+              <span>Video Dokumentasi</span>
+          </h2>
+          {isLoadingMedia ? <Skeleton className="h-48 w-full" /> : videos.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {videos.map(video => (
+                <Card key={video.id} className="overflow-hidden group relative">
+                   {role === 'admin' && (
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedMediaForDeletion(video);
+                          }}
+                           aria-label={`Hapus video ${video.caption || ''}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                    )}
+                  <CardHeader>
+                    <CardTitle className="text-lg">{video.caption || 'Video Kegiatan'}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="aspect-video rounded-md overflow-hidden bg-muted">
+                      <iframe
+                        className="w-full h-full"
+                        src={video.url}
+                        title={video.caption || "YouTube video player"}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
                   </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground italic">Belum ada foto untuk kegiatan ini.</p>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground italic">Belum ada video untuk kegiatan ini.</p>
+          )}
+        </section>
+        
+        {selectedMediaForDeletion && (
+           <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Apakah Anda Yakin?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tindakan ini akan menghapus media secara permanen dan tidak dapat dibatalkan.
+                  {selectedMediaForDeletion.type === 'photo' && ` Foto dengan keterangan "${selectedMediaForDeletion.caption || '(tanpa keterangan)'}" akan dihapus.`}
+                  {selectedMediaForDeletion.type === 'video' && ` Video dengan keterangan "${selectedMediaForDeletion.caption || '(tanpa keterangan)'}" akan dihapus.`}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setSelectedMediaForDeletion(null)}>Batal</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => activityId && handleDeleteMedia(activityId, selectedMediaForDeletion.id)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Menghapus..." : "Ya, Hapus"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
         )}
-      </section>
-
-      <section>
-        <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-            <Video className="h-6 w-6 text-primary" />
-            <span>Video Dokumentasi</span>
-        </h2>
-        {isLoadingMedia ? <Skeleton className="h-48 w-full" /> : videos.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {videos.map(video => (
-              <Card key={video.id} className="overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="text-lg">{video.caption || 'Video Kegiatan'}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="aspect-video rounded-md overflow-hidden bg-muted">
-                    <iframe
-                      className="w-full h-full"
-                      src={video.url}
-                      title={video.caption || "YouTube video player"}
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    ></iframe>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground italic">Belum ada video untuk kegiatan ini.</p>
-        )}
-      </section>
+      </AlertDialog>
     </div>
   );
 }
