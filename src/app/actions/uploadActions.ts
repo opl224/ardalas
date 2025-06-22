@@ -33,6 +33,12 @@ export async function uploadActivityMedia(activityId: string, formData: FormData
 
   if (uploadError) {
     console.error('Supabase upload error:', uploadError);
+    if (uploadError.message.includes("Bucket not found")) {
+        return { error: "Gagal mengunggah file: Bucket 'activities' tidak ditemukan. Harap buat bucket publik dengan nama 'activities' di dasbor Supabase Anda." };
+    }
+    if (uploadError.message.includes("violates row-level security policy")) {
+      return { error: "Gagal mengunggah file: Kebijakan Keamanan Supabase (RLS) memblokir unggahan. Pastikan Anda telah membuat kebijakan yang mengizinkan unggahan publik ke bucket 'activities'." };
+    }
     return { error: `Gagal mengunggah file: ${uploadError.message}` };
   }
 
