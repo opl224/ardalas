@@ -4,7 +4,7 @@
 import { useSearchParams } from 'next/navigation';
 import React, { Suspense, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Camera, Video, ArrowLeft, ImagePlus, Trash2 } from "lucide-react";
+import { Camera, Video, ArrowLeft, ImagePlus, Trash2, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,10 @@ function GalleryContent() {
 
   const [selectedMediaForDeletion, setSelectedMediaForDeletion] = useState<MediaItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState<MediaItem | null>(null);
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
 
   useEffect(() => {
@@ -216,6 +220,16 @@ function GalleryContent() {
       setIsDeleting(false);
     }
   };
+
+  const openImageViewer = (image: MediaItem) => {
+    setSelectedImage(image);
+    setIsImageViewerOpen(true);
+    setZoomLevel(1); // Reset zoom when opening
+  };
+
+  const handleZoomIn = () => setZoomLevel(prev => prev + 0.2);
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(0.2, prev - 0.2));
+  const handleZoomReset = () => setZoomLevel(1);
   
   const photos = media.filter(item => item.type === 'photo');
   const videos = media.filter(item => item.type === 'video');
@@ -379,21 +393,27 @@ function GalleryContent() {
                       </Button>
                     </AlertDialogTrigger>
                   )}
-                  <div className="aspect-video relative">
-                    <Image
-                      src={image.url}
-                      alt={image.caption || activity.title}
-                      layout="fill"
-                      objectFit="cover"
-                      className="group-hover:scale-105 transition-transform duration-300"
-                      data-ai-hint="school activity"
-                    />
-                  </div>
-                  {image.caption && (
-                    <CardContent className="p-3">
-                      <p className="text-sm font-medium truncate">{image.caption}</p>
-                    </CardContent>
-                  )}
+                  <button
+                    className="w-full h-full text-left cursor-pointer"
+                    onClick={() => openImageViewer(image)}
+                    aria-label={`Lihat gambar ${image.caption || activity.title} lebih besar`}
+                  >
+                    <div className="aspect-video relative">
+                      <Image
+                        src={image.url}
+                        alt={image.caption || activity.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        data-ai-hint="school activity"
+                      />
+                    </div>
+                    {image.caption && (
+                      <CardContent className="p-3">
+                        <p className="text-sm font-medium truncate" title={image.caption}>{image.caption}</p>
+                      </CardContent>
+                    )}
+                  </button>
                 </Card>
               ))}
             </div>
@@ -472,6 +492,42 @@ function GalleryContent() {
             </AlertDialogContent>
         )}
       </AlertDialog>
+
+      <Dialog open={isImageViewerOpen} onOpenChange={setIsImageViewerOpen}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-2 sm:p-4 bg-background/80 backdrop-blur-md">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="truncate">{selectedImage?.caption || activity.title}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-grow min-h-0 w-full flex items-center justify-center overflow-auto bg-black/10 dark:bg-black/30 rounded-md">
+            {selectedImage && (
+              <div
+                className="relative transition-transform duration-200 ease-out"
+                style={{ transform: `scale(${zoomLevel})` }}
+              >
+                <Image
+                  src={selectedImage.url}
+                  alt={selectedImage.caption || activity.title || "Gambar"}
+                  width={1920}
+                  height={1080}
+                  className="max-w-full max-h-full object-contain"
+                  style={{ width: 'auto', height: 'auto' }}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex-shrink-0 flex-row justify-center items-center gap-2 pt-2">
+            <Button variant="outline" size="icon" onClick={handleZoomOut} aria-label="Zoom Out">
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={handleZoomReset} aria-label="Reset Zoom">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={handleZoomIn} aria-label="Zoom In">
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
