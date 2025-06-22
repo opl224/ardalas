@@ -91,7 +91,7 @@ export const navItems: NavItem[] = [
     icon: Settings,
   },
   { 
-    title: "Profil Saya", 
+    title: "Tentang Saya", 
     href: "/settings/profile", 
     icon: UserCircle,
   },
