@@ -125,7 +125,16 @@ function GalleryContent() {
         const result = await uploadActivityMedia(activityId, formData);
         
         if (result.error) {
-          throw new Error(result.error);
+          toast({
+            title: "Gagal Mengunggah",
+            description: result.error.includes("Bucket not found")
+              ? "Bucket 'activities' tidak ditemukan di Supabase. Harap buat bucket publik dengan nama 'activities' di dasbor Supabase Anda."
+              : result.error,
+            variant: "destructive",
+            duration: 9000,
+          });
+          setIsSubmitting(false);
+          return;
         }
         if (result.url) {
           mediaUrl = result.url;
