@@ -3,16 +3,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase URL and Anon Key must be provided.');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
 export async function uploadActivityMedia(activityId: string, formData: FormData) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("YOUR_SUPABASE_URL") || supabaseAnonKey.includes("YOUR_SUPABASE_ANON_KEY")) {
+    return { error: 'Konfigurasi Supabase tidak lengkap. Harap periksa variabel lingkungan Anda.' };
+  }
+  
+  const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
   const file = formData.get('file') as File;
 
   if (!file) {
