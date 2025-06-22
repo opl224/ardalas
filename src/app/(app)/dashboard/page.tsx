@@ -28,6 +28,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSidebar } from "@/components/ui/sidebar";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 interface StatCardProps {
@@ -145,6 +147,7 @@ export default function DashboardPage() {
 
   const [selectedDateEvents, setSelectedDateEvents] = useState<CalendarEvent[]>([]);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
+  const { isMobile } = useSidebar();
 
 
   useEffect(() => {
@@ -526,73 +529,177 @@ export default function DashboardPage() {
 
       {role === 'admin' && (
         <section>
-          <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
-            <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
-            <StatCard title="Total Orang Tua" value={stats.adminTotalParents} icon={UserCircle} loading={loadingStats} href="/parents" />
-            <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
-            <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
-          </div>
+          {isMobile ? (
+            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+              <AccordionItem value="item-1" className="border-b-0">
+                <AccordionTrigger>
+                  <h2 className="text-xl font-semibold font-headline">Statistik Sekolah</h2>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 pt-4">
+                    <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
+                    <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
+                    <StatCard title="Total Orang Tua" value={stats.adminTotalParents} icon={UserCircle} loading={loadingStats} href="/parents" />
+                    <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
+                    <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          ) : (
+            <>
+              <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Sekolah</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <StatCard title="Total Siswa" value={stats.adminTotalStudents} icon={Users} loading={loadingStats} href="/students" />
+                <StatCard title="Total Guru" value={stats.adminTotalTeachers} icon={GraduationCap} loading={loadingStats} href="/teachers" />
+                <StatCard title="Total Orang Tua" value={stats.adminTotalParents} icon={UserCircle} loading={loadingStats} href="/parents" />
+                <StatCard title="Total Kelas" value={stats.adminTotalClasses} icon={School} loading={loadingStats} href="/classes" />
+                <StatCard title="Total Mata Pelajaran" value={stats.adminTotalSubjects} icon={Library} loading={loadingStats} href="/subjects" />
+              </div>
+            </>
+          )}
         </section>
       )}
 
       {role === 'guru' && (
         <section>
-          <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Pengajaran Anda</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Total Siswa Diajar" value={stats.teacherTotalStudentsTaught} icon={Users} loading={loadingStats} />
-            <StatCard title="Total Kelas Diajar" value={stats.teacherTotalClassesTaught} icon={School} loading={loadingStats} />
-            <StatCard title="Total Mapel Diajar" value={stats.teacherTotalSubjectsTaught} icon={Library} loading={loadingStats} />
-            <StatCard title="Total Tugas Diberikan" value={stats.teacherTotalAssignmentsGiven} icon={ClipboardCheck} loading={loadingStats} href="/assignments" />
-          </div>
+           {isMobile ? (
+            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+              <AccordionItem value="item-1" className="border-b-0">
+                <AccordionTrigger>
+                  <h2 className="text-xl font-semibold font-headline">Statistik Pengajaran Anda</h2>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pt-4">
+                    <StatCard title="Total Siswa Diajar" value={stats.teacherTotalStudentsTaught} icon={Users} loading={loadingStats} />
+                    <StatCard title="Total Kelas Diajar" value={stats.teacherTotalClassesTaught} icon={School} loading={loadingStats} />
+                    <StatCard title="Total Mapel Diajar" value={stats.teacherTotalSubjectsTaught} icon={Library} loading={loadingStats} />
+                    <StatCard title="Total Tugas Diberikan" value={stats.teacherTotalAssignmentsGiven} icon={ClipboardCheck} loading={loadingStats} href="/assignments" />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          ) : (
+            <>
+              <h2 className="text-2xl font-semibold mb-4 font-headline">Statistik Pengajaran Anda</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <StatCard title="Total Siswa Diajar" value={stats.teacherTotalStudentsTaught} icon={Users} loading={loadingStats} />
+                <StatCard title="Total Kelas Diajar" value={stats.teacherTotalClassesTaught} icon={School} loading={loadingStats} />
+                <StatCard title="Total Mapel Diajar" value={stats.teacherTotalSubjectsTaught} icon={Library} loading={loadingStats} />
+                <StatCard title="Total Tugas Diberikan" value={stats.teacherTotalAssignmentsGiven} icon={ClipboardCheck} loading={loadingStats} href="/assignments" />
+              </div>
+            </>
+           )}
         </section>
       )}
 
       {role === 'siswa' && user && (
         <section>
-          <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Siswa</h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-                <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="text-3xl font-bold">{user.className || user.classId || "Belum ada kelas"}</div>
-                    <p className="text-xs text-muted-foreground pt-1">Informasi kelas Anda saat ini.</p>
-                     <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
-                </CardContent>
-            </Card>
-            <StatCard title="Wali Kelas Saya" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
-            <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
-            <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
-          </div>
+          {isMobile ? (
+            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+              <AccordionItem value="item-1" className="border-b-0">
+                <AccordionTrigger>
+                  <h2 className="text-xl font-semibold font-headline">Info Cepat Siswa</h2>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 pt-4">
+                    <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                        <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
+                        <CardContent>
+                            <div className="text-3xl font-bold">{user.className || user.classId || "Belum ada kelas"}</div>
+                            <p className="text-xs text-muted-foreground pt-1">Informasi kelas Anda saat ini.</p>
+                            <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
+                        </CardContent>
+                    </Card>
+                    <StatCard title="Wali Kelas Saya" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                    <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
+                    <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          ) : (
+            <>
+              <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Siswa</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                    <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">{user.className || user.classId || "Belum ada kelas"}</div>
+                        <p className="text-xs text-muted-foreground pt-1">Informasi kelas Anda saat ini.</p>
+                        <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
+                    </CardContent>
+                </Card>
+                <StatCard title="Wali Kelas Saya" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
+                <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+              </div>
+            </>
+          )}
         </section>
       )}
 
       {role === 'orangtua' && user && (
          <section>
-          <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Anak ({user.linkedStudentName || "Siswa"})</h2>
-           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-                <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="text-3xl font-bold">
-                      {loadingStats ? <Skeleton className="h-8 w-32" /> :
-                       (user.linkedStudentClassName || user.linkedStudentClassId || "0")
-                      }
-                    </div>
-                    <div className="text-xs text-muted-foreground pt-1">
-                      {loadingStats ? <Skeleton className="h-4 w-24" /> :
-                       `(${stats.parentChildClassStudentCount || 0} siswa)`
-                      }
-                    </div>
-                    {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
-                </CardContent>
-            </Card>
-            <StatCard title="Wali Kelas Anak" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
-            <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
-            <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
-            <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
-          </div>
+          {isMobile ? (
+            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+              <AccordionItem value="item-1" className="border-b-0">
+                <AccordionTrigger>
+                  <h2 className="text-xl font-semibold font-headline">Info Cepat Anak ({user.linkedStudentName || "Siswa"})</h2>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 pt-4">
+                    <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                        <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
+                        <CardContent>
+                            <div className="text-3xl font-bold">
+                              {loadingStats ? <Skeleton className="h-8 w-32" /> :
+                              (user.linkedStudentClassName || user.linkedStudentClassId || "0")
+                              }
+                            </div>
+                            <div className="text-xs text-muted-foreground pt-1">
+                              {loadingStats ? <Skeleton className="h-4 w-24" /> :
+                              `(${stats.parentChildClassStudentCount || 0} siswa)`
+                              }
+                            </div>
+                            {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
+                        </CardContent>
+                    </Card>
+                    <StatCard title="Wali Kelas Anak" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                    <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
+                    <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
+                    <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          ) : (
+            <>
+              <h2 className="text-2xl font-semibold mb-4 font-headline">Info Cepat Anak ({user.linkedStudentName || "Siswa"})</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+                    <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Anak</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold">
+                          {loadingStats ? <Skeleton className="h-8 w-32" /> :
+                          (user.linkedStudentClassName || user.linkedStudentClassId || "0")
+                          }
+                        </div>
+                        <div className="text-xs text-muted-foreground pt-1">
+                          {loadingStats ? <Skeleton className="h-4 w-24" /> :
+                          `(${stats.parentChildClassStudentCount || 0} siswa)`
+                          }
+                        </div>
+                        {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
+                    </CardContent>
+                </Card>
+                <StatCard title="Wali Kelas Anak" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
+                <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
+                <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
+              </div>
+            </>
+          )}
         </section>
       )}
 
