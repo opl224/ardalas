@@ -62,7 +62,8 @@ export async function uploadActivityMedia(activityId: string, formData: FormData
         return { error: 'Unggahan berhasil, tetapi gagal mendapatkan URL publik dari Supabase.' };
     }
       
-    revalidatePath(`/new-activity/gallery?id=${activityId}`);
+    // Temporarily disabled to debug Vercel server action error
+    // revalidatePath(`/new-activity/gallery?id=${activityId}`);
     
     return { url: publicUrlData.publicUrl, filePath: filePath }; // Return both url and path
 
@@ -115,7 +116,8 @@ export async function deleteActivityMedia(activityId: string, mediaId: string, f
       }
     }
     
-    revalidatePath(`/new-activity/gallery?id=${activityId}`);
+    // Temporarily disabled to debug Vercel server action error
+    // revalidatePath(`/new-activity/gallery?id=${activityId}`);
     return { success: true };
   } catch (error: any) {
     console.error("Error deleting media:", error);
@@ -169,7 +171,8 @@ export async function deleteActivity(activityId: string) {
         }
       }
       
-      revalidatePath('/new-activity');
+      // Temporarily disabled to debug Vercel server action error
+      // revalidatePath('/new-activity');
       return { success: true };
     } catch (error: any) {
         console.error("Kesalahan menghapus kegiatan:", error);
