@@ -10,7 +10,7 @@ export default function AboutMePage() {
   return (
     <div className="space-y-8 flex flex-col items-center">
       <div className="relative flex justify-center items-center pt-8">
-         <div className="absolute -top-4 -right-12 z-10 opacity-50 scale-75">
+         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-10 opacity-50 scale-75">
             <CircularText
               text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
               onHover="speedUp"
