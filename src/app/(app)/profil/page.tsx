@@ -26,13 +26,15 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { updateProfile } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, Timestamp } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { format } from 'date-fns';
+import { id as indonesiaLocale } from 'date-fns/locale';
 
 
 const availableAvatars = [
@@ -71,7 +73,13 @@ export default function ProfilePage() {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(user?.photoURL || null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [additionalUserData, setAdditionalUserData] = useState<{ address?: string; nis?: string; }>({});
+  const [additionalUserData, setAdditionalUserData] = useState<{
+    address?: string;
+    nis?: string;
+    gender?: "laki-laki" | "perempuan";
+    dateOfBirth?: Timestamp;
+    attendanceNumber?: number;
+  }>({});
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -90,7 +98,13 @@ export default function ProfilePage() {
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const data = userDocSnap.data();
-          setAdditionalUserData({ address: data.address, nis: data.nis });
+          setAdditionalUserData({
+            address: data.address,
+            nis: data.nis,
+            gender: data.gender,
+            dateOfBirth: data.dateOfBirth,
+            attendanceNumber: data.attendanceNumber,
+          });
           form.reset({
             name: user.displayName || "",
             email: user.email || "",
@@ -384,40 +398,59 @@ export default function ProfilePage() {
                     </Form>
                   ) : (
                     <>
-                      <div className="space-y-4 py-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                         <div>
                           <Label className="text-muted-foreground">Nama Lengkap</Label>
-                          <p>{user.displayName || "-"}</p>
+                          <p className="font-medium">{user.displayName || "-"}</p>
                         </div>
                         <div>
                           <Label className="text-muted-foreground">Email</Label>
-                          <p>{user.email || "-"}</p>
+                          <p className="font-medium">{user.email || "-"}</p>
                         </div>
-                        <div>
+                        <div className="sm:col-span-2">
                           <Label className="text-muted-foreground">Alamat</Label>
-                          <p>{additionalUserData.address || "Belum diatur"}</p>
+                          <p className="font-medium">{additionalUserData.address || "Belum diatur"}</p>
                         </div>
+                        
                         {role === 'siswa' && (
                           <>
+                            <div className="pt-2 border-t sm:col-span-2 mt-2">
+                              <h4 className="font-semibold text-base mt-2">Info Akademik</h4>
+                            </div>
                             <div>
                               <Label className="text-muted-foreground">NIS</Label>
-                              <p>{additionalUserData.nis || "Belum diatur"}</p>
+                              <p className="font-medium">{additionalUserData.nis || "Belum diatur"}</p>
                             </div>
                             <div>
                               <Label className="text-muted-foreground">Kelas</Label>
-                              <p>{user.className || "Belum ada kelas"}</p>
+                              <p className="font-medium">{user.className || "Belum ada kelas"}</p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground">Tanggal Lahir</Label>
+                              <p className="font-medium">{additionalUserData.dateOfBirth ? format(additionalUserData.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "Belum diatur"}</p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground">Jenis Kelamin</Label>
+                              <p className="font-medium capitalize">{additionalUserData.gender || "Belum diatur"}</p>
+                            </div>
+                             <div>
+                              <Label className="text-muted-foreground">Nomor Absen</Label>
+                              <p className="font-medium">{additionalUserData.attendanceNumber != null ? additionalUserData.attendanceNumber : "Belum diatur"}</p>
                             </div>
                           </>
                         )}
                         {role === 'orangtua' && (
                           <>
+                            <div className="pt-2 border-t sm:col-span-2 mt-2">
+                              <h4 className="font-semibold text-base mt-2">Info Anak</h4>
+                            </div>
                             <div>
                               <Label className="text-muted-foreground">Nama Anak Terhubung</Label>
-                              <p>{user.linkedStudentName || "Belum terhubung"}</p>
+                              <p className="font-medium">{user.linkedStudentName || "Belum terhubung"}</p>
                             </div>
                             <div>
                               <Label className="text-muted-foreground">Kelas Anak</Label>
-                              <p>{user.linkedStudentClassName || "Belum ada kelas"}</p>
+                              <p className="font-medium">{user.linkedStudentClassName || "Belum ada kelas"}</p>
                             </div>
                           </>
                         )}
