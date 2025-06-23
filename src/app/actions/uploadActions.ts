@@ -4,7 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, deleteDoc, collection, query, writeBatch } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, collection, query, writeBatch, getDocs } from "firebase/firestore";
 
 
 export async function uploadActivityMedia(activityId: string, formData: FormData) {
