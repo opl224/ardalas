@@ -8,16 +8,16 @@ import ScrambledText from '@/components/ui/ScrambledText';
 
 export default function AboutMePage() {
   return (
-    <div className="space-y-8 flex flex-col items-center">
-      <div className="relative flex justify-center items-center pt-8">
-         <div className="absolute -top-4 right-1/2 translate-x-1/2 z-20 opacity-50 scale-75">
-            <CircularText
-              text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
-              onHover="speedUp"
-              spinDuration={30}
-              radius={70}
-            />
-          </div>
+    <div className="relative space-y-8 flex flex-col items-center">
+      <div className="absolute top-0 right-0 z-20 opacity-50 scale-75">
+         <CircularText
+           text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
+           onHover="speedUp"
+           spinDuration={30}
+           radius={70}
+         />
+       </div>
+      <div className="flex justify-center items-center pt-8">
         <ProfileCard
             name="Noval Firdaus"
             title="Developer Pemula"
