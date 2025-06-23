@@ -103,9 +103,9 @@
 .pc-shine {
   mask-image: var(--icon);
   mask-mode: luminance;
-  mask-repeat: repeat;
-  mask-size: 15%;
-  mask-position: top calc(200% - (var(--background-y) * 5)) left calc(100% - var(--background-x));
+  mask-repeat: no-repeat;
+  mask-size: 150%;
+  mask-position: center;
   transition: filter 0.6s ease;
   filter: brightness(0.66) contrast(1.33) saturate(0.33) opacity(0.5);
   animation: holo-bg 18s linear infinite;
