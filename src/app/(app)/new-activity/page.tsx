@@ -40,6 +40,7 @@ import { id as indonesiaLocale } from 'date-fns/locale';
 import { deleteActivity } from '@/app/actions/uploadActions';
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 interface Activity {
   id: string;
@@ -51,6 +52,7 @@ interface Activity {
 export default function NewActivityPage() {
   const { role } = useAuth();
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,7 +62,7 @@ export default function NewActivityPage() {
   const [newActivityDate, setNewActivityDate] = useState("");
   const [newActivityColor, setNewActivityColor] = useState("#2F80ED");
 
-  // New states for delete mode
+  // States for delete mode
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -122,6 +124,24 @@ export default function NewActivityPage() {
     }
   };
 
+  const handleSingleDelete = async (activityId: string, activityTitle: string) => {
+    setIsDeleting(true);
+    try {
+        const result = await deleteActivity(activityId);
+        if (result.error) {
+            toast({ title: "Gagal Menghapus", description: result.error, variant: "destructive" });
+        } else {
+            toast({ title: "Berhasil Dihapus", description: `Folder kegiatan "${activityTitle}" berhasil dihapus.` });
+        }
+    } catch (error: any) {
+        console.error("Kesalahan menghapus kegiatan:", error);
+        toast({ title: "Terjadi Kesalahan", description: "Proses penghapusan gagal.", variant: "destructive" });
+    } finally {
+        setIsDeleting(false);
+    }
+  };
+
+
   const handleMultipleDelete = async () => {
     if (selectedToDelete.length === 0) return;
     setIsDeleting(true);
@@ -157,20 +177,48 @@ export default function NewActivityPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Kegiatan Baru Sekolah</h1>
+        <h1 className="text-3xl font-bold font-headline">Galeri Kegiatan Sekolah</h1>
         <p className="text-muted-foreground">Klik folder di bawah untuk melihat galeri kegiatan yang telah dibagikan.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
             <FolderKanban className="h-6 w-6 text-primary" />
-            <span>Galeri Kegiatan</span>
+            <span>Dokumentasi Kegiatan</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           {role === 'admin' && (
             <div className="flex items-center justify-end gap-2 mb-6 p-4 border-b">
-              {!isDeleteMode ? (
+              {isMobile && isDeleteMode ? (
+                 <>
+                  <span className="text-sm font-medium mr-auto">Pilih folder untuk dihapus...</span>
+                  <Button variant="outline" size="sm" onClick={() => { setIsDeleteMode(false); setSelectedToDelete([]); }}>
+                    Batal
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                       <Button variant="destructive" size="sm" disabled={selectedToDelete.length === 0}>
+                        Hapus ({selectedToDelete.length})
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Anda akan menghapus {selectedToDelete.length} folder kegiatan beserta semua isinya. Tindakan ini tidak dapat dibatalkan.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleMultipleDelete} disabled={isDeleting}>
+                          {isDeleting ? "Menghapus..." : "Ya, Hapus Semua"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              ) : (
                 <>
                   <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                     <DialogTrigger asChild>
@@ -206,37 +254,11 @@ export default function NewActivityPage() {
                       </form>
                     </DialogContent>
                   </Dialog>
-                  <Button variant="outline" size="icon" onClick={() => setIsDeleteMode(true)} aria-label="Aktifkan mode hapus">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="text-sm font-medium mr-auto">Pilih folder untuk dihapus...</span>
-                  <Button variant="outline" size="sm" onClick={() => { setIsDeleteMode(false); setSelectedToDelete([]); }}>
-                    Batal
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                       <Button variant="destructive" size="sm" disabled={selectedToDelete.length === 0}>
-                        Hapus ({selectedToDelete.length})
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Anda akan menghapus {selectedToDelete.length} folder kegiatan beserta semua isinya. Tindakan ini tidak dapat dibatalkan.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleMultipleDelete} disabled={isDeleting}>
-                          {isDeleting ? "Menghapus..." : "Ya, Hapus Semua"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  {isMobile && (
+                     <Button variant="outline" size="icon" onClick={() => setIsDeleteMode(true)} aria-label="Aktifkan mode hapus">
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                  )}
                 </>
               )}
             </div>
@@ -253,18 +275,21 @@ export default function NewActivityPage() {
               ))
             ) : activities.length > 0 ? (
                 activities.map((activity) => {
-                  const isSelected = selectedToDelete.includes(activity.id);
+                  const isSelectedForDelete = selectedToDelete.includes(activity.id);
                   return (
                     <div 
                       key={activity.id} 
                       className={cn(
                         "relative flex flex-col items-center gap-2 flex-shrink-0 transition-all duration-200",
-                        isDeleteMode && "cursor-pointer rounded-lg p-2",
-                        isDeleteMode && isSelected && "bg-destructive/20 ring-2 ring-destructive",
-                        isDeleteMode && !isSelected && "hover:bg-muted"
+                        // Mobile-specific styles for delete mode
+                        isMobile && isDeleteMode && "cursor-pointer rounded-lg p-2",
+                        isMobile && isDeleteMode && isSelectedForDelete && "bg-destructive/20 ring-2 ring-destructive",
+                        isMobile && isDeleteMode && !isSelectedForDelete && "hover:bg-muted",
+                        // Desktop-specific style for hover effect
+                        !isMobile && "group"
                       )}
                       onClick={() => {
-                        if (isDeleteMode) {
+                        if (isMobile && isDeleteMode) {
                           setSelectedToDelete(prev => 
                             prev.includes(activity.id)
                               ? prev.filter(id => id !== activity.id)
@@ -273,14 +298,54 @@ export default function NewActivityPage() {
                         }
                       }}
                     >
-                      {isDeleteMode && (
+                      {/* Mobile checkbox for delete mode */}
+                      {isMobile && isDeleteMode && (
                           <Checkbox
-                              checked={isSelected}
+                              checked={isSelectedForDelete}
                               className="absolute top-1 left-1 z-10 bg-background"
                               aria-label={`Pilih ${activity.title}`}
                           />
                       )}
-                      <Link href={isDeleteMode ? '#' : `/new-activity/gallery?id=${activity.id}`} onClick={(e) => { if (isDeleteMode) e.preventDefault(); }}>
+
+                      {/* Desktop hover delete button */}
+                      {!isMobile && role === 'admin' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-0 right-0 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => { e.stopPropagation(); }}
+                              aria-label={`Hapus folder ${activity.title}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Anda akan menghapus folder kegiatan "{activity.title}" beserta semua isinya. Tindakan ini tidak dapat dibatalkan.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Batal</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleSingleDelete(activity.id, activity.title)}
+                                disabled={isDeleting}
+                              >
+                                {isDeleting ? "Menghapus..." : "Ya, Hapus"}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                      
+                      <Link 
+                        href={(isMobile && isDeleteMode) ? '#' : `/new-activity/gallery?id=${activity.id}`} 
+                        onClick={(e) => { if (isMobile && isDeleteMode) e.preventDefault(); }}
+                        aria-label={`Buka galeri ${activity.title}`}
+                      >
                         <Folder color={activity.color} size={0.8} />
                       </Link>
                       <p className="text-sm font-semibold">{activity.title}</p>
