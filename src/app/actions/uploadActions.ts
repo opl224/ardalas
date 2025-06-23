@@ -11,8 +11,11 @@ export async function uploadActivityMedia(activityId: string, formData: FormData
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-    if (!supabaseUrl || !supabaseServiceKey || supabaseUrl.includes("YOUR_SUPABASE_URL") || supabaseServiceKey.includes("YOUR_SUPABASE_KEY")) {
-      return { error: 'Kesalahan Konfigurasi: Variabel lingkungan Supabase (URL atau SERVICE_KEY) tidak diatur dengan benar di server.' };
+    if (!supabaseUrl || supabaseUrl.includes("YOUR_SUPABASE_URL")) {
+      return { error: 'Kesalahan Konfigurasi: NEXT_PUBLIC_SUPABASE_URL tidak diatur dengan benar di server.' };
+    }
+    if (!supabaseServiceKey || supabaseServiceKey.includes("YOUR_SUPABASE_KEY")) {
+        return { error: 'Kesalahan Konfigurasi: SUPABASE_SERVICE_KEY tidak diatur dengan benar di server.' };
     }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
