@@ -4,9 +4,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, deleteDoc, collection, query, writeBatch, getDocs } from "firebase/firestore";
+import { doc, deleteDoc, collection, query, writeBatch, getDocs } from "firebase/firestore";
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE = 6 * 1024 * 1024; // 2MB
 
 export async function uploadActivityMedia(activityId: string, formData: FormData) {
   try {

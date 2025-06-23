@@ -93,6 +93,22 @@ function GalleryContent() {
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
 
+  const convertToEmbeddableUrl = (url: string, type: 'photo' | 'video'): string => {
+    if (url.includes("drive.google.com/file/d/")) {
+      const fileIdMatch = url.match(/file\/d\/([a-zA-Z0-9_-]+)/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        const fileId = fileIdMatch[1];
+        if (type === 'photo') {
+          return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+        if (type === 'video') {
+          return `https://drive.google.com/file/d/${fileId}/preview`;
+        }
+      }
+    }
+    return url;
+  };
+
 
   useEffect(() => {
     if (!activityId) {
@@ -168,7 +184,7 @@ function GalleryContent() {
 
     setIsSubmitting(true);
     try {
-      let mediaUrl = newMediaUrl;
+      let finalUrl = newMediaUrl;
       let mediaFilePath: string | undefined = undefined;
 
       if (newMediaType === 'photo' && photoUploadMethod === 'file') {
@@ -199,36 +215,33 @@ function GalleryContent() {
         }
 
         if (result.url && result.filePath) {
-          mediaUrl = result.url;
+          finalUrl = result.url;
           mediaFilePath = result.filePath;
         } else {
             toast({ title: "Gagal Mengunggah", description: "URL atau Path media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
-      } else if (newMediaType === 'video') {
-          if (!newMediaUrl) {
-            toast({ title: "URL video tidak boleh kosong", variant: "destructive" });
+      } else {
+        // This handles URL for both photo and video
+        if (!newMediaUrl) {
+            toast({ title: "URL tidak boleh kosong", variant: "destructive" });
             setIsSubmitting(false);
             return;
-          }
-          if (!mediaUrl.startsWith("https://www.youtube.com/embed/")) {
-              toast({ title: "Format URL Video Salah", description: "Harap gunakan format embed YouTube (e.g., https://www.youtube.com/embed/...)", variant: "destructive" });
-              setIsSubmitting(false);
-              return;
-          }
-      } else if (newMediaType === 'photo' && photoUploadMethod === 'url') {
-           if (!newMediaUrl) {
-                toast({ title: "URL foto tidak boleh kosong", variant: "destructive" });
-                setIsSubmitting(false);
-                return;
-            }
+        }
+        finalUrl = convertToEmbeddableUrl(newMediaUrl, newMediaType);
+
+        if (newMediaType === 'video' && !finalUrl.startsWith("https://www.youtube.com/embed/") && !finalUrl.startsWith("https://drive.google.com/file/d/")) {
+            toast({ title: "Format URL Video Salah", description: "Harap gunakan format embed YouTube atau link Google Drive yang valid.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
+        }
       }
 
       await addDoc(collection(db, "activities", activityId, "media"), {
         type: newMediaType,
-        url: mediaUrl,
-        filePath: mediaFilePath || null, // Store filePath in Firestore
+        url: finalUrl,
+        filePath: mediaFilePath || null,
         caption: newMediaCaption,
         createdAt: serverTimestamp(),
       });
@@ -391,7 +404,7 @@ function GalleryContent() {
                                       key="url-input"
                                       value={newMediaUrl} 
                                       onChange={(e) => setNewMediaUrl(e.target.value)} 
-                                      placeholder={"https://contoh.com/gambar.jpg"} 
+                                      placeholder={"https://contoh.com/gambar.jpg atau link Google Drive"} 
                                       required 
                                   />
                               </div>
@@ -406,7 +419,7 @@ function GalleryContent() {
                           key="video-input"
                           value={newMediaUrl} 
                           onChange={(e) => setNewMediaUrl(e.target.value)} 
-                          placeholder={"https://www.youtube.com/embed/..."} 
+                          placeholder={"https://www.youtube.com/embed/... atau link Google Drive"} 
                           required 
                         />
                       </div>
