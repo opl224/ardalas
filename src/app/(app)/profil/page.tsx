@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home } from "lucide-react";
+import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home, School } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import LottieLoader from "@/components/ui/LottieLoader";
 import {
@@ -60,7 +60,7 @@ export default function ProfilePage() {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(user?.photoURL || null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [additionalUserData, setAdditionalUserData] = useState<{ address?: string }>({});
+  const [additionalUserData, setAdditionalUserData] = useState<{ address?: string; nis?: string; }>({});
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -79,7 +79,7 @@ export default function ProfilePage() {
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const data = userDocSnap.data();
-          setAdditionalUserData({ address: data.address });
+          setAdditionalUserData({ address: data.address, nis: data.nis });
           form.reset({
             name: user.displayName || "",
             email: user.email || "",
@@ -286,7 +286,7 @@ export default function ProfilePage() {
                         </div>
                     </div>
                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                        <Shield className="h-5 w-5 text-muted-foreground shrink-0"/>
+                        <School className="h-5 w-5 text-muted-foreground shrink-0"/>
                         <div>
                             <p className="text-xs text-muted-foreground">Kelas Anak</p>
                             <p className="font-medium">{user.linkedStudentClassName || "-"}</p>
@@ -302,72 +302,113 @@ export default function ProfilePage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Edit Detail Profil</DialogTitle>
+                    <DialogTitle>Detail Profil</DialogTitle>
                     <DialogDescription>
-                      Perbarui informasi profil Anda. Perubahan akan disimpan di seluruh sistem.
+                      {role === 'admin'
+                        ? "Perbarui informasi profil Anda. Perubahan akan disimpan di seluruh sistem."
+                        : "Informasi detail profil Anda."
+                      }
                     </DialogDescription>
                   </DialogHeader>
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleProfileUpdate)} className="space-y-4">
-                      {role === 'admin' ? (
-                          <>
-                            <FormField
-                              control={form.control}
-                              name="name"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Nama Lengkap</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="Nama lengkap Anda" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="email"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Email (tidak dapat diubah)</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} readOnly disabled />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="address"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Alamat</FormLabel>
-                                  <FormControl>
-                                    <Textarea placeholder="Masukkan alamat Anda" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </>
-                      ) : (
-                          <p className="text-sm text-muted-foreground text-center p-4 border rounded-md">
-                              Fitur edit profil untuk peran '{role}' akan segera hadir.
-                          </p>
-                      )}
-                      
-                      <DialogFooter>
-                        <DialogClose asChild>
-                          <Button type="button" variant="outline">
-                            Batal
+
+                  {role === 'admin' ? (
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(handleProfileUpdate)} className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nama Lengkap</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Nama lengkap Anda" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email (tidak dapat diubah)</FormLabel>
+                              <FormControl>
+                                <Input {...field} readOnly disabled />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="address"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Alamat</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Masukkan alamat Anda" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                          <DialogClose asChild>
+                            <Button type="button" variant="outline">Batal</Button>
+                          </DialogClose>
+                          <Button type="submit" disabled={isUpdatingProfile}>
+                            {isUpdatingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
                           </Button>
-                        </DialogClose>
-                        <Button type="submit" disabled={isUpdatingProfile || role !== 'admin'}>
-                          {isUpdatingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </Form>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  ) : (
+                    <>
+                      <div className="space-y-4 py-4 text-sm">
+                        <div>
+                          <Label className="text-muted-foreground">Nama Lengkap</Label>
+                          <p>{user.displayName || "-"}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Email</Label>
+                          <p>{user.email || "-"}</p>
+                        </div>
+                        <div>
+                          <Label className="text-muted-foreground">Alamat</Label>
+                          <p>{additionalUserData.address || "Belum diatur"}</p>
+                        </div>
+                        {role === 'siswa' && (
+                          <>
+                            <div>
+                              <Label className="text-muted-foreground">NIS</Label>
+                              <p>{additionalUserData.nis || "Belum diatur"}</p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground">Kelas</Label>
+                              <p>{user.className || "Belum ada kelas"}</p>
+                            </div>
+                          </>
+                        )}
+                        {role === 'orangtua' && (
+                          <>
+                            <div>
+                              <Label className="text-muted-foreground">Nama Anak Terhubung</Label>
+                              <p>{user.linkedStudentName || "Belum terhubung"}</p>
+                            </div>
+                            <div>
+                              <Label className="text-muted-foreground">Kelas Anak</Label>
+                              <p>{user.linkedStudentClassName || "Belum ada kelas"}</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                       <DialogFooter>
+                          <DialogClose asChild>
+                            <Button type="button" variant="outline">Tutup</Button>
+                          </DialogClose>
+                        </DialogFooter>
+                    </>
+                  )}
                 </DialogContent>
               </Dialog>
             </div>
