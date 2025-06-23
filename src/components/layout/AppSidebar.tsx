@@ -111,7 +111,11 @@ export function AppSidebar() {
                 tooltip={item.title}
               >
                 <div className="flex items-center gap-2 overflow-hidden">
-                  <item.icon className="h-5 w-5 shrink-0" />
+                  {typeof item.icon === 'string' ? (
+                    <Image src={item.icon} alt={item.title} width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <item.icon className="h-5 w-5 shrink-0" />
+                  )}
                   <span className="truncate">{item.title}</span>
                 </div>
                 <ChevronRight className={cn("h-4 w-4 shrink-0 transition-transform duration-500", isCurrentSubmenuOpen && "rotate-90")} />
@@ -145,7 +149,11 @@ export function AppSidebar() {
                      setOpenSubmenu(null);
                   }
                 }}>
-                  <item.icon className="h-5 w-5 shrink-0" />
+                  {typeof item.icon === 'string' ? (
+                    <Image src={item.icon} alt={item.title} width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <item.icon className="h-5 w-5 shrink-0" />
+                  )}
                   <span className="truncate">{item.title}</span>
                   {item.label && <span className="ml-auto text-xs">{item.label}</span>}
                 </Link>

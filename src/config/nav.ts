@@ -24,7 +24,7 @@ import type { Role } from "./roles";
 export interface NavItem {
   title: string;
   href: string;
-  icon: LucideIcon;
+  icon: LucideIcon | string;
   roles?: Role[]; 
   children?: NavItem[];
   label?: string; 
@@ -93,7 +93,7 @@ export const navItems: NavItem[] = [
   { 
     title: "Tentang Saya", 
     href: "/settings/profile", 
-    icon: UserCircle,
+    icon: "/avatars/opank1.png",
   },
 ];
 
