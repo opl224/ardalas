@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Shield, AlertCircle, Edit } from "lucide-react";
+import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import LottieLoader from "@/components/ui/LottieLoader";
 import {
@@ -19,12 +19,20 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { updateProfile } from "firebase/auth";
-import { auth } from "@/lib/firebase/config";
+import { auth, db } from "@/lib/firebase/config";
+import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { cn } from "@/lib/utils";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 
 const availableAvatars = [
@@ -33,13 +41,56 @@ const availableAvatars = [
   "/avatars/perempuan.png",
 ];
 
+// Schema for the profile edit form
+const profileFormSchema = z.object({
+  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
+  email: z.string().email(), // Keep email for display, but it won't be editable
+  address: z.string().optional(),
+});
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
+
+
 export default function ProfilePage() {
   const { user, loading, role, refreshUser } = useAuth();
   const { toast } = useToast();
   
   const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(user?.photoURL || null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [additionalUserData, setAdditionalUserData] = useState<{ address?: string }>({});
+
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      name: user?.displayName || "",
+      email: user?.email || "",
+      address: "",
+    },
+  });
+
+  // Fetch additional data like address from Firestore when the dialog opens
+  useEffect(() => {
+    if (isDetailDialogOpen && user) {
+      const fetchExtraData = async () => {
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          setAdditionalUserData({ address: data.address });
+          form.reset({
+            name: user.displayName || "",
+            email: user.email || "",
+            address: data.address || "",
+          });
+        }
+      };
+      fetchExtraData();
+    }
+  }, [isDetailDialogOpen, user, form]);
+
 
   const handleAvatarUpdate = async () => {
     if (!user || !selectedAvatar) {
@@ -63,6 +114,42 @@ export default function ProfilePage() {
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleProfileUpdate = async (values: ProfileFormValues) => {
+      if (!user) return;
+      setIsUpdatingProfile(true);
+
+      try {
+        // Update Firebase Auth profile (only displayName can be updated this way)
+        if (user.displayName !== values.name) {
+            await updateProfile(user, { displayName: values.name });
+        }
+
+        // Update Firestore 'users' document
+        const userDocRef = doc(db, "users", user.uid);
+        await setDoc(userDocRef, { 
+            name: values.name,
+            address: values.address || null 
+        }, { merge: true });
+
+        await refreshUser(); 
+
+        toast({
+            title: "Profil Diperbarui",
+            description: "Informasi profil Anda telah berhasil disimpan.",
+        });
+
+        setIsDetailDialogOpen(false);
+      } catch (error) {
+        console.error("Error updating profile:", error);
+        toast({
+            title: "Gagal Memperbarui Profil",
+            variant: "destructive",
+        });
+      } finally {
+          setIsUpdatingProfile(false);
+      }
   };
 
 
@@ -209,7 +296,80 @@ export default function ProfilePage() {
               </div>
             )}
             <div className="pt-4 flex justify-center">
-              <Button variant="outline">Lihat Detail</Button>
+              <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">Lihat & Edit Detail</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Detail Profil</DialogTitle>
+                    <DialogDescription>
+                      Perbarui informasi profil Anda. Perubahan akan disimpan di seluruh sistem.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleProfileUpdate)} className="space-y-4">
+                      {role === 'admin' ? (
+                          <>
+                            <FormField
+                              control={form.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Nama Lengkap</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Nama lengkap Anda" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email (tidak dapat diubah)</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} readOnly disabled />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="address"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Alamat</FormLabel>
+                                  <FormControl>
+                                    <Textarea placeholder="Masukkan alamat Anda" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </>
+                      ) : (
+                          <p className="text-sm text-muted-foreground text-center p-4 border rounded-md">
+                              Fitur edit profil untuk peran '{role}' akan segera hadir.
+                          </p>
+                      )}
+                      
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">
+                            Batal
+                          </Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={isUpdatingProfile || role !== 'admin'}>
+                          {isUpdatingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
             </div>
         </CardContent>
       </Card>
