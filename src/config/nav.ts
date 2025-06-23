@@ -94,7 +94,7 @@ export const navItems: NavItem[] = [
   { 
     title: "Tentang Saya", 
     href: "/aboutme", 
-    icon: "/avatars/opank1.png"
+    icon: PersonStanding
   },
 ];
 

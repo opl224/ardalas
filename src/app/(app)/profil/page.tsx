@@ -208,6 +208,9 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+            <div className="pt-4 flex justify-center">
+              <Button variant="outline">Lihat Detail</Button>
+            </div>
         </CardContent>
       </Card>
     </div>
