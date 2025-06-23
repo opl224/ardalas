@@ -64,7 +64,7 @@ export default function ProfilePage() {
               <AvatarFallback className="text-3xl">{getInitials(user.displayName)}</AvatarFallback>
             </Avatar>
             <CardTitle className="text-2xl">{user.displayName || "Pengguna"}</CardTitle>
-            <CardDescription>{user.email}</CardDescription>
+            <CardDescription>{role ? roleDisplayNames[role] : "Peran tidak diketahui"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
             <div className="border-t border-border pt-4">
