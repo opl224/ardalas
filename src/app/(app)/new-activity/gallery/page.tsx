@@ -4,7 +4,7 @@
 import { useSearchParams } from 'next/navigation';
 import React, { Suspense, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Camera, Video, ArrowLeft, ImagePlus, Trash2, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Camera, Video, ArrowLeft, ImagePlus, Trash2, ZoomIn, ZoomOut, RotateCcw, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import { uploadActivityMedia, deleteActivityMedia } from '@/app/actions/uploadActions';
 import { Switch } from '@/components/ui/switch'; 
+import { Alert } from '@/components/ui/alert';
 
 interface Activity {
   id: string;
@@ -126,9 +127,42 @@ function GalleryContent() {
     };
   }, [activityId]);
   
+  const photos = media.filter(item => item.type === 'photo');
+  const videos = media.filter(item => item.type === 'video');
+  const photoLimitReached = photos.length >= 5;
+  const videoLimitReached = videos.length >= 2;
+
+  const handleOpenAddDialog = (isOpen: boolean) => {
+    setIsAddMediaOpen(isOpen);
+    if (isOpen) {
+      // Set default media type based on availability
+      if (photoLimitReached && !videoLimitReached) {
+        setNewMediaType('video');
+      } else {
+        setNewMediaType('photo');
+      }
+      // Reset form fields
+      setNewMediaUrl('');
+      setNewMediaCaption('');
+      setSelectedFile(null);
+      setPhotoUploadMethod('file');
+    }
+  };
+
+
   const handleAddMedia = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activityId) return;
+
+    if (newMediaType === 'photo' && photoLimitReached) {
+        toast({ title: "Batas Maksimal Foto", description: "Anda telah mencapai batas maksimal 5 foto.", variant: "destructive" });
+        return;
+    }
+    if (newMediaType === 'video' && videoLimitReached) {
+        toast({ title: "Batas Maksimal Video", description: "Anda telah mencapai batas maksimal 2 video.", variant: "destructive" });
+        return;
+    }
+
 
     setIsSubmitting(true);
     try {
@@ -231,8 +265,6 @@ function GalleryContent() {
   const handleZoomOut = () => setZoomLevel(prev => Math.max(0.2, prev - 0.2));
   const handleZoomReset = () => setZoomLevel(1);
   
-  const photos = media.filter(item => item.type === 'photo');
-  const videos = media.filter(item => item.type === 'video');
 
   if (isLoadingActivity) {
     return <Skeleton className="h-64 w-full" />;
@@ -264,9 +296,9 @@ function GalleryContent() {
             </p>
           </div>
           {role === 'admin' && (
-            <Dialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen}>
+            <Dialog open={isAddMediaOpen} onOpenChange={handleOpenAddDialog}>
               <DialogTrigger asChild>
-                <Button className="ml-auto">
+                <Button className="ml-auto" disabled={photoLimitReached && videoLimitReached}>
                   <ImagePlus className="mr-2 h-4 w-4" /> Tambah Media
                 </Button>
               </DialogTrigger>
@@ -276,89 +308,98 @@ function GalleryContent() {
                   <DialogDescription>Tambahkan foto atau video ke galeri kegiatan ini.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddMedia} className="space-y-4">
-                   <div>
-                     <Label htmlFor="media-type">Tipe Media</Label>
-                     <Select value={newMediaType} onValueChange={(value) => {
-                        setNewMediaType(value as 'photo' | 'video');
-                        setNewMediaUrl('');
-                        setSelectedFile(null);
-                     }}>
-                       <SelectTrigger id="media-type" className="mt-1">
-                         <SelectValue placeholder="Pilih tipe media" />
-                       </SelectTrigger>
-                       <SelectContent>
-                         <SelectItem value="photo">Foto</SelectItem>
-                         <SelectItem value="video">Video (YouTube Embed)</SelectItem>
-                       </SelectContent>
-                     </Select>
-                   </div>
-                  {newMediaType === 'photo' && (
-                    <div className="space-y-4 rounded-md border p-4">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="upload-method-switch" className="flex flex-col space-y-0.5">
-                              <span>Unggah File</span>
-                              <span className="text-xs font-normal text-muted-foreground">Matikan untuk menggunakan link URL.</span>
-                            </Label>
-                            <Switch
-                                id="upload-method-switch"
-                                checked={photoUploadMethod === 'file'}
-                                onCheckedChange={(checked) => setPhotoUploadMethod(checked ? 'file' : 'url')}
-                                aria-label="Toggle upload method"
-                            />
-                        </div>
-                        {photoUploadMethod === 'file' ? (
-                            <div key="file-upload">
-                                <Label htmlFor="media-file">Pilih File Foto</Label>
-                                <Input 
-                                    id="media-file"
-                                    key="file-input"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
-                                    className="mt-1"
-                                    required
-                                />
-                            </div>
-                        ) : (
-                            <div key="url-upload">
-                                <Label htmlFor="media-url-photo">URL Foto</Label>
-                                <Input 
-                                    id="media-url-photo" 
-                                    key="url-input"
-                                    value={newMediaUrl} 
-                                    onChange={(e) => setNewMediaUrl(e.target.value)} 
-                                    placeholder={"https://contoh.com/gambar.jpg"} 
-                                    required 
-                                />
-                            </div>
-                        )}
-                    </div>
-                  )}
-                  {newMediaType === 'video' && (
-                    <div key="video-upload">
-                      <Label htmlFor="media-url-video">URL Video Embed</Label>
-                      <Input 
-                        id="media-url-video" 
-                        key="video-input"
-                        value={newMediaUrl} 
-                        onChange={(e) => setNewMediaUrl(e.target.value)} 
-                        placeholder={"https://www.youtube.com/embed/..."} 
-                        required 
-                      />
-                    </div>
-                  )}
-                   <div>
-                     <Label htmlFor="media-caption">Keterangan (Opsional)</Label>
-                     <Textarea 
-                        id="media-caption"
-                        value={newMediaCaption}
-                        onChange={(e) => setNewMediaCaption(e.target.value)}
-                        placeholder="Deskripsi singkat tentang media ini"
-                     />
-                   </div>
+                   {photoLimitReached && videoLimitReached ? (
+                     <Alert variant="destructive">
+                       <AlertCircle className="h-4 w-4" />
+                       <p>Anda telah mencapai batas maksimal unggahan untuk foto dan video.</p>
+                     </Alert>
+                   ) : (
+                    <>
+                     <div>
+                       <Label htmlFor="media-type">Tipe Media</Label>
+                       <Select value={newMediaType} onValueChange={(value) => {
+                          setNewMediaType(value as 'photo' | 'video');
+                          setNewMediaUrl('');
+                          setSelectedFile(null);
+                       }}>
+                         <SelectTrigger id="media-type" className="mt-1">
+                           <SelectValue placeholder="Pilih tipe media" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="photo" disabled={photoLimitReached}>Foto ({photos.length}/5)</SelectItem>
+                           <SelectItem value="video" disabled={videoLimitReached}>Video ({videos.length}/2)</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
+                    {newMediaType === 'photo' && (
+                      <div className="space-y-4 rounded-md border p-4">
+                          <div className="flex items-center justify-between">
+                              <Label htmlFor="upload-method-switch" className="flex flex-col space-y-0.5">
+                                <span>Unggah File</span>
+                                <span className="text-xs font-normal text-muted-foreground">Matikan untuk menggunakan link URL.</span>
+                              </Label>
+                              <Switch
+                                  id="upload-method-switch"
+                                  checked={photoUploadMethod === 'file'}
+                                  onCheckedChange={(checked) => setPhotoUploadMethod(checked ? 'file' : 'url')}
+                                  aria-label="Toggle upload method"
+                              />
+                          </div>
+                          {photoUploadMethod === 'file' ? (
+                              <div key="file-upload">
+                                  <Label htmlFor="media-file">Pilih File Foto</Label>
+                                  <Input 
+                                      id="media-file"
+                                      key="file-input"
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                                      className="mt-1"
+                                      required
+                                  />
+                              </div>
+                          ) : (
+                              <div key="url-upload">
+                                  <Label htmlFor="media-url-photo">URL Foto</Label>
+                                  <Input 
+                                      id="media-url-photo" 
+                                      key="url-input"
+                                      value={newMediaUrl} 
+                                      onChange={(e) => setNewMediaUrl(e.target.value)} 
+                                      placeholder={"https://contoh.com/gambar.jpg"} 
+                                      required 
+                                  />
+                              </div>
+                          )}
+                      </div>
+                    )}
+                    {newMediaType === 'video' && (
+                      <div key="video-upload">
+                        <Label htmlFor="media-url-video">URL Video Embed</Label>
+                        <Input 
+                          id="media-url-video" 
+                          key="video-input"
+                          value={newMediaUrl} 
+                          onChange={(e) => setNewMediaUrl(e.target.value)} 
+                          placeholder={"https://www.youtube.com/embed/..."} 
+                          required 
+                        />
+                      </div>
+                    )}
+                     <div>
+                       <Label htmlFor="media-caption">Keterangan (Opsional)</Label>
+                       <Textarea 
+                          id="media-caption"
+                          value={newMediaCaption}
+                          onChange={(e) => setNewMediaCaption(e.target.value)}
+                          placeholder="Deskripsi singkat tentang media ini"
+                       />
+                     </div>
+                    </>
+                   )}
                    <DialogFooter>
                      <DialogClose asChild><Button variant="outline" type="button">Batal</Button></DialogClose>
-                     <Button type="submit" disabled={isSubmitting}>
+                     <Button type="submit" disabled={isSubmitting || (photoLimitReached && newMediaType === 'photo') || (videoLimitReached && newMediaType === 'video')}>
                        {isSubmitting ? 'Menyimpan...' : 'Simpan Media'}
                      </Button>
                    </DialogFooter>
@@ -371,7 +412,7 @@ function GalleryContent() {
         <section>
           <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
               <Camera className="h-6 w-6 text-primary" />
-              <span>Foto Kegiatan</span>
+              <span>Foto Kegiatan ({photos.length}/5)</span>
           </h2>
           {isLoadingMedia ? <Skeleton className="h-48 w-full" /> : photos.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -425,7 +466,7 @@ function GalleryContent() {
         <section>
           <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
               <Video className="h-6 w-6 text-primary" />
-              <span>Video Dokumentasi</span>
+              <span>Video Dokumentasi ({videos.length}/2)</span>
           </h2>
           {isLoadingMedia ? <Skeleton className="h-48 w-full" /> : videos.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
