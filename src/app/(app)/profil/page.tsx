@@ -298,7 +298,9 @@ export default function ProfilePage() {
             <div className="pt-4 flex justify-center">
               <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">Lihat & Edit Detail</Button>
+                  <Button variant="outline">
+                    {role === 'admin' ? 'Lihat & Edit Detail' : 'Lihat Detail'}
+                  </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
