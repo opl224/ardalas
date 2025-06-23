@@ -11,20 +11,19 @@ export default function AboutMePage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Tentang Pengembang</h1>
-        <p className="text-muted-foreground">Profil tim pengembang di balik aplikasi Ardalas.</p>
+        <p className="text-muted-foreground">Profil pengembang di balik aplikasi Ardalas.</p>
       </div>
       <div className="flex justify-center items-center py-8">
         <ProfileCard
-            name="Tim Ardalas"
-            title="Pengembang Aplikasi"
-            handle="ardalasdev"
+            name="Nifsah Amalia"
+            title="Full-Stack Developer"
+            handle="nifsah"
             status="Online"
-            contactText="Hubungi Kami"
-            avatarUrl="https://placehold.co/512x512.png"
-            data-ai-hint="developer avatar"
+            contactText="Hubungi Saya"
+            avatarUrl="/avatars/nifsah.png"
             showUserInfo={true}
             enableTilt={true}
-            onContactClick={() => console.log('Contact clicked')}
+            onContactClick={() => window.open('https://www.linkedin.com/in/nifsah-amalia/', '_blank')}
         />
       </div>
     </div>
