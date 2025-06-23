@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
@@ -105,18 +104,19 @@ export default function ProfilePage() {
 
 
   const handleAvatarUpdate = async () => {
-    if (!user || !selectedAvatar) {
-      toast({ title: "Error", description: "Avatar tidak dipilih.", variant: "destructive" });
+    const currentUser = auth.currentUser;
+    if (!currentUser || !selectedAvatar) {
+      toast({ title: "Error", description: "Avatar atau pengguna tidak valid.", variant: "destructive" });
       return;
     }
-    if (user.photoURL === selectedAvatar) {
+    if (currentUser.photoURL === selectedAvatar) {
         setIsAvatarDialogOpen(false);
         return;
     }
 
     setIsUpdating(true);
     try {
-      await updateProfile(user, { photoURL: selectedAvatar });
+      await updateProfile(currentUser, { photoURL: selectedAvatar });
       await refreshUser(); 
       toast({ title: "Avatar Diperbarui", description: "Foto profil Anda berhasil diubah." });
       setIsAvatarDialogOpen(false);
@@ -129,17 +129,21 @@ export default function ProfilePage() {
   };
 
   const handleProfileUpdate = async (values: ProfileFormValues) => {
-      if (!user) return;
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast({ title: "Error", description: "Sesi tidak valid, silakan login kembali.", variant: "destructive" });
+        return;
+      }
       setIsUpdatingProfile(true);
 
       try {
         // Update Firebase Auth profile (only displayName can be updated this way)
-        if (user.displayName !== values.name) {
-            await updateProfile(user, { displayName: values.name });
+        if (currentUser.displayName !== values.name) {
+            await updateProfile(currentUser, { displayName: values.name });
         }
 
         // Update Firestore 'users' document
-        const userDocRef = doc(db, "users", user.uid);
+        const userDocRef = doc(db, "users", currentUser.uid);
         await setDoc(userDocRef, { 
             name: values.name,
             address: values.address || null 
