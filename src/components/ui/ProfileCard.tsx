@@ -51,7 +51,7 @@ const adjust = (
 const easeInOutCubic = (x: number): number =>
   x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
 
-const semicolonIcon = "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='60' height='100' viewBox='0 0 60 100'%3e%3ctext x='30' y='70' font-family='monospace' font-size='100' fill='white' text-anchor='middle'%3e;%3c/text%3e%3c/svg%3e";
+const semicolonIcon = "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3e%3ctext x='50' y='70' font-family='monospace' font-size='80' fill='white' text-anchor='middle'%3e12%3c/text%3e%3c/svg%3e";
 
 const ProfileCardComponent: React.FC<ProfileCardProps> = ({
   avatarUrl,
