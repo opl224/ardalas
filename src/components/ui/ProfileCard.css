@@ -178,6 +178,7 @@
 
 .pc-avatar-content {
   overflow: hidden;
+  mix-blend-mode: normal;
 }
 
 .pc-avatar-content .avatar {
