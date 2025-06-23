@@ -1,46 +1,21 @@
 
 "use client";
 
-import ProfileCard from '@/components/ui/ProfileCard';
-import '@/components/ui/ProfileCard.css';
-import CircularText from '@/components/ui/CircularText';
-import '@/components/ui/CircularText.css';
-import ScrambledText from '@/components/ui/ScrambledText';
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Info } from "lucide-react";
 
-export default function AboutMePage() {
+export default function MovedPage() {
   return (
-    <div className="space-y-8 flex flex-col items-center">
-      <div className="relative flex justify-center items-center pt-8">
-         <div className="absolute -top-4 -right-12 z-20 opacity-50 scale-75">
-            <CircularText
-              text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
-              onHover="speedUp"
-              spinDuration={30}
-              radius={70}
-            />
-          </div>
-        <ProfileCard
-            name="Noval Firdaus"
-            title="Developer Pemula"
-            handle="opank"
-            status="mahasiswa"
-            contactText="Hubungi Saya"
-            avatarUrl="/avatars/opank1.png"
-            showUserInfo={true}
-            enableTilt={true}
-            onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
-        />
-      </div>
-       <div className="text-center max-w-lg text-xl font-mono text-foreground">
-        <ScrambledText
-          radius={100}
-          duration={1.2}
-          speed={0.5}
-          scrambleChars=".:"
-        >
-          "Saya Manusia Biasa Makan Nasi"
-        </ScrambledText>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-theme(spacing.20))] text-center p-4">
+      <Info className="h-12 w-12 text-primary mb-4" />
+      <h2 className="text-2xl font-bold mb-2">Halaman Telah Dipindahkan</h2>
+      <p className="text-muted-foreground mb-6">
+        Halaman profil sekarang dapat diakses di menu "Tentang Saya".
+      </p>
+      <Button asChild>
+        <Link href="/aboutme">Buka Halaman Profil</Link>
+      </Button>
     </div>
   );
 }
