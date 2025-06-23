@@ -104,8 +104,8 @@
   mask-image: var(--icon);
   mask-mode: luminance;
   mask-repeat: no-repeat;
-  mask-size: 80%;
-  mask-position: bottom 20px;
+  mask-size: 100%;
+  mask-position: center;
   transition: filter 0.6s ease;
   filter: brightness(0.66) contrast(1.33) saturate(0.33) opacity(0.5);
   animation: holo-bg 18s linear infinite;
@@ -185,7 +185,7 @@
   width: 100%;
   position: absolute;
   left: 50%;
-  top: 8em;
+  bottom: 5.5em; 
   transform: translateX(-50%);
   opacity: calc(1.75 - var(--pointer-from-center));
 }
@@ -198,8 +198,8 @@
   backdrop-filter: blur(30px);
   mask: linear-gradient(to bottom,
       rgba(0, 0, 0, 0) 0%,
-      rgba(0, 0, 0, 0) 60%,
-      rgba(0, 0, 0, 1) 90%,
+      rgba(0, 0, 0, 0) 80%,
+      rgba(0, 0, 0, 1) 95%,
       rgba(0, 0, 0, 1) 100%);
   pointer-events: none;
 }
