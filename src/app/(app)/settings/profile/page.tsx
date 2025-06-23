@@ -11,12 +11,12 @@ export default function AboutMePage() {
   return (
     <div className="space-y-8 flex flex-col items-center">
       <div className="relative flex justify-center items-center pt-8">
-         <div className="absolute -top-4 -right-4 z-20 opacity-50 scale-75">
+         <div className="absolute -top-4 -right-12 z-20 opacity-50 scale-75">
             <CircularText
               text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
               onHover="speedUp"
               spinDuration={30}
-              radius={80}
+              radius={70}
             />
           </div>
         <ProfileCard
@@ -38,7 +38,7 @@ export default function AboutMePage() {
           speed={0.5}
           scrambleChars=".:"
         >
-          Saya Manusia Biasa Makan Nasi
+          "Saya Manusia Biasa Makan Nasi"
         </ScrambledText>
       </div>
     </div>
