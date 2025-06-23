@@ -17,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, PanelLeft, Mail, X } from "lucide-react";
+import { Bell, LogOut, Search, Settings, PanelLeft, Mail, X, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -291,6 +291,12 @@ function UserNav() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings/profile">
+            <User className="mr-2 h-4 w-4" />
+            <span>Profil</span>
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings">
             <Settings className="mr-2 h-4 w-4" />
