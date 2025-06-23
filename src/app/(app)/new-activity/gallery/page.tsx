@@ -60,6 +60,7 @@ interface MediaItem {
   id: string;
   type: 'photo' | 'video';
   url: string;
+  filePath?: string; // Add filePath for direct storage access
   caption?: string;
   createdAt: Timestamp;
 }
@@ -163,10 +164,10 @@ function GalleryContent() {
         return;
     }
 
-
     setIsSubmitting(true);
     try {
       let mediaUrl = newMediaUrl;
+      let mediaFilePath: string | undefined = undefined;
 
       if (newMediaType === 'photo' && photoUploadMethod === 'file') {
         if (!selectedFile) {
@@ -190,10 +191,11 @@ function GalleryContent() {
           return;
         }
 
-        if (result.url) {
+        if (result.url && result.filePath) {
           mediaUrl = result.url;
+          mediaFilePath = result.filePath;
         } else {
-            toast({ title: "Gagal Mengunggah", description: "URL media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
+            toast({ title: "Gagal Mengunggah", description: "URL atau Path media tidak ditemukan setelah unggahan berhasil.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
@@ -219,6 +221,7 @@ function GalleryContent() {
       await addDoc(collection(db, "activities", activityId, "media"), {
         type: newMediaType,
         url: mediaUrl,
+        filePath: mediaFilePath || null, // Store filePath in Firestore
         caption: newMediaCaption,
         createdAt: serverTimestamp(),
       });
@@ -238,10 +241,10 @@ function GalleryContent() {
     }
   };
 
-  const handleDeleteMedia = async (activityId: string, mediaId: string) => {
+  const handleDeleteMedia = async (activityId: string, mediaItem: MediaItem) => {
     setIsDeleting(true);
     try {
-      const result = await deleteActivityMedia(activityId, mediaId);
+      const result = await deleteActivityMedia(activityId, mediaItem.id, mediaItem.filePath, mediaItem.url);
       if (result.error) {
         toast({ title: "Gagal Menghapus", description: result.error, variant: "destructive" });
       } else {
@@ -524,7 +527,7 @@ function GalleryContent() {
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setSelectedMediaForDeletion(null)}>Batal</AlertDialogCancel>
                 <AlertDialogAction
-                  onClick={() => activityId && handleDeleteMedia(activityId, selectedMediaForDeletion.id)}
+                  onClick={() => activityId && selectedMediaForDeletion && handleDeleteMedia(activityId, selectedMediaForDeletion)}
                   disabled={isDeleting}
                 >
                   {isDeleting ? "Menghapus..." : "Ya, Hapus"}
