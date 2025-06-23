@@ -38,6 +38,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 const availableAvatars = [
   "/avatars/laki-laki.png",
   "/avatars/perempuan.png",
+  "/avatars/avatar-1.png",
+  "/avatars/avatar-2.png",
+  "/avatars/avatar-3.png",
+  "/avatars/avatar-4.png",
+  "/avatars/avatar-5.png",
+  "/avatars/avatar-6.png",
 ];
 
 // Schema for the profile edit form
