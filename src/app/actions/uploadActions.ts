@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache';
 import { db } from "@/lib/firebase/config";
 import { doc, getDoc, deleteDoc, collection, query, writeBatch, getDocs } from "firebase/firestore";
 
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
 export async function uploadActivityMedia(activityId: string, formData: FormData) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -23,6 +25,10 @@ export async function uploadActivityMedia(activityId: string, formData: FormData
 
     if (!file) {
       return { error: 'Tidak ada file yang terdeteksi dalam permintaan.' };
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return { error: 'Ukuran file tidak boleh melebihi 2MB.' };
     }
     
     if (!file.type.startsWith('image/')) {

@@ -65,6 +65,8 @@ interface MediaItem {
   createdAt: Timestamp;
 }
 
+const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+
 function GalleryContent() {
   const searchParams = useSearchParams();
   const activityId = searchParams.get('id');
@@ -174,6 +176,11 @@ function GalleryContent() {
           toast({ title: "File foto harus dipilih", variant: "destructive" });
           setIsSubmitting(false);
           return;
+        }
+        if (selectedFile.size > MAX_FILE_SIZE) {
+            toast({ title: "Ukuran File Terlalu Besar", description: "Ukuran file tidak boleh melebihi 2MB.", variant: "destructive" });
+            setIsSubmitting(false);
+            return;
         }
         const formData = new FormData();
         formData.append('file', selectedFile);
@@ -350,13 +357,28 @@ function GalleryContent() {
                           </div>
                           {photoUploadMethod === 'file' ? (
                               <div key="file-upload">
-                                  <Label htmlFor="media-file">Pilih File Foto</Label>
+                                  <Label htmlFor="media-file">Pilih File Foto (Maks 2MB)</Label>
                                   <Input 
                                       id="media-file"
                                       key="file-input"
                                       type="file"
                                       accept="image/*"
-                                      onChange={(e) => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+                                      onChange={(e) => {
+                                        const file = e.target.files ? e.target.files[0] : null;
+                                        if (file) {
+                                          if (file.size > MAX_FILE_SIZE) {
+                                            toast({
+                                              title: "Ukuran File Terlalu Besar",
+                                              description: "Ukuran file foto tidak boleh melebihi 2MB.",
+                                              variant: "destructive"
+                                            });
+                                            e.target.value = ''; // Clear the input
+                                            setSelectedFile(null);
+                                          } else {
+                                            setSelectedFile(file);
+                                          }
+                                        }
+                                      }}
                                       className="mt-1"
                                       required
                                   />
