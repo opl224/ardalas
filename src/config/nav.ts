@@ -39,7 +39,7 @@ export const navItems: NavItem[] = [
     children: [
       { title: "Pengumuman", href: "/announcements", icon: Megaphone },
       { title: "Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
-      { title: "Kegiatan Baru", href: "/new-activity", icon: FolderKanban },
+      { title: "Kegiatan", href: "/new-activity", icon: FolderKanban },
     ],
   },
   { 
