@@ -198,7 +198,7 @@ export default function NewActivityPage() {
           </CardHeader>
           <CardContent>
             {role === 'admin' && isMobile && (
-              <div className="flex items-center justify-end gap-2 mb-6 p-4 border-b">
+              <div className="flex items-center justify-between gap-2 mb-6 p-4 border-b">
                 {isDeleteMode ? (
                   <>
                     <span className="text-sm font-medium mr-auto">Pilih folder untuk dihapus...</span>
