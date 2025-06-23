@@ -9,7 +9,7 @@ import ScrambledText from '@/components/ui/ScrambledText';
 export default function AboutMePage() {
   return (
     <div className="relative space-y-8 flex flex-col items-center">
-      <div className="absolute top-0 right-0 z-20 opacity-50 scale-75">
+      <div className="absolute top-2 right-2 md:top-0 md:right-12 z-20 opacity-50 scale-75">
          <CircularText
            text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
            onHover="speedUp"
@@ -24,7 +24,7 @@ export default function AboutMePage() {
             handle="opank"
             status="mahasiswa"
             contactText="Hubungi Saya"
-            avatarUrl="/opank1.png"
+            avatarUrl="/avatars/laki-laki.png"
             showUserInfo={true}
             enableTilt={true}
             onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
