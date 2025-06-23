@@ -13,10 +13,10 @@ export default function AboutMePage() {
             handle="opank"
             status="Online"
             contactText="Hubungi Saya"
-            avatarUrl="/avatars/opank.png"
+            avatarUrl="/avatars/opank1.png"
             showUserInfo={true}
             enableTilt={true}
-            onContactClick={() => window.open('https://www.linkedin.com/', '_blank')}
+            onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
         />
       </div>
       <div className="text-center text-muted-foreground max-w-lg">
