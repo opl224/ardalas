@@ -5,12 +5,66 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Shield, AlertCircle } from "lucide-react";
+import { User as UserIcon, Mail, Shield, AlertCircle, Edit } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import LottieLoader from "@/components/ui/LottieLoader";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import Image from "next/image";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { updateProfile } from "firebase/auth";
+import { auth } from "@/lib/firebase/config";
+import { cn } from "@/lib/utils";
+
+
+const availableAvatars = [
+  "/avatars/opank1.png",
+  "/avatars/laki-laki.png",
+  "/avatars/perempuan.png",
+];
 
 export default function ProfilePage() {
-  const { user, loading, role } = useAuth();
+  const { user, loading, role, refreshUser } = useAuth();
+  const { toast } = useToast();
+  
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(user?.photoURL || null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleAvatarUpdate = async () => {
+    if (!user || !selectedAvatar) {
+      toast({ title: "Error", description: "Avatar tidak dipilih.", variant: "destructive" });
+      return;
+    }
+    if (user.photoURL === selectedAvatar) {
+        setIsAvatarDialogOpen(false);
+        return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await updateProfile(user, { photoURL: selectedAvatar });
+      await refreshUser(); 
+      toast({ title: "Avatar Diperbarui", description: "Foto profil Anda berhasil diubah." });
+      setIsAvatarDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating avatar:", error);
+      toast({ title: "Gagal Memperbarui Avatar", variant: "destructive" });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -59,10 +113,50 @@ export default function ProfilePage() {
       <h1 className="text-3xl font-bold font-headline">Profil Pengguna</h1>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="items-center text-center">
-            <Avatar className="h-24 w-24 mb-4">
-              <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile avatar"/>
-              <AvatarFallback className="text-3xl">{getInitials(user.displayName)}</AvatarFallback>
-            </Avatar>
+            <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+                <div className="relative">
+                    <Avatar className="h-24 w-24 mb-4">
+                        <AvatarImage src={user.photoURL || undefined} alt={user.displayName || "User"} data-ai-hint="profile avatar"/>
+                        <AvatarFallback className="text-3xl">{getInitials(user.displayName)}</AvatarFallback>
+                    </Avatar>
+                     <DialogTrigger asChild>
+                        <Button variant="outline" size="icon" className="absolute bottom-4 -right-1 h-8 w-8 rounded-full">
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Ubah Avatar</span>
+                        </Button>
+                    </DialogTrigger>
+                </div>
+                 <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Pilih Avatar Baru</DialogTitle>
+                        <DialogDescription>
+                            Pilih salah satu gambar di bawah ini untuk dijadikan foto profil Anda.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 grid grid-cols-3 gap-4">
+                        {availableAvatars.map(avatarPath => (
+                            <button 
+                                key={avatarPath} 
+                                className={cn(
+                                    "relative aspect-square w-full rounded-full overflow-hidden border-2 transition-all",
+                                    selectedAvatar === avatarPath ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent hover:border-primary/50"
+                                )}
+                                onClick={() => setSelectedAvatar(avatarPath)}
+                            >
+                                <Image src={avatarPath} alt={`Avatar option`} layout="fill" objectFit="cover" data-ai-hint="avatar picture"/>
+                            </button>
+                        ))}
+                    </div>
+                     <DialogFooter>
+                        <DialogClose asChild><Button variant="outline" type="button">Batal</Button></DialogClose>
+                        <Button onClick={handleAvatarUpdate} disabled={isUpdating}>
+                            {isUpdating && <LottieLoader width={16} height={16} className="mr-2" />}
+                            Simpan Perubahan
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             <CardTitle className="text-2xl">{user.displayName || "Pengguna"}</CardTitle>
             <CardDescription>{role ? roleDisplayNames[role] : "Peran tidak diketahui"}</CardDescription>
         </CardHeader>
