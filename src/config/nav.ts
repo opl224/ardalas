@@ -17,7 +17,8 @@ import {
   Settings,
   UserCog,
   GraduationCap,
-  FolderKanban, 
+  FolderKanban,
+  PersonStanding, 
 } from "lucide-react";
 import type { Role } from "./roles";
 
@@ -93,7 +94,7 @@ export const navItems: NavItem[] = [
   { 
     title: "Tentang Saya", 
     href: "/settings/profile", 
-    icon: "/develop.png"
+    icon: PersonStanding
   },
 ];
 

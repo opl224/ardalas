@@ -17,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, db } from "@/lib/firebase/config";
 import { cn } from "@/lib/utils";
 import { signOut } from "firebase/auth";
-import { Bell, LogOut, Search, Settings, UserCircle, PanelLeft, Mail, X } from "lucide-react";
+import { Bell, LogOut, Search, Settings, PanelLeft, Mail, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +38,7 @@ import {
   Timestamp, 
 } from "firebase/firestore";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { roleDisplayNames } from "@/config/roles";
 
 interface NotificationDoc {
   id: string; 
@@ -241,7 +242,7 @@ function NotificationBell() {
 
 
 function UserNav() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -276,17 +277,24 @@ function UserNav() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 bg-popover/90 backdrop-blur-md" align="end" forceMount>
+         <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">{user.displayName}</p>
+            <p className="text-xs leading-none text-muted-foreground">
+              {user.email}
+            </p>
+            {role && (
+                 <p className="text-xs leading-none text-muted-foreground capitalize pt-1">
+                    Peran: {roleDisplayNames[role]}
+                </p>
+            )}
+          </div>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/settings/profile"> 
-            <UserCircle className="mr-2 h-4 w-4" />
-            <span>Profil</span>
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings">
             <Settings className="mr-2 h-4 w-4" />
-            <span>Pengaturan</span>
+            <span>Pengaturan Akun</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -342,4 +350,3 @@ export function AppHeader() {
     </header>
   );
 }
-
