@@ -24,7 +24,7 @@ export default function AboutMePage() {
             handle="opank"
             status="mahasiswa"
             contactText="Hubungi Saya"
-            avatarUrl="/avatars/laki-laki.png"
+            avatarUrl="/opank1.png"
             showUserInfo={true}
             enableTilt={true}
             onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
