@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
@@ -114,7 +115,7 @@ export default function ProfilePage() {
       };
       fetchExtraData();
     }
-  }, [isDetailDialogOpen, user, form]);
+  }, [isDetailDialogOpen, user, form.reset]);
 
 
   const handleAvatarUpdate = async () => {
