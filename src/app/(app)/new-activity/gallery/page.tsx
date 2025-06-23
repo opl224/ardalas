@@ -65,7 +65,7 @@ interface MediaItem {
   createdAt: Timestamp;
 }
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+const MAX_FILE_SIZE = 6 * 1024 * 1024; // 6MB
 
 function GalleryContent() {
   const searchParams = useSearchParams();
@@ -194,7 +194,7 @@ function GalleryContent() {
           return;
         }
         if (selectedFile.size > MAX_FILE_SIZE) {
-            toast({ title: "Ukuran File Terlalu Besar", description: "Ukuran file tidak boleh melebihi 2MB.", variant: "destructive" });
+            toast({ title: "Ukuran File Terlalu Besar", description: "Ukuran file tidak boleh melebihi 6MB.", variant: "destructive" });
             setIsSubmitting(false);
             return;
         }
@@ -370,7 +370,7 @@ function GalleryContent() {
                           </div>
                           {photoUploadMethod === 'file' ? (
                               <div key="file-upload">
-                                  <Label htmlFor="media-file">Pilih File Foto (Maks 2MB)</Label>
+                                  <Label htmlFor="media-file">Pilih File Foto (Maks 6MB)</Label>
                                   <Input 
                                       id="media-file"
                                       key="file-input"
@@ -382,7 +382,7 @@ function GalleryContent() {
                                           if (file.size > MAX_FILE_SIZE) {
                                             toast({
                                               title: "Ukuran File Terlalu Besar",
-                                              description: "Ukuran file foto tidak boleh melebihi 2MB.",
+                                              description: "Ukuran file foto tidak boleh melebihi 6MB.",
                                               variant: "destructive"
                                             });
                                             e.target.value = ''; // Clear the input
