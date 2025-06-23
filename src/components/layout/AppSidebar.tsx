@@ -112,7 +112,7 @@ export function AppSidebar() {
               >
                 <div className="flex items-center gap-2 overflow-hidden">
                   {typeof item.icon === 'string' ? (
-                    <Image src={item.icon} alt={item.title} width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                    <Image src={item.icon} alt={item.title} width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover dark:invert dark:brightness-95" />
                   ) : (
                     <item.icon className="h-5 w-5 shrink-0" />
                   )}
@@ -150,7 +150,7 @@ export function AppSidebar() {
                   }
                 }}>
                   {typeof item.icon === 'string' ? (
-                    <Image src={item.icon} alt={item.title} width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+                    <Image src={item.icon} alt={item.title} width={20} height={20} className="h-5 w-5 shrink-0 rounded-full object-cover dark:invert dark:brightness-95" />
                   ) : (
                     <item.icon className="h-5 w-5 shrink-0" />
                   )}

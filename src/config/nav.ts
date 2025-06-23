@@ -93,7 +93,7 @@ export const navItems: NavItem[] = [
   { 
     title: "Tentang Saya", 
     href: "/settings/profile", 
-    icon: "/avatars/opank1.png",
+    icon: "/dev.png",
   },
 ];
 
