@@ -2,7 +2,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FolderKanban, PlusCircle } from "lucide-react";
+import { FolderKanban, PlusCircle, Trash2 } from "lucide-react";
 import Folder from "@/components/ui/Folder";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -17,6 +17,17 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +37,7 @@ import { collection, addDoc, query, orderBy, onSnapshot, Timestamp, serverTimest
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
+import { deleteActivity } from '@/app/actions/uploadActions';
 
 interface Activity {
   id: string;
@@ -45,6 +57,10 @@ export default function NewActivityPage() {
   const [newActivityTitle, setNewActivityTitle] = useState("");
   const [newActivityDate, setNewActivityDate] = useState("");
   const [newActivityColor, setNewActivityColor] = useState("#2F80ED");
+
+  // State for deletion
+  const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "activities"), orderBy("date", "desc"));
@@ -103,6 +119,19 @@ export default function NewActivityPage() {
     }
   };
 
+  const handleDeleteActivity = async (activityId: string) => {
+    if (!activityId) return;
+    setIsDeleting(true);
+    const result = await deleteActivity(activityId);
+    if (result.error) {
+        toast({ title: "Gagal Menghapus", description: result.error, variant: "destructive" });
+    } else {
+        toast({ title: "Kegiatan Dihapus", description: "Folder kegiatan dan semua isinya telah berhasil dihapus." });
+    }
+    setActivityToDelete(null); // Close dialog
+    setIsDeleting(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -152,28 +181,62 @@ export default function NewActivityPage() {
             </Dialog>
           )}
         </CardHeader>
-        <CardContent className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center">
-          {isLoading ? (
-            [...Array(3)].map((_, index) => (
-              <div key={index} className="flex flex-col items-center gap-2 flex-shrink-0">
-                 <Skeleton className="w-[80px] h-[64px] rounded-lg" />
-                 <Skeleton className="h-4 w-24" />
-              </div>
-            ))
-          ) : activities.length > 0 ? (
-              activities.map((activity) => (
-                <div key={activity.id} className="flex flex-col items-center gap-2 flex-shrink-0">
-                  <Link href={`/new-activity/gallery?id=${activity.id}`}>
-                    <Folder color={activity.color} size={0.8} />
-                  </Link>
-                  <p className="text-sm font-semibold">{activity.title}</p>
-                  <p className="text-xs font-medium text-muted-foreground">{activity.date ? format(activity.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : 'Tanggal tidak valid'}</p>
+        <AlertDialog>
+          <CardContent className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center">
+            {isLoading ? (
+              [...Array(3)].map((_, index) => (
+                <div key={index} className="flex flex-col items-center gap-2 flex-shrink-0">
+                  <Skeleton className="w-[80px] h-[64px] rounded-lg" />
+                  <Skeleton className="h-4 w-24" />
                 </div>
               ))
-          ) : (
-            <p className="col-span-3 text-center text-muted-foreground">Belum ada kegiatan yang ditambahkan.</p>
+            ) : activities.length > 0 ? (
+                activities.map((activity) => (
+                  <div key={activity.id} className="relative group/folder flex flex-col items-center gap-2 flex-shrink-0">
+                    {role === 'admin' && (
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="destructive" 
+                          size="icon" 
+                          className="absolute -top-2 -right-2 z-10 h-6 w-6 rounded-full opacity-0 group-hover/folder:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                              e.stopPropagation();
+                              setActivityToDelete(activity);
+                          }}
+                          aria-label={`Hapus folder ${activity.title}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                    )}
+                    <Link href={`/new-activity/gallery?id=${activity.id}`}>
+                      <Folder color={activity.color} size={0.8} />
+                    </Link>
+                    <p className="text-sm font-semibold">{activity.title}</p>
+                    <p className="text-xs font-medium text-muted-foreground">{activity.date ? format(activity.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : 'Tanggal tidak valid'}</p>
+                  </div>
+                ))
+            ) : (
+              <p className="col-span-3 text-center text-muted-foreground">Belum ada kegiatan yang ditambahkan.</p>
+            )}
+          </CardContent>
+          {activityToDelete && (
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Apakah Anda Yakin?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tindakan ini akan menghapus folder kegiatan <strong>&quot;{activityToDelete.title}&quot;</strong> dan <strong>semua foto serta video di dalamnya</strong>. Tindakan ini tidak dapat dibatalkan.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setActivityToDelete(null)}>Batal</AlertDialogCancel>
+                <AlertDialogAction onClick={() => handleDeleteActivity(activityToDelete.id)} disabled={isDeleting}>
+                  {isDeleting ? "Menghapus..." : "Ya, Hapus Semua"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
           )}
-        </CardContent>
+        </AlertDialog>
       </Card>
     </div>
   );

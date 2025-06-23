@@ -4,7 +4,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { revalidatePath } from 'next/cache';
 import { db } from "@/lib/firebase/config";
-import { doc, getDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, collection, query, writeBatch } from "firebase/firestore";
 
 
 export async function uploadActivityMedia(activityId: string, formData: FormData) {
@@ -111,4 +111,65 @@ export async function deleteActivityMedia(activityId: string, mediaId: string) {
     console.error("Error deleting media:", error);
     return { error: `Gagal menghapus media: ${error.message}` };
   }
+}
+
+export async function deleteActivity(activityId: string) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("YOUR_SUPABASE_URL") || supabaseAnonKey.includes("YOUR_SUPABASE_ANON_KEY")) {
+        return { error: 'Konfigurasi Supabase tidak lengkap.' };
+    }
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    const batch = writeBatch(db);
+    const mediaCollectionRef = collection(db, "activities", activityId, "media");
+    const mediaQuery = query(mediaCollectionRef);
+
+    try {
+        const mediaSnapshot = await getDocs(mediaQuery);
+        const filesToDeleteFromStorage: string[] = [];
+
+        mediaSnapshot.forEach(mediaDoc => {
+            const mediaData = mediaDoc.data();
+            const mediaUrl = mediaData.url;
+            if (mediaUrl && mediaUrl.includes(supabaseUrl)) {
+                const bucketName = 'activities';
+                try {
+                    const urlObject = new URL(mediaUrl);
+                    const pathParts = urlObject.pathname.split('/');
+                    const bucketIndex = pathParts.indexOf(bucketName);
+                    if (bucketIndex !== -1 && bucketIndex < pathParts.length - 1) {
+                        const filePath = pathParts.slice(bucketIndex + 1).join('/');
+                        filesToDeleteFromStorage.push(filePath);
+                    }
+                } catch (e) {
+                    console.error("URL tidak valid, lewati penghapusan dari storage:", mediaUrl, e);
+                }
+            }
+            batch.delete(mediaDoc.ref);
+        });
+
+        const activityDocRef = doc(db, "activities", activityId);
+        batch.delete(activityDocRef);
+        await batch.commit();
+
+        if (filesToDeleteFromStorage.length > 0) {
+            const { error: storageError } = await supabase.storage
+                .from('activities')
+                .remove(filesToDeleteFromStorage);
+            
+            if (storageError) {
+                 console.error("Kesalahan penghapusan dari Supabase Storage:", storageError.message);
+                 return { error: `Data Firestore dihapus, tetapi terjadi kesalahan saat menghapus file di storage: ${storageError.message}` };
+            }
+        }
+        
+        revalidatePath('/new-activity');
+        return { success: true };
+
+    } catch (error: any) {
+        console.error("Kesalahan menghapus kegiatan:", error);
+        return { error: `Gagal menghapus kegiatan: ${error.message}` };
+    }
 }
