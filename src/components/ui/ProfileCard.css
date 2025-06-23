@@ -182,10 +182,10 @@
 }
 
 .pc-avatar-content .avatar {
-  width: 100%;
+  width: 95%;
   position: absolute;
   left: 50%;
-  bottom: 5.5em; 
+  bottom: 0.1em; 
   transform: translateX(-50%);
   opacity: calc(1.75 - var(--pointer-from-center));
 }

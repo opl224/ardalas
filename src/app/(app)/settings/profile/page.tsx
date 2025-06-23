@@ -4,6 +4,7 @@ import ProfileCard from '@/components/ui/ProfileCard';
 import '@/components/ui/ProfileCard.css';
 import CircularText from '@/components/ui/CircularText';
 import '@/components/ui/CircularText.css';
+import ScrambledText from '@/components/ui/ScrambledText';
 
 export default function AboutMePage() {
   return (
@@ -23,16 +24,22 @@ export default function AboutMePage() {
             handle="opank"
             status="Online"
             contactText="Hubungi Saya"
-            avatarUrl="/avatars/opank1.png"
+            avatarUrl="/avatars/opank.png"
             showUserInfo={true}
             enableTilt={true}
             onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
         />
       </div>
        <div className="text-center max-w-lg">
-        <p className="text-sm">
-          "Setiap baris kode adalah langkah kecil menuju perubahan besar dalam pendidikan."
-        </p>
+        <ScrambledText
+          className="text-xl semibold"
+          radius={100}
+          duration={1.2}
+          speed={0.5}
+          scrambleChars={".:"}
+        >
+          "Saya Manusia Biasa Makan Nasi"
+        </ScrambledText>
       </div>
     </div>
   );

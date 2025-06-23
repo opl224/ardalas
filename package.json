@@ -45,6 +45,7 @@
     "firebase": "^11.8.1",
     "framer-motion": "^11.2.12",
     "genkit": "^1.8.0",
+    "gsap": "^3.12.5",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "lottie-react": "^2.4.0",
