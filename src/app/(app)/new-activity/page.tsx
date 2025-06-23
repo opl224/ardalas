@@ -61,6 +61,8 @@ export default function NewActivityPage() {
   // State for deletion
   const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeForDeletion, setActiveForDeletion] = useState<string | null>(null);
+
 
   useEffect(() => {
     const q = query(collection(db, "activities"), orderBy("date", "desc"));
@@ -182,7 +184,10 @@ export default function NewActivityPage() {
           )}
         </CardHeader>
         <AlertDialog>
-          <CardContent className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center">
+          <CardContent 
+            className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center"
+            onClick={() => setActiveForDeletion(null)}
+          >
             {isLoading ? (
               [...Array(3)].map((_, index) => (
                 <div key={index} className="flex flex-col items-center gap-2 flex-shrink-0">
@@ -192,13 +197,22 @@ export default function NewActivityPage() {
               ))
             ) : activities.length > 0 ? (
                 activities.map((activity) => (
-                  <div key={activity.id} className="relative group/folder flex flex-col items-center gap-2 flex-shrink-0">
-                    {role === 'admin' && (
+                  <div 
+                    key={activity.id} 
+                    className="relative flex flex-col items-center gap-2 flex-shrink-0"
+                    onDoubleClick={() => {
+                        if (role === 'admin') {
+                            setActiveForDeletion(activity.id);
+                        }
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {role === 'admin' && activeForDeletion === activity.id && (
                       <AlertDialogTrigger asChild>
                         <Button 
                           variant="destructive" 
                           size="icon" 
-                          className="absolute -top-2 -right-2 z-10 h-6 w-6 rounded-full opacity-0 group-hover/folder:opacity-100 transition-opacity"
+                          className="absolute -top-2 -right-2 z-10 h-6 w-6 rounded-full"
                           onClick={(e) => {
                               e.stopPropagation();
                               setActivityToDelete(activity);
@@ -209,7 +223,11 @@ export default function NewActivityPage() {
                         </Button>
                       </AlertDialogTrigger>
                     )}
-                    <Link href={`/new-activity/gallery?id=${activity.id}`}>
+                    <Link href={`/new-activity/gallery?id=${activity.id}`} onClick={(e) => {
+                        if (activeForDeletion === activity.id) {
+                            e.preventDefault(); // Prevent navigation if delete mode is active
+                        }
+                    }}>
                       <Folder color={activity.color} size={0.8} />
                     </Link>
                     <p className="text-sm font-semibold">{activity.title}</p>
