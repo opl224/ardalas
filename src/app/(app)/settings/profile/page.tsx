@@ -8,15 +8,15 @@ export default function AboutMePage() {
     <div className="space-y-8 flex flex-col items-center">
       <div className="flex justify-center items-center pt-8">
         <ProfileCard
-            name="Nifsah Amalia"
+            name="Taufik Hidayat"
             title="Full-Stack Developer"
-            handle="nifsah"
+            handle="opank"
             status="Online"
             contactText="Hubungi Saya"
-            avatarUrl="/avatars/nifsah.png"
+            avatarUrl="/avatars/opank.png"
             showUserInfo={true}
             enableTilt={true}
-            onContactClick={() => window.open('https://www.linkedin.com/in/nifsah-amalia/', '_blank')}
+            onContactClick={() => window.open('https://www.linkedin.com/', '_blank')}
         />
       </div>
       <div className="text-center text-muted-foreground max-w-lg">
