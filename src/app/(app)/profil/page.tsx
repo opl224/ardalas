@@ -33,6 +33,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 const availableAvatars = [
@@ -231,20 +232,22 @@ export default function ProfilePage() {
                             Pilih salah satu gambar di bawah ini untuk dijadikan foto profil Anda.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4 grid grid-cols-3 gap-4">
-                        {availableAvatars.map(avatarPath => (
-                            <button 
-                                key={avatarPath} 
-                                className={cn(
-                                    "relative aspect-square w-full rounded-full overflow-hidden border-2 transition-all",
-                                    selectedAvatar === avatarPath ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent hover:border-primary/50"
-                                )}
-                                onClick={() => setSelectedAvatar(avatarPath)}
-                            >
-                                <Image src={avatarPath} alt={`Avatar option`} layout="fill" objectFit="cover" data-ai-hint="avatar picture"/>
-                            </button>
-                        ))}
-                    </div>
+                    <ScrollArea className="max-h-[60vh]">
+                        <div className="py-4 grid grid-cols-3 sm:grid-cols-4 gap-4 pr-4">
+                            {availableAvatars.map(avatarPath => (
+                                <button 
+                                    key={avatarPath} 
+                                    className={cn(
+                                        "relative aspect-square w-full rounded-full overflow-hidden border-2 transition-all",
+                                        selectedAvatar === avatarPath ? "border-primary ring-2 ring-primary ring-offset-2" : "border-transparent hover:border-primary/50"
+                                    )}
+                                    onClick={() => setSelectedAvatar(avatarPath)}
+                                >
+                                    <Image src={avatarPath} alt={`Avatar option`} layout="fill" objectFit="cover" data-ai-hint="avatar picture"/>
+                                </button>
+                            ))}
+                        </div>
+                    </ScrollArea>
                      <DialogFooter>
                         <DialogClose asChild><Button variant="outline" type="button">Batal</Button></DialogClose>
                         <Button onClick={handleAvatarUpdate} disabled={isUpdating}>
