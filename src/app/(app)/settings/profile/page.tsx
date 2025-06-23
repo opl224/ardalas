@@ -1,19 +1,12 @@
-
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserCircle } from "lucide-react";
 import ProfileCard from '@/components/ui/ProfileCard';
 import '@/components/ui/ProfileCard.css';
 
 export default function AboutMePage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold font-headline">Tentang Pengembang</h1>
-        <p className="text-muted-foreground">Profil pengembang di balik aplikasi Ardalas.</p>
-      </div>
-      <div className="flex justify-center items-center py-8">
+    <div className="space-y-8 flex flex-col items-center">
+      <div className="flex justify-center items-center pt-8">
         <ProfileCard
             name="Nifsah Amalia"
             title="Full-Stack Developer"
@@ -25,6 +18,12 @@ export default function AboutMePage() {
             enableTilt={true}
             onContactClick={() => window.open('https://www.linkedin.com/in/nifsah-amalia/', '_blank')}
         />
+      </div>
+      <div className="text-center text-muted-foreground max-w-lg">
+        <p className="text-sm">
+          Aplikasi ini dikembangkan dengan dedikasi untuk memajukan dunia pendidikan melalui teknologi.
+          Setiap baris kode ditulis dengan harapan untuk memberikan dampak positif bagi para guru, siswa, dan orang tua.
+        </p>
       </div>
     </div>
   );
