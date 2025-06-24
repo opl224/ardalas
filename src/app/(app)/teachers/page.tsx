@@ -577,16 +577,16 @@ export default function TeachersPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[150px]")}>Nama Profil</TableHead>
-                    {!isMobile && <TableHead>Email Profil</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "min-w-[120px]")}>Mapel</TableHead>
-                    {!isMobile && <TableHead>Gender</TableHead>}
-                    {!isMobile && <TableHead>UID Akun Tertaut</TableHead>}
-                    <TableHead className={cn("text-center w-16", isMobile && "w-12 px-1")}>Aksi</TableHead>
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/4")}>Nama Profil</TableHead>
+                    {!isMobile && <TableHead className="w-1/4">Email Profil</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/5")}>Mapel</TableHead>
+                    {!isMobile && <TableHead className="w-[80px]">Gender</TableHead>}
+                    {!isMobile && <TableHead className="w-1/5">UID Akun Tertaut</TableHead>}
+                    <TableHead className={cn("text-center", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -606,18 +606,18 @@ export default function TeachersPage() {
                         </TableCell>
                       )}
                       {!isMobile && (
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="font-mono text-xs truncate" title={teacher.uid}>
                           {teacher.uid ? (
                             <div className="flex items-center gap-1">
-                              <UidLinkIcon className="h-3 w-3 text-muted-foreground" /> 
-                              {teacher.uid.substring(0,10)}...
+                              <UidLinkIcon className="h-3 w-3 text-muted-foreground shrink-0" /> 
+                              <span className="truncate">{teacher.uid}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground italic">Belum tertaut</span>
                           )}
                         </TableCell>
                       )}
-                      <TableCell className={cn("text-center", isMobile && "px-1")}>
+                      <TableCell className={cn("text-center", isMobile ? "px-1" : "")}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${teacher.name}`}>
