@@ -597,14 +597,24 @@ export default function AnnouncementsPage() {
       ) : announcements.length > 0 ? (
         announcements.map((announcement) => {
             const isExpanded = expandedIds.has(announcement.id);
-            const contentIsLong = announcement.content.length > 150 || announcement.content.split('\n').length > 2;
+            // Heuristics to determine if truncation is likely needed.
+            const titleIsLong = announcement.title.length > 80;
+            const contentIsLong = announcement.content.length > 150 || announcement.content.split('\n').length > 3;
+            const showReadMore = titleIsLong || contentIsLong;
 
             return (
           <Card key={announcement.id} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
             <CardHeader>
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-xl break-words" title={announcement.title}>{announcement.title}</CardTitle>
+                  <CardTitle 
+                    className={cn(
+                        "text-xl break-words",
+                        !isExpanded && "line-clamp-2"
+                    )}
+                    title={announcement.title}>
+                      {announcement.title}
+                  </CardTitle>
                   <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground mt-1 break-words">
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
@@ -660,10 +670,10 @@ export default function AnnouncementsPage() {
               </div>
             </CardHeader>
             <CardContent>
-                <p className={cn("text-sm text-foreground whitespace-pre-line", !isExpanded && "line-clamp-2")}>
+                <p className={cn("text-sm text-foreground whitespace-pre-line", !isExpanded && "line-clamp-3")}>
                     {announcement.content}
                 </p>
-                {contentIsLong && (
+                {showReadMore && (
                     <Button
                         variant="link"
                         className="p-0 h-auto mt-2 text-primary"
