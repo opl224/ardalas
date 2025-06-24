@@ -514,23 +514,23 @@ export default function SubjectsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Nama Mata Pelajaran</TableHead>
-                    {!isMobile && <TableHead className="min-w-[250px]">Deskripsi</TableHead>}
-                    <TableHead className={cn("min-w-[150px]", isMobile && "px-2")}>Guru Penanggung Jawab</TableHead>
-                    {role === "admin" && <TableHead className={cn("text-right min-w-[100px]", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>}
+                    <TableHead className="w-[50px]">No.</TableHead>
+                    <TableHead className={cn(isMobile ? "w-1/2 px-2" : "w-1/3")}>Nama Mata Pelajaran</TableHead>
+                    {!isMobile && <TableHead className="w-1/2">Deskripsi</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-1/2 px-2" : "w-1/3")}>Guru Penanggung Jawab</TableHead>
+                    {role === "admin" && <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((subject, index) => (
                     <TableRow key={subject.id}>
-                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className={cn("font-medium truncate", isMobile && "px-2")} title={subject.name}>{subject.name}</TableCell>
-                      {!isMobile && <TableCell className="truncate max-w-sm" title={subject.description || "-"}>{subject.description || "-"}</TableCell>}
-                      <TableCell className={cn("truncate", isMobile && "px-2")} title={subject.teacherName || subject.teacherUid || "-"}>{subject.teacherName || subject.teacherUid || "-"}</TableCell>
+                      <TableCell className="text-center">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className="font-medium truncate" title={subject.name}>{subject.name}</TableCell>
+                      {!isMobile && <TableCell className="truncate" title={subject.description || "-"}>{subject.description || "-"}</TableCell>}
+                      <TableCell className="truncate" title={subject.teacherName || subject.teacherUid || "-"}>{subject.teacherName || subject.teacherUid || "-"}</TableCell>
                       {role === "admin" && (
                         <TableCell className={cn("text-right", isMobile && "px-1")}>
                            <DropdownMenu>
@@ -645,4 +645,3 @@ export default function SubjectsPage() {
     </div>
   );
 }
-

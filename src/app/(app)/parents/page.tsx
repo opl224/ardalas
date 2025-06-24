@@ -804,23 +804,23 @@ export default function ParentsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile ? "px-2" : "")}>Nama Orang Tua</TableHead>
-                    {!isMobile && <TableHead>Gender</TableHead>}
-                    {!isMobile && <TableHead>Email</TableHead>}
-                    <TableHead className={cn(isMobile ? "px-2" : "")}>Nama Anak</TableHead>
-                    {!isMobile && <TableHead>UID Akun Tertaut</TableHead>}
+                    <TableHead className="w-[50px]">No.</TableHead>
+                    <TableHead className={cn(isMobile ? "w-1/2" : "w-1/4")}>Nama Orang Tua</TableHead>
+                    {!isMobile && <TableHead className="w-[80px]">Gender</TableHead>}
+                    {!isMobile && <TableHead className="w-1/4">Email</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-1/2" : "w-1/5")}>Nama Anak</TableHead>
+                    {!isMobile && <TableHead className="w-1/5">UID Akun Tertaut</TableHead>}
                     {(authRole === 'admin' || authRole === 'guru') && <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-center w-16")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((parent, index) => (
                     <TableRow key={parent.id}>
-                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={parent.name}>{parent.name}</TableCell>
+                      <TableCell className="text-center">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className="font-medium truncate" title={parent.name}>{parent.name}</TableCell>
                        {!isMobile && (
                         <TableCell>
                           {parent.gender === "laki-laki" ? (
@@ -833,13 +833,13 @@ export default function ParentsPage() {
                         </TableCell>
                        )}
                       {!isMobile && <TableCell className="truncate" title={parent.email}>{parent.email || "-"}</TableCell>}
-                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={parent.studentName}>{parent.studentName || "-"}</TableCell>
+                      <TableCell className="truncate" title={parent.studentName}>{parent.studentName || "-"}</TableCell>
                       {!isMobile && (
-                        <TableCell className="font-mono text-xs">
+                        <TableCell className="truncate font-mono text-xs" title={parent.uid}>
                           {parent.uid ? (
                             <div className="flex items-center gap-1">
-                              <UidLinkIcon className="h-3 w-3 text-muted-foreground" />
-                              <span className="truncate" title={parent.uid}>{parent.uid.substring(0,10)}...</span>
+                              <UidLinkIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="truncate">{parent.uid}</span>
                             </div>
                           ) : (
                             <span className="text-muted-foreground italic">Belum tertaut</span>
