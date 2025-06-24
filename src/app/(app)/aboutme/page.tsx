@@ -23,27 +23,29 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function AboutMePage() {
   return (
-    <div className="relative space-y-8 flex flex-col items-center">
-      <div className="absolute top-2 right-2 md:top-0 md:right-12 z-20 opacity-50 scale-75">
-         <CircularText
-           text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
-           onHover="speedUp"
-           spinDuration={30}
-           radius={70}
-         />
-       </div>
-      <div className="flex justify-center items-center pt-8">
-        <ProfileCard
-            name="Noval Firdaus"
-            title="Developer Pemula"
-            handle="opank"
-            status="mahasiswa"
-            contactText="Hubungi Saya"
-            avatarUrl="/opank1.png"
-            showUserInfo={true}
-            enableTilt={true}
-            onContactClick={() => window.location.href = 'mailto:nnovalfirdaus@gmail.com'}
-        />
+    <div className="space-y-8 flex flex-col items-center">
+      <div className="pt-8">
+        <div className="relative inline-block">
+          <ProfileCard
+              name="Noval Firdaus"
+              title="Developer Pemula"
+              handle="opank"
+              status="mahasiswa"
+              contactText="Hubungi Saya"
+              avatarUrl="/opank1.png"
+              showUserInfo={true}
+              enableTilt={true}
+              onContactClick={() => window.location.href = 'mailto:nnovalfirdaus@gmail.com'}
+          />
+          <div className="absolute top-2 -right-2 md:top-0 md:-right-12 z-20 opacity-50 scale-75">
+             <CircularText
+               text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
+               onHover="speedUp"
+               spinDuration={30}
+               radius={70}
+             />
+           </div>
+        </div>
       </div>
 
       <Dialog>
