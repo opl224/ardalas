@@ -7,6 +7,8 @@ import CircularText from '@/components/ui/CircularText';
 import '@/components/ui/CircularText.css';
 import ScrambledText from '@/components/ui/ScrambledText';
 import Image from 'next/image';
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 
 export default function AboutMePage() {
   return (
@@ -33,24 +35,28 @@ export default function AboutMePage() {
         />
       </div>
 
-      <div className="flex items-center justify-center gap-6">
-        <Image
-          src="/logo-icon/github.png"
-          alt="GitHub Logo"
-          width={48}
-          height={48}
-          className="h-12 w-12 dark:invert"
-          data-ai-hint="github logo"
-        />
-        <Image
-          src="/logo-icon/nextjs.png"
-          alt="Next.js Logo"
-          width={48}
-          height={48}
-          className="h-12 w-12 dark:invert"
-          data-ai-hint="nextjs logo"
-        />
-      </div>
+      <Link href="#" className="inline-flex items-center gap-4 rounded-full bg-secondary px-6 py-3 text-lg font-semibold text-secondary-foreground shadow-md transition-all hover:bg-secondary/90 hover:shadow-lg hover:scale-105">
+        <div className="flex items-center gap-3">
+          <Image
+            src="/logo-icon/github.png"
+            alt="GitHub Logo"
+            width={32}
+            height={32}
+            className="h-8 w-8 dark:invert"
+            data-ai-hint="github logo"
+          />
+          <Image
+            src="/logo-icon/nextjs.png"
+            alt="Next.js Logo"
+            width={32}
+            height={32}
+            className="h-8 w-8 dark:invert"
+            data-ai-hint="nextjs logo"
+          />
+        </div>
+        <span>Projek</span>
+        <ArrowRight className="h-5 w-5" />
+      </Link>
 
        <div className="text-center max-w-lg text-xl font-mono text-foreground">
         <ScrambledText
