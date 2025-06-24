@@ -734,7 +734,7 @@ export default function ExamsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
