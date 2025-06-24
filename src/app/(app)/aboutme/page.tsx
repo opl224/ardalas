@@ -5,6 +5,7 @@ import '@/components/ui/ProfileCard.css';
 import CircularText from '@/components/ui/CircularText';
 import '@/components/ui/CircularText.css';
 import ScrambledText from '@/components/ui/ScrambledText';
+import Image from 'next/image';
 
 export default function AboutMePage() {
   return (
@@ -30,6 +31,26 @@ export default function AboutMePage() {
             onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
         />
       </div>
+
+      <div className="flex items-center justify-center gap-6">
+        <Image
+          src="/logo-icon/github.png"
+          alt="GitHub Logo"
+          width={48}
+          height={48}
+          className="h-12 w-12"
+          data-ai-hint="github logo"
+        />
+        <Image
+          src="/logo-icon/nextjs.png"
+          alt="Next.js Logo"
+          width={48}
+          height={48}
+          className="h-12 w-12"
+          data-ai-hint="nextjs logo"
+        />
+      </div>
+
        <div className="text-center max-w-lg text-xl font-mono text-foreground">
         <ScrambledText
           radius={100}
