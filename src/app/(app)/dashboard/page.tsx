@@ -761,11 +761,11 @@ export default function DashboardPage() {
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardContent className="p-4">
             {loadingCalendar ? (
-              <div className="flex items-center justify-center h-[600px]">
+              <div className="flex items-center justify-center h-[500px] md:h-[600px]">
                 <LottieLoader width={64} height={64} />
               </div>
             ) : (
-                <div className="h-[600px] text-sm">
+                <div className="h-[500px] md:h-[600px] text-sm">
                 <Calendar
                     culture="id"
                     localizer={localizer}
