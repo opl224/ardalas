@@ -59,16 +59,14 @@ export default function AboutMePage() {
                   data-ai-hint="github logo"
                 />
               </Link>
-              <Link href="https://nextjs.org" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                <Image
-                  src="/logo-icon/nextjs.png"
-                  alt="Next.js Logo"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 dark:invert"
-                  data-ai-hint="nextjs logo"
-                />
-              </Link>
+              <Image
+                src="/logo-icon/nextjs.png"
+                alt="Next.js Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 dark:invert"
+                data-ai-hint="nextjs logo"
+              />
             </div>
             <span>Projek</span>
             <ArrowRight className="h-5 w-5" />
@@ -83,21 +81,23 @@ export default function AboutMePage() {
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
             <Image
-              src="https://placehold.co/400x300.png"
-              alt="Placeholder Project 1"
+              src="/project/ngecet.jpg"
+              alt="Project Ngecet"
               width={400}
               height={300}
               className="rounded-md object-cover w-full h-auto"
-              data-ai-hint="project portfolio"
+              data-ai-hint="painting app screenshot"
             />
-            <Image
-              src="https://placehold.co/400x300.png"
-              alt="Placeholder Project 2"
-              width={400}
-              height={300}
-              className="rounded-md object-cover w-full h-auto"
-              data-ai-hint="website screenshot"
-            />
+            <Link href="https://ngeser.vercel.app" target="_blank" rel="noopener noreferrer">
+              <Image
+                src="/project/ngeser.jpg"
+                alt="Project Ngeser"
+                width={400}
+                height={300}
+                className="rounded-md object-cover w-full h-auto"
+                data-ai-hint="game screenshot"
+              />
+            </Link>
           </div>
         </DialogContent>
       </Dialog>
