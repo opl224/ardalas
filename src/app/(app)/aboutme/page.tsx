@@ -18,6 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 export default function AboutMePage() {
@@ -79,26 +80,28 @@ export default function AboutMePage() {
               Berikut adalah beberapa projek yang pernah saya kerjakan.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-            <Image
-              src="/project/ngecet.jpg"
-              alt="Project Ngecet"
-              width={400}
-              height={300}
-              className="rounded-md object-cover w-full h-auto"
-              data-ai-hint="painting app screenshot"
-            />
-            <Link href="https://ngeser.vercel.app" target="_blank" rel="noopener noreferrer">
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
               <Image
-                src="/project/ngeser.jpg"
-                alt="Project Ngeser"
+                src="/project/ngecet.jpg"
+                alt="Project Ngecet"
                 width={400}
                 height={300}
                 className="rounded-md object-cover w-full h-auto"
-                data-ai-hint="game screenshot"
+                data-ai-hint="painting app screenshot"
               />
-            </Link>
-          </div>
+              <Link href="https://ngeser.vercel.app" target="_blank" rel="noopener noreferrer">
+                <Image
+                  src="/project/ngeser.jpg"
+                  alt="Project Ngeser"
+                  width={400}
+                  height={300}
+                  className="rounded-md object-cover w-full h-auto"
+                  data-ai-hint="game screenshot"
+                />
+              </Link>
+            </div>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
