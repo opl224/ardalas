@@ -767,14 +767,14 @@ export default function UserAdministrationPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className={cn("w-full", isMobile && "table-fixed")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className={cn(isMobile ? "w-1/2" : "min-w-[150px] w-1/4")}>Nama</TableHead>
-                    {!isMobile && <TableHead className="min-w-[180px] w-1/4">Email</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-1/2" : "min-w-[100px] w-1/6")}>Peran</TableHead>
-                    {!isMobile && <TableHead className="min-w-[180px] w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-1/2" : "w-1/4")}>Nama</TableHead>
+                    {!isMobile && <TableHead className="w-1/4">Email</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-1/2" : "w-1/6")}>Peran</TableHead>
+                    {!isMobile && <TableHead className="w-1/4">Kelas Ditugaskan/Dimiliki</TableHead>}
                     <TableHead className="text-center w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
