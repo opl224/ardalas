@@ -1,3 +1,4 @@
+
 "use client";
 
 import ProfileCard from '@/components/ui/ProfileCard';
@@ -38,7 +39,7 @@ export default function AboutMePage() {
           alt="GitHub Logo"
           width={48}
           height={48}
-          className="h-12 w-12"
+          className="h-12 w-12 dark:invert"
           data-ai-hint="github logo"
         />
         <Image
@@ -46,7 +47,7 @@ export default function AboutMePage() {
           alt="Next.js Logo"
           width={48}
           height={48}
-          className="h-12 w-12"
+          className="h-12 w-12 dark:invert"
           data-ai-hint="nextjs logo"
         />
       </div>
