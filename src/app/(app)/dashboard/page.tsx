@@ -720,7 +720,7 @@ export default function DashboardPage() {
             {recentAnnouncements.map((announcement) => (
               <Card key={announcement.id} className="bg-card/70 backdrop-blur-sm border-border shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-lg">{announcement.title}</CardTitle>
+                  <CardTitle className="text-lg line-clamp-2">{announcement.title}</CardTitle>
                   <CardDescription>
                      {announcement.date ? format(announcement.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "Tanggal tidak tersedia"}
                      {announcement.targetAudience && announcement.targetAudience.length > 0 && (
