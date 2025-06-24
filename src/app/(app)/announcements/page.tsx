@@ -586,8 +586,8 @@ export default function AnnouncementsPage() {
             <CardHeader>
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-xl truncate" title={announcement.title}>{announcement.title}</CardTitle>
-                  <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1 flex-wrap">
+                  <CardTitle className="text-xl" title={announcement.title}>{announcement.title}</CardTitle>
+                  <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground mt-1 break-words">
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
                     <span>Untuk: {announcement.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ")}</span>
