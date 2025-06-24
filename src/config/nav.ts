@@ -33,6 +33,12 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
+  { 
+    title: "Administrasi Pengguna",
+    href: "/admin/user-administration", 
+    icon: UserCog,
+    roles: ["admin"], 
+  },
   {
     title: "Sekolah",
     href: "#",
@@ -42,12 +48,6 @@ export const navItems: NavItem[] = [
       { title: "Acara", href: "/events", icon: CalendarDays, roles: ["admin", "guru", "siswa", "orangtua"] },
       { title: "Kegiatan", href: "/new-activity", icon: FolderKanban },
     ],
-  },
-  { 
-    title: "Administrasi Pengguna",
-    href: "/admin/user-administration", 
-    icon: UserCog,
-    roles: ["admin"], 
   },
   {
     title: "Pengguna",
