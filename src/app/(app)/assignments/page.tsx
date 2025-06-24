@@ -1147,23 +1147,23 @@ export default function AssignmentsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    {!isMobile && <TableHead className="min-w-[180px]">Judul Tugas</TableHead>}
+                    {!isMobile && <TableHead className="min-w-[180px] truncate">Judul Tugas</TableHead>}
                     <TableHead className={cn("truncate", isMobile ? "w-1/2 px-2" : "min-w-[150px]")}>Mata Pelajaran</TableHead>
                     
-                    {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead>Guru</TableHead>}
-                    {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead>Kelas</TableHead>}
-                    {!isMobile && (isAdminRole ) && <TableHead>Guru</TableHead>}
+                    {!isMobile && (isStudentRole || isParentRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount <=1 )) && <TableHead className="truncate">Guru</TableHead>}
+                    {!isMobile && (isAdminRole || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1)) && <TableHead className="truncate">Kelas</TableHead>}
+                    {!isMobile && (isAdminRole ) && <TableHead className="truncate">Guru</TableHead>}
                     
                     {!isMobile && <TableHead className={cn("truncate text-center")} title="Pertemuan Ke-">P Ke-</TableHead>}
                     <TableHead className={cn(isMobile ? "w-1/2 px-2" : "")}>Batas Waktu</TableHead>
                     
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>File Tugas</TableHead>}
                     {!isMobile && (isStudentRole || isParentRole) && <TableHead>Status</TableHead>}
-                    {!isMobile && isTeacherOrAdminRole && <TableHead>Pengumpulan</TableHead>}
+                    {!isMobile && isTeacherOrAdminRole && <TableHead className="truncate">Pengumpulan</TableHead>}
                     
                     <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
@@ -1212,7 +1212,7 @@ export default function AssignmentsPage() {
                       )}
 
                       {!isMobile && isTeacherOrAdminRole && (
-                        <TableCell>
+                        <TableCell className="truncate">
                           {assignment.submissionCount !== undefined && assignment.totalStudentsInClass !== undefined
                             ? `${assignment.submissionCount}/${assignment.totalStudentsInClass} siswa`
                             : "Memuat..."}

@@ -1363,35 +1363,35 @@ export default function ResultsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile && "px-2")}>
+                    <TableHead className={cn(isMobile && "px-2", "w-1/4")}>
                         {(role === 'siswa' || role === 'orangtua') ? 'Judul Asesmen' : 'Siswa'}
                     </TableHead>
                     {isMobile ? (
                         <>
-                            <TableHead className="px-2">Mapel</TableHead>
+                            <TableHead className="px-2 w-1/3">Mapel</TableHead>
                             <TableHead className="w-16 px-1 text-center">Nilai</TableHead>
                         </>
                     ) : (
                       <>
                         {(role === 'siswa' || role === 'orangtua') ? (
                           <>
-                            <TableHead>Mapel</TableHead>
-                            <TableHead>Link Tugas</TableHead>
-                            <TableHead>Feedback Guru</TableHead>
-                            <TableHead>Nilai</TableHead>
+                            <TableHead className="w-1/6">Mapel</TableHead>
+                            <TableHead className="w-auto">Link Tugas</TableHead>
+                            <TableHead className="w-1/3">Feedback Guru</TableHead>
+                            <TableHead className="w-16">Nilai</TableHead>
                           </>
                         ) : ( 
                           <>
-                            {canManageResults && <TableHead>Kelas</TableHead>}
-                            {(role === 'admin' || role === 'guru') && <TableHead>Mapel</TableHead>}
-                            <TableHead>Asesmen</TableHead>
-                            <TableHead>Nilai</TableHead>
-                            <TableHead>Feedback Guru</TableHead>
-                            <TableHead>Tanggal Asesmen</TableHead>
+                            {canManageResults && <TableHead className="w-1/6">Kelas</TableHead>}
+                            {(role === 'admin' || role === 'guru') && <TableHead className="w-1/6">Mapel</TableHead>}
+                            <TableHead className="w-1/4">Asesmen</TableHead>
+                            <TableHead className="w-16">Nilai</TableHead>
+                            <TableHead className="w-auto">Feedback Guru</TableHead>
+                            <TableHead className="w-[120px]">Tanggal</TableHead>
                           </>
                         )}
                       </>
@@ -1437,7 +1437,7 @@ export default function ResultsPage() {
                                   </Button>
                                 ) : (result.assignmentId ? <span className="text-xs text-muted-foreground italic">N/A</span> : "-")}
                               </TableCell>
-                              <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
+                              <TableCell className="truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
                               <TableCell>{result.score}</TableCell>
                             </>
                           ) : (
@@ -1449,7 +1449,7 @@ export default function ResultsPage() {
                                 {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
                               </TableCell>
                               <TableCell>{result.score}</TableCell>
-                              <TableCell className="max-w-[200px] truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
+                              <TableCell className="truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
                               <TableCell>
                                 {format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
                               </TableCell>
