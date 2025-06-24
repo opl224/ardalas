@@ -37,12 +37,12 @@ export default function AboutMePage() {
               enableTilt={true}
               onContactClick={() => window.location.href = 'mailto:nnovalfirdaus@gmail.com'}
           />
-          <div className="absolute top-2 -right-2 z-20 opacity-50 scale-75">
+          <div className="absolute top-[60px] right-[40px] z-20 opacity-50 scale-[0.6]">
              <CircularText
                text="NOVAL-FIRDAUS-NOVAL-FIRDAUS-"
                onHover="speedUp"
                spinDuration={30}
-               radius={70}
+               radius={60}
              />
            </div>
         </div>
