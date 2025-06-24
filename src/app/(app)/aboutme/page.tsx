@@ -29,7 +29,7 @@ export default function AboutMePage() {
             avatarUrl="/opank1.png"
             showUserInfo={true}
             enableTilt={true}
-            onContactClick={() => window.location.href = 'mailto:opank2441@gmail.com'}
+            onContactClick={() => window.location.href = 'mailto:nnovalfirdaus@gmail.com'}
         />
       </div>
 
