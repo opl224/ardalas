@@ -82,14 +82,16 @@ export default function AboutMePage() {
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-              <Image
-                src="/project/ngecet.jpg"
-                alt="Project Ngecet"
-                width={400}
-                height={300}
-                className="rounded-md object-cover w-full h-auto"
-                data-ai-hint="painting app screenshot"
-              />
+              <Link href="https://ngecet.vercel.app/" target="_blank" rel="noopener noreferrer">
+                <Image
+                  src="/project/ngecet.jpg"
+                  alt="Project Ngecet"
+                  width={400}
+                  height={300}
+                  className="rounded-md object-cover w-full h-auto"
+                  data-ai-hint="painting app screenshot"
+                />
+              </Link>
               <Link href="https://ngeser.vercel.app" target="_blank" rel="noopener noreferrer">
                 <Image
                   src="/project/ngeser.jpg"
