@@ -575,28 +575,6 @@ export default function AnnouncementsPage() {
         )}
       </div>
 
-      {/* Search and Filter UI - To be implemented if needed */}
-      {/* <Card className="bg-card/70 backdrop-blur-sm border-border shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Cari pengumuman..." className="pl-8" />
-            </div>
-            <Select>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter per Peran" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Peran</SelectItem>
-                {ROLES.map(r => <SelectItem key={r} value={r}>{roleDisplayNames[r as keyof typeof roleDisplayNames]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card> */}
-
       {isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-32 w-full rounded-md" />
@@ -606,8 +584,8 @@ export default function AnnouncementsPage() {
         announcements.map((announcement) => (
           <Card key={announcement.id} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
             <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
                   <CardTitle className="text-xl truncate" title={announcement.title}>{announcement.title}</CardTitle>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1 flex-wrap">
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
