@@ -109,14 +109,8 @@ export default function SettingsPage() {
                 />
             </div>
           </div>
-
-          <div className="mt-8 p-6 border border-dashed border-border rounded-md text-center text-muted-foreground">
-            <p className="font-semibold">Fitur Lainnya Segera Hadir!</p>
-            <p className="text-xs">Kami terus berupaya meningkatkan pengalaman Anda.</p>
-          </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-
