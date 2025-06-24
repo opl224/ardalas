@@ -50,16 +50,14 @@ export default function AboutMePage() {
         <DialogTrigger asChild>
           <Button className="inline-flex items-center gap-4 rounded-full bg-secondary px-6 py-3 text-lg font-semibold text-secondary-foreground shadow-md transition-all hover:bg-secondary/90 hover:shadow-lg hover:scale-105 h-auto">
             <div className="flex items-center gap-3">
-              <Link href="https://github.com/opl224" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                <Image
-                  src="/logo-icon/github.png"
-                  alt="GitHub Logo"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 dark:invert"
-                  data-ai-hint="github logo"
-                />
-              </Link>
+              <Image
+                src="/logo-icon/github.png"
+                alt="GitHub Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8 dark:invert"
+                data-ai-hint="github logo"
+              />
               <Image
                 src="/logo-icon/nextjs.png"
                 alt="Next.js Logo"
