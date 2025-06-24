@@ -67,6 +67,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface AnnouncementData {
   id: string;
@@ -116,6 +117,7 @@ export default function AnnouncementsPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<AnnouncementData | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const [teacherClasses, setTeacherClasses] = useState<ClassMin[]>([]);
   const [isLoadingTeacherClasses, setIsLoadingTeacherClasses] = useState(false);
@@ -141,6 +143,18 @@ export default function AnnouncementsPage() {
       targetClassIds: [],
     }
   });
+
+  const toggleReadMore = (id: string) => {
+    setExpandedIds(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(id)) {
+            newSet.delete(id);
+        } else {
+            newSet.add(id);
+        }
+        return newSet;
+    });
+  };
 
   const fetchAnnouncements = async () => {
     setIsLoading(true);
@@ -581,12 +595,16 @@ export default function AnnouncementsPage() {
           <Skeleton className="h-32 w-full rounded-md" />
         </div>
       ) : announcements.length > 0 ? (
-        announcements.map((announcement) => (
+        announcements.map((announcement) => {
+            const isExpanded = expandedIds.has(announcement.id);
+            const contentIsLong = announcement.content.length > 150 || announcement.content.split('\n').length > 2;
+
+            return (
           <Card key={announcement.id} className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
             <CardHeader>
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-xl" title={announcement.title}>{announcement.title}</CardTitle>
+                  <CardTitle className="text-xl break-words" title={announcement.title}>{announcement.title}</CardTitle>
                   <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground mt-1 break-words">
                     <span>{format(announcement.date.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</span>
                     <span>&bull;</span>
@@ -642,13 +660,22 @@ export default function AnnouncementsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-foreground whitespace-pre-line line-clamp-3">{announcement.content}</p>
-              <Button variant="link" asChild className="p-0 h-auto mt-2 text-primary">
-                <Link href={`/announcements`}>Baca Selengkapnya</Link>
-              </Button>
+                <p className={cn("text-sm text-foreground whitespace-pre-line", !isExpanded && "line-clamp-2")}>
+                    {announcement.content}
+                </p>
+                {contentIsLong && (
+                    <Button
+                        variant="link"
+                        className="p-0 h-auto mt-2 text-primary"
+                        onClick={() => toggleReadMore(announcement.id)}
+                    >
+                        {isExpanded ? "Tutup" : "Baca Selengkapnya"}
+                    </Button>
+                )}
             </CardContent>
           </Card>
-        ))
+          );
+        })
       ) : (
         <Card className="bg-card/70 backdrop-blur-sm border-border">
           <CardContent className="p-6 text-center text-muted-foreground">
