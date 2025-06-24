@@ -557,22 +557,22 @@ export default function ClassesPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={cn("w-[50px]", isMobile && "w-10 px-2 text-center")}>No.</TableHead>
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "")}>Nama Kelas</TableHead>
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "")}>Wali Kelas</TableHead>
-                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "")}>Aksi</TableHead>
+                    <TableHead className="w-[50px]">No.</TableHead>
+                    <TableHead className="w-1/2">Nama Kelas</TableHead>
+                    <TableHead className="w-1/2">Wali Kelas</TableHead>
+                    <TableHead className="text-right w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((classItem, index) => (
                     <TableRow key={classItem.id}>
-                      <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className={cn("font-medium", isMobile ? "truncate px-2" : "")} title={classItem.name}>{classItem.name}</TableCell>
-                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={classItem.teacherName || "-"}>{classItem.teacherName || "-"}</TableCell>
-                      <TableCell className={cn("text-right", isMobile && "px-1")}>
+                      <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                      <TableCell className="font-medium truncate" title={classItem.name}>{classItem.name}</TableCell>
+                      <TableCell className="truncate" title={classItem.teacherName || "-"}>{classItem.teacherName || "-"}</TableCell>
+                      <TableCell className="text-right">
                         {authRole === "guru" || authRole === "orangtua" ? (
                            <Button
                             variant="outline"

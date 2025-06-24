@@ -810,17 +810,17 @@ export default function LessonsPage() {
           ) : currentTableData.length > 0 ? (
             <>
             <div className="overflow-x-auto mt-4">
-              <Table className={cn(isMobile && "table-fixed w-full")}>
+              <Table className="table-fixed w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className={cn("w-[50px]", isMobile && "w-10 px-2 text-center")}>No.</TableHead>
-                    <TableHead className={cn(isMobile ? "px-2" : "")}>Mata Pelajaran</TableHead>
+                    <TableHead className="w-[50px]">No.</TableHead>
+                    <TableHead>Mata Pelajaran</TableHead>
                     {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
                     {!isMobile && (role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
                     {!isMobile && <TableHead>Hari</TableHead>}
-                    <TableHead className={cn(isMobile ? "px-2" : "")}>Waktu</TableHead>
+                    <TableHead>Waktu</TableHead>
                     {!isMobile && canManageLessons && <TableHead>Topik</TableHead>}
-                    <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
+                    <TableHead className="text-right w-16">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -828,18 +828,18 @@ export default function LessonsPage() {
                     const isActiveNow = isStudentOrParent ? isLessonCurrentlyActive(lesson) : false;
                     return (
                       <TableRow key={lesson.id}>
-                        <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                        <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={lesson.subjectName || lesson.subjectId}>{lesson.subjectName || lesson.subjectId}</TableCell>
+                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                        <TableCell className="font-medium truncate" title={lesson.subjectName || lesson.subjectId}>{lesson.subjectName || lesson.subjectId}</TableCell>
                         
                         {!isMobile && !(isStudentOrParent || role === 'guru') && <TableCell className="truncate" title={lesson.className || lesson.classId}>{lesson.className || lesson.classId}</TableCell>}
                         {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell className="truncate" title={lesson.teacherName || lesson.teacherId}>{lesson.teacherName || lesson.teacherId}</TableCell>}
                         {!isMobile && <TableCell>{lesson.dayOfWeek}</TableCell>}
                         
-                        <TableCell className={cn(isMobile ? "px-2" : "")}>{lesson.startTime} - {lesson.endTime}</TableCell>
+                        <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
                         
                         {!isMobile && canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
                         
-                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
+                        <TableCell className="text-right">
                           {isStudentOrParent ? (
                             role === "orangtua" ? (
                               <Button
@@ -1051,4 +1051,3 @@ export default function LessonsPage() {
     </div>
   );
 }
-
