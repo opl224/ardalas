@@ -98,6 +98,7 @@ interface Teacher {
   name: string;
   email: string; 
   subject: string; 
+  nip?: string;
   address?: string;
   phone?: string;
   gender?: "laki-laki" | "perempuan";
@@ -110,6 +111,7 @@ const GENDERS = ["laki-laki", "perempuan"] as const;
 const teacherFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }), 
+  nip: z.string().min(5, { message: "NIP minimal 5 karakter." }).optional().or(z.literal('')),
   subject: z.string().min(2, { message: "Mata pelajaran minimal 2 karakter." }),
   address: z.string().trim().optional(),
   phone: z.string().trim().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal('')),
@@ -149,6 +151,7 @@ export default function TeachersPage() {
     defaultValues: {
       name: "",
       email: "",
+      nip: "",
       subject: "",
       address: "",
       phone: "",
@@ -196,6 +199,7 @@ export default function TeachersPage() {
         name: docSnap.data().name,
         email: docSnap.data().email,
         subject: docSnap.data().subject,
+        nip: docSnap.data().nip,
         address: docSnap.data().address,
         phone: docSnap.data().phone,
         gender: docSnap.data().gender,
@@ -225,6 +229,7 @@ export default function TeachersPage() {
         name: selectedTeacher.name,
         email: selectedTeacher.email,
         subject: selectedTeacher.subject,
+        nip: selectedTeacher.nip || "",
         address: selectedTeacher.address || "",
         phone: selectedTeacher.phone || "",
         gender: selectedTeacher.gender,
@@ -241,6 +246,7 @@ export default function TeachersPage() {
         name: data.name,
         email: data.email,
         subject: data.subject,
+        nip: data.nip || null,
         address: data.address || null,
         phone: data.phone || null,
         gender: data.gender,
@@ -250,7 +256,7 @@ export default function TeachersPage() {
       
       toast({ title: "Profil Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddTeacherDialogOpen(false);
-      addTeacherForm.reset({name: "", email: "", subject: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+      addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
       fetchTeachers(); 
     } catch (error: any) {
       console.error("Error adding teacher profile:", error);
@@ -270,6 +276,7 @@ export default function TeachersPage() {
         name: data.name,
         email: data.email,
         subject: data.subject,
+        nip: data.nip || null,
         address: data.address || null,
         phone: data.phone || null,
         gender: data.gender,
@@ -331,7 +338,8 @@ export default function TeachersPage() {
         const matchesSearchTerm = searchTerm === "" ||
           teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          teacher.subject.toLowerCase().includes(searchTerm.toLowerCase());
+          teacher.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (teacher.nip && teacher.nip.includes(searchTerm));
         return matchesSubject && matchesSearchTerm;
       });
   }, [teachers, searchTerm, subjectFilter]);
@@ -402,6 +410,13 @@ export default function TeachersPage() {
         <Input id={`${formType}-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-nip`}>NIP</Label>
+        <Input id={`${formType}-nip`} {...formInstance.register("nip")} className="mt-1" placeholder="Nomor Induk Pegawai" />
+        {formInstance.formState.errors.nip && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nip.message}</p>
         )}
       </div>
       <div>
@@ -546,7 +561,7 @@ export default function TeachersPage() {
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Cari nama, email, atau mapel..."
+                placeholder="Cari nama, email, NIP, atau mapel..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-8 w-full"
@@ -582,10 +597,11 @@ export default function TeachersPage() {
                   <TableRow>
                     <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
                     <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/4")}>Nama Profil</TableHead>
-                    {!isMobile && <TableHead className="w-1/4">Email Profil</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/5")}>Mapel</TableHead>
+                    {!isMobile && <TableHead className="w-1/6">NIP</TableHead>}
+                    {!isMobile && <TableHead className="w-1/5">Email Profil</TableHead>}
+                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/6")}>Mapel</TableHead>
                     {!isMobile && <TableHead className="w-[80px]">Gender</TableHead>}
-                    {!isMobile && <TableHead className="w-1/5">UID Akun Tertaut</TableHead>}
+                    {!isMobile && <TableHead className="w-1/6">UID Akun Tertaut</TableHead>}
                     <TableHead className={cn("text-center", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -594,6 +610,7 @@ export default function TeachersPage() {
                     <TableRow key={teacher.id}>
                        <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={teacher.name}>{teacher.name}</TableCell>
+                      {!isMobile && <TableCell className="truncate" title={teacher.nip}>{teacher.nip || "-"}</TableCell>}
                       {!isMobile && <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>}
                       <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={teacher.subject}>{teacher.subject}</TableCell>
                       {!isMobile && (
@@ -717,6 +734,7 @@ export default function TeachersPage() {
             {selectedTeacherForView && (
                 <div className="space-y-3 py-4 text-sm max-h-[60vh] overflow-y-auto pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedTeacherForView.name}</p></div>
+                    <div><Label className="text-muted-foreground">NIP:</Label><p className="font-medium">{selectedTeacherForView.nip || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Email Profil:</Label><p className="font-medium">{selectedTeacherForView.email}</p></div>
                     <div><Label className="text-muted-foreground">Mata Pelajaran Utama:</Label><p className="font-medium">{selectedTeacherForView.subject}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedTeacherForView.gender || "-"}</p></div>
@@ -781,3 +799,4 @@ export default function TeachersPage() {
 }
     
 
+    

@@ -4,9 +4,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Megaphone, CalendarDays, BookOpen, ArrowRight, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck, UserCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Megaphone, Users, GraduationCap, Library, ExternalLink, BookCopy, ClipboardCheck, School, CalendarCheck, UserCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase/config";
 import { collection, getDocs, query, where, Timestamp, orderBy, limit, documentId, doc, getDoc } from "firebase/firestore";
 import { useAuth } from "@/context/AuthContext";
