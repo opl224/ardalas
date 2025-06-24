@@ -59,6 +59,16 @@ export default function AboutMePage() {
                   data-ai-hint="github logo"
                 />
               </Link>
+              <Link href="https://nextjs.org" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                <Image
+                  src="/logo-icon/nextjs.png"
+                  alt="Next.js Logo"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 dark:invert"
+                  data-ai-hint="nextjs logo"
+                />
+              </Link>
             </div>
             <span>Projek</span>
             <ArrowRight className="h-5 w-5" />
