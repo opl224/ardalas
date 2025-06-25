@@ -299,14 +299,6 @@ function TeacherAdminAttendanceManagement() {
       const currentDayName = DAY_NAMES_ID[getDay(selectedDate)];
 
       try {
-        const attendanceQuery = query(
-          collection(db, "attendances"),
-          where("classId", "==", selectedClassId),
-          where("subjectId", "==", selectedSubjectId),
-          where("date", "==", dateToQuery)
-        );
-        const attendanceSnapshot = await getDocs(attendanceQuery);
-
         const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
@@ -316,6 +308,14 @@ function TeacherAdminAttendanceManagement() {
             setIsLoadingFormData(false);
             return;
         }
+
+        const attendanceQuery = query(
+          collection(db, "attendances"),
+          where("classId", "==", selectedClassId),
+          where("subjectId", "==", selectedSubjectId),
+          where("date", "==", dateToQuery)
+        );
+        const attendanceSnapshot = await getDocs(attendanceQuery);
         
         if (!attendanceSnapshot.empty) {
           const attendanceDoc = attendanceSnapshot.docs[0];
@@ -826,8 +826,8 @@ function TeacherAdminAttendanceManagement() {
                         </tbody>
                     </table>
                   </div>
-                  {form.formState.errors.studentAttendances && !form.formState.errors.studentAttendances.message && (<p className="text-sm text-destructive mt-1">Periksa kembali input kehadiran siswa.</p>)}
-                   {form.formState.errors.studentAttendances?.message && (<p className="text-sm text-destructive mt-1">{form.formState.errors.studentAttendances?.message}</p>)}
+                  {form.formState.errors.studentAttendances && !form.formState.errors.studentAttendances.message && (<p className="text-sm font-medium text-destructive mt-1">Periksa kembali input kehadiran siswa.</p>)}
+                   {form.formState.errors.studentAttendances?.message && (<p className="text-sm font-medium text-destructive mt-1">{form.formState.errors.studentAttendances?.message}</p>)}
                 </div>
               ) : null
             )}
@@ -925,6 +925,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
         ...doc.data(),
       } as StudentAttendanceHistoryEntry));
 
+      // Sort client-side
       history.sort((a, b) => {
         const timeA = a.attendedAt?.toMillis() || 0;
         const timeB = b.attendedAt?.toMillis() || 0;
@@ -972,7 +973,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
   
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
 
-  const handleExport = (format: 'pdf' | 'xlsx') => {
+  const handleExport = (formatType: 'pdf' | 'xlsx') => {
     if (filteredHistory.length === 0) {
       toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
       return;
@@ -991,7 +992,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
       "Status": record.status,
     }));
 
-    if (format === 'pdf') {
+    if (formatType === 'pdf') {
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text(`Riwayat Absensi: ${studentName}`, 14, 20);
@@ -1005,7 +1006,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
         headStyles: { fillColor: [64, 149, 237] },
       });
       doc.save(`${fileName}.pdf`);
-    } else if (format === 'xlsx') {
+    } else if (formatType === 'xlsx') {
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
@@ -1016,7 +1017,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
       XLSX.writeFile(workbook, `${fileName}.xlsx`);
     }
 
-    toast({ title: "Ekspor Berhasil", description: `${fileName}.${format} telah diunduh.` });
+    toast({ title: "Ekspor Berhasil", description: `${fileName}.${formatType} telah diunduh.` });
     setIsExporting(false);
   };
 
