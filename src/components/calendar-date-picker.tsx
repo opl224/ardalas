@@ -165,88 +165,63 @@ export const CalendarDatePicker = React.forwardRef<
     };
 
     const handleMonthChange = (newMonthIndex: number, part: string) => {
-      setSelectedRange(null);
-      if (part === "from") {
-        if (yearFrom !== undefined) {
-          if (newMonthIndex < 0 || newMonthIndex > 11) return; 
-          const newMonth = new Date(yearFrom, newMonthIndex, 1);
-          const from =
-            numberOfMonths === 2
-              ? startOfMonth(toDate(newMonth, { timeZone }))
-              : date?.from
-              ? new Date(
-                  date.from.getFullYear(),
-                  newMonth.getMonth(),
-                  date.from.getDate()
-                )
-              : newMonth;
-          const to =
-            numberOfMonths === 2
-              ? date?.to
-                ? endOfDay(toDate(date.to, { timeZone }))
-                : endOfMonth(toDate(newMonth, { timeZone }))
-              : from;
-          if (from <= to) {
-            onDateSelect({ from, to });
-            setMonthFrom(newMonth);
-          }
+        setSelectedRange(null);
+        if (part === "from") {
+            if (yearFrom !== undefined) {
+                if (newMonthIndex < 0 || newMonthIndex > 11) return;
+                const dayOfMonth = date?.from?.getDate() ?? 1;
+                const newDate = new Date(yearFrom, newMonthIndex, dayOfMonth);
+                const from = numberOfMonths === 2 ? startOfMonth(toDate(newDate, { timeZone })) : newDate;
+                const to = numberOfMonths === 2 ? (date?.to ? endOfDay(toDate(date.to, { timeZone })) : endOfMonth(toDate(newDate, { timeZone }))) : from;
+                if (!date?.to || from <= to) {
+                    onDateSelect({ from, to });
+                    setMonthFrom(newDate);
+                }
+            }
+        } else { // part === 'to'
+            if (yearTo !== undefined && numberOfMonths === 2) {
+                if (newMonthIndex < 0 || newMonthIndex > 11) return;
+                const newMonth = new Date(yearTo, newMonthIndex, 1);
+                const from = date?.from ? startOfDay(toDate(date.from, { timeZone })) : startOfMonth(toDate(newMonth, { timeZone }));
+                const to = endOfMonth(toDate(newMonth, { timeZone }));
+                if (from <= to) {
+                    onDateSelect({ from, to });
+                    setMonthTo(newMonth);
+                }
+            }
         }
-      } else { 
-        if (yearTo !== undefined && numberOfMonths === 2) {
-          if (newMonthIndex < 0 || newMonthIndex > 11) return;
-          const newMonth = new Date(yearTo, newMonthIndex, 1);
-          const from = date?.from
-            ? startOfDay(toDate(date.from, { timeZone }))
-            : startOfMonth(toDate(newMonth, { timeZone }));
-          const to = endOfMonth(toDate(newMonth, { timeZone }));
-          if (from <= to) {
-            onDateSelect({ from, to });
-            setMonthTo(newMonth);
-          }
-        }
-      }
     };
 
     const handleYearChange = (newYear: number, part: string) => {
-      setSelectedRange(null);
-      if (part === "from") {
-        if (years.includes(newYear)) {
-          const currentMonthFrom = monthFrom?.getMonth() ?? date?.from?.getMonth() ?? 0;
-          const newMonthDate = new Date(newYear, currentMonthFrom, 1);
-          const from =
-            numberOfMonths === 2
-              ? startOfMonth(toDate(newMonthDate, { timeZone }))
-              : date?.from
-              ? new Date(newYear, newMonthDate.getMonth(), date.from.getDate())
-              : newMonthDate;
-          const to =
-            numberOfMonths === 2
-              ? date?.to
-                ? endOfDay(toDate(date.to, { timeZone }))
-                : endOfMonth(toDate(newMonthDate, { timeZone }))
-              : from;
-          if (from <= to) {
-            onDateSelect({ from, to });
-            setYearFrom(newYear);
-            setMonthFrom(newMonthDate);
-          }
+        setSelectedRange(null);
+        if (part === "from") {
+            if (years.includes(newYear)) {
+                const currentMonthFrom = monthFrom?.getMonth() ?? date?.from?.getMonth() ?? 0;
+                const dayOfMonth = date?.from?.getDate() ?? 1;
+                const newDate = new Date(newYear, currentMonthFrom, dayOfMonth);
+                const from = numberOfMonths === 2 ? startOfMonth(toDate(newDate, { timeZone })) : newDate;
+                const to = numberOfMonths === 2 ? (date?.to ? endOfDay(toDate(date.to, { timeZone })) : endOfMonth(toDate(newDate, { timeZone }))) : from;
+                if (!date?.to || from <= to) {
+                    onDateSelect({ from, to });
+                    setYearFrom(newYear);
+                    setMonthFrom(newDate);
+                }
+            }
+        } else { // part === 'to'
+            if (years.includes(newYear) && numberOfMonths === 2) {
+                const currentMonthTo = monthTo?.getMonth() ?? date?.to?.getMonth() ?? 0;
+                const newDate = new Date(newYear, currentMonthTo, 1);
+                const from = date?.from ? startOfDay(toDate(date.from, { timeZone })) : startOfMonth(toDate(newDate, { timeZone }));
+                const to = endOfMonth(toDate(newDate, { timeZone }));
+                if (from <= to) {
+                    onDateSelect({ from, to });
+                    setYearTo(newYear);
+                    setMonthTo(newDate);
+                }
+            }
         }
-      } else { 
-        if (years.includes(newYear) && numberOfMonths === 2) {
-          const currentMonthTo = monthTo?.getMonth() ?? date?.to?.getMonth() ?? 0;
-          const newMonthDate = new Date(newYear, currentMonthTo, 1);
-          const from = date?.from
-            ? startOfDay(toDate(date.from, { timeZone }))
-            : startOfMonth(toDate(newMonthDate, { timeZone }));
-          const to = endOfMonth(toDate(newMonthDate, { timeZone }));
-          if (from <= to) {
-            onDateSelect({ from, to });
-            setYearTo(newYear);
-            setMonthTo(newMonthDate);
-          }
-        }
-      }
     };
+
 
     const today = new Date();
 
