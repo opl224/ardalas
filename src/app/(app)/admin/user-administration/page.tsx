@@ -57,8 +57,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { ROLES, Role, roleDisplayNames } from "@/config/roles";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db } from "@/lib/firebase/config";
-import { createUserWithEmailAndPassword, type FirebaseError } from "firebase/auth";
+import { db, firebaseConfig } from "@/lib/firebase/config";
+import { createUserWithEmailAndPassword, getAuth, type FirebaseError } from "firebase/auth";
+import { initializeApp, deleteApp, type FirebaseApp } from "firebase/app";
 import {
   collection,
   getDocs,
@@ -286,8 +287,15 @@ export default function UserAdministrationPage() {
 
   const handleAddUserSubmit: SubmitHandler<AddUserFormValues> = async (data) => {
     addUserForm.clearErrors();
+    let secondaryApp: FirebaseApp | undefined;
+
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      // Initialize a temporary, secondary Firebase app to create the user.
+      // This prevents the admin from being logged out and the new user from being logged in.
+      secondaryApp = initializeApp(firebaseConfig, `user-creation-app-${Date.now()}`);
+      const secondaryAuth = getAuth(secondaryApp);
+      
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password);
       const newAuthUser = userCredential.user;
 
       const userData: {
@@ -309,17 +317,12 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
         userData.assignedClassIds = data.assignedClassIds;
-      } else {
-        delete userData.assignedClassIds;
       }
 
       if (data.role === 'siswa' && data.classId) {
         const selectedClass = allClasses.find(c => c.id === data.classId);
         userData.classId = data.classId;
         userData.className = selectedClass?.name || "";
-      } else {
-        delete userData.classId;
-        delete userData.className;
       }
 
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
@@ -352,6 +355,10 @@ export default function UserAdministrationPage() {
             variant: "destructive"
         });
       }
+    } finally {
+        if (secondaryApp) {
+            await deleteApp(secondaryApp);
+        }
     }
   };
 
@@ -967,3 +974,4 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
