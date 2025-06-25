@@ -1049,8 +1049,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                       <TableHead>Mata Pelajaran</TableHead>
                        {isMobile ? (
                         <>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Aksi</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
                         </>
                        ) : (
                         <>
@@ -1068,12 +1067,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                         <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
                         {isMobile ? (
                            <>
-                             <TableCell>
-                                <span className="flex items-center gap-1.5 font-medium text-green-600">
-                                  <CheckCircle className="h-4 w-4" />
-                                  {record.status}
-                                </span>
-                             </TableCell>
                              <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" onClick={() => handleViewDetails(record)}>
                                 <Eye className="h-4 w-4" />
