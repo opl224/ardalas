@@ -36,7 +36,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const LAST_ACTIVITY_STORAGE_KEY = 'lastUserActivityTimestamp';
-const INACTIVITY_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+const INACTIVITY_TIMEOUT_MS = 1.5 * 60 * 60 * 1000; // 1.5 hours in milliseconds
 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -174,61 +174,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const eventsToTrack: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
 
     const updateLastActivity = () => {
-      const now = Date.now().toString();
-      localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, now);
+      localStorage.setItem(LAST_ACTIVITY_STORAGE_KEY, Date.now().toString());
     };
 
     const handleActivity = () => {
       updateLastActivity();
     };
 
+    const checkInactivity = () => {
+      const lastActivityTimestamp = localStorage.getItem(LAST_ACTIVITY_STORAGE_KEY);
+      if (lastActivityTimestamp) {
+        const lastActivityTime = parseInt(lastActivityTimestamp, 10);
+        if (Date.now() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
+          if (auth.currentUser) {
+            toast({
+              title: "Sesi Berakhir",
+              description: `Anda telah dikeluarkan secara otomatis karena tidak aktif selama ${INACTIVITY_TIMEOUT_MS / (60 * 1000)} menit.`,
+              variant: "default",
+            });
+            signOut(auth).catch(error => {
+              console.error("Error during automatic sign-out:", error);
+            });
+            // Cleanup immediately after initiating signOut
+            if (activityInterval) clearInterval(activityInterval);
+            eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
+          }
+        }
+      }
+    };
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkInactivity();
+      }
+    };
+
     if (user && !loading) {
-      updateLastActivity(); // Initialize or update last activity timestamp on login/refresh
+      updateLastActivity(); 
 
       eventsToTrack.forEach(event => window.addEventListener(event, handleActivity, { passive: true }));
+      document.addEventListener('visibilitychange', handleVisibilityChange);
 
-      activityInterval = setInterval(() => {
-        const lastActivityTimestamp = localStorage.getItem(LAST_ACTIVITY_STORAGE_KEY);
-        if (lastActivityTimestamp) {
-          const lastActivityTime = parseInt(lastActivityTimestamp, 10);
-          if (Date.now() - lastActivityTime > INACTIVITY_TIMEOUT_MS) {
-            if (auth.currentUser) { // Check if user is still authenticated with Firebase
-              toast({
-                title: "Sesi Berakhir",
-                description: "Anda telah dikeluarkan secara otomatis karena tidak aktif selama 2 jam.",
-                variant: "default",
-              });
-              signOut(auth).catch(error => {
-                console.error("Error during automatic sign-out:", error);
-                toast({
-                  title: "Gagal Logout Otomatis",
-                  description: "Terjadi kesalahan saat mencoba logout otomatis.",
-                  variant: "destructive",
-                });
-              });
-              // No explicit redirect here, onAuthStateChanged in AppLayout handles it.
-              // Cleanup immediately after initiating signOut
-              if (activityInterval) clearInterval(activityInterval);
-              eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
-              localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
-            }
-          }
-        } else {
-          // If no timestamp but user exists, set it
-          updateLastActivity();
-        }
-      }, 60 * 1000); // Check every minute
+      activityInterval = setInterval(checkInactivity, 60 * 1000); // Check every minute
 
     } else if (!user && !loading) {
       // User is logged out or was never logged in
       if (activityInterval) clearInterval(activityInterval);
       eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       localStorage.removeItem(LAST_ACTIVITY_STORAGE_KEY);
     }
 
     return () => { // Cleanup function for when the component unmounts or user/loading changes
       if (activityInterval) clearInterval(activityInterval);
       eventsToTrack.forEach(event => window.removeEventListener(event, handleActivity));
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user, loading, toast]);
 
@@ -247,4 +249,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
