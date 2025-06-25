@@ -159,17 +159,16 @@ export default function NewActivityPage() {
           <p className="text-muted-foreground">Klik folder di bawah untuk melihat galeri kegiatan yang telah dibagikan.</p>
         </div>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-          <CardHeader className="flex flex-row items-center justify-between pb-4">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 border-b">
             <CardTitle className="flex items-center gap-2">
               <FolderKanban className="h-6 w-6 text-primary" />
               <span>Dokumentasi Kegiatan</span>
             </CardTitle>
-          </CardHeader>
-           {role === 'admin' && (
-              <div className="flex items-center justify-between gap-2 mb-6 p-4 border-b">
+            {role === 'admin' && (
+              <div className="flex items-center gap-2">
                 {isDeleteMode ? (
                   <>
-                    <span className="text-sm font-medium mr-auto">Pilih folder untuk dihapus...</span>
+                    <span className="text-sm font-medium mr-auto hidden md:inline">Pilih folder...</span>
                     <Button variant="outline" size="sm" onClick={() => { setIsDeleteMode(false); setSelectedToDelete([]); }}>
                       Batal
                     </Button>
@@ -210,6 +209,7 @@ export default function NewActivityPage() {
                 )}
               </div>
             )}
+          </CardHeader>
           <CardContent>
             <div 
               className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center"
