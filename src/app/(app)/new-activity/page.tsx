@@ -40,7 +40,6 @@ import { id as indonesiaLocale } from 'date-fns/locale';
 import { deleteActivity } from '@/app/actions/uploadActions';
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { useSidebar } from "@/components/ui/sidebar";
 
 interface Activity {
   id: string;
@@ -52,17 +51,14 @@ interface Activity {
 export default function NewActivityPage() {
   const { role } = useAuth();
   const { toast } = useToast();
-  const { isMobile } = useSidebar();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Form state for new activity
   const [newActivityTitle, setNewActivityTitle] = useState("");
   const [newActivityDate, setNewActivityDate] = useState("");
   const [newActivityColor, setNewActivityColor] = useState("#2F80ED");
 
-  // States for delete mode
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectedToDelete, setSelectedToDelete] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -110,7 +106,6 @@ export default function NewActivityPage() {
         description: `Folder untuk "${newActivityTitle}" berhasil dibuat.`,
       });
       setIsAddDialogOpen(false);
-      // Reset form
       setNewActivityTitle("");
       setNewActivityDate("");
       setNewActivityColor("#2F80ED");
@@ -123,24 +118,6 @@ export default function NewActivityPage() {
       });
     }
   };
-
-  const handleSingleDelete = async (activityId: string, activityTitle: string) => {
-    setIsDeleting(true);
-    try {
-        const result = await deleteActivity(activityId);
-        if (result.error) {
-            toast({ title: "Gagal Menghapus", description: result.error, variant: "destructive" });
-        } else {
-            toast({ title: "Berhasil Dihapus", description: `Folder kegiatan "${activityTitle}" berhasil dihapus.` });
-        }
-    } catch (error: any) {
-        console.error("Kesalahan menghapus kegiatan:", error);
-        toast({ title: "Terjadi Kesalahan", description: "Proses penghapusan gagal.", variant: "destructive" });
-    } finally {
-        setIsDeleting(false);
-    }
-  };
-
 
   const handleMultipleDelete = async () => {
     if (selectedToDelete.length === 0) return;
@@ -187,17 +164,8 @@ export default function NewActivityPage() {
               <FolderKanban className="h-6 w-6 text-primary" />
               <span>Dokumentasi Kegiatan</span>
             </CardTitle>
-            {role === 'admin' && !isMobile && (
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Tambah Kegiatan
-                </Button>
-              </DialogTrigger>
-            )}
           </CardHeader>
-          <CardContent>
-            {role === 'admin' && isMobile && (
+           {role === 'admin' && (
               <div className="flex items-center justify-between gap-2 mb-6 p-4 border-b">
                 {isDeleteMode ? (
                   <>
@@ -207,8 +175,8 @@ export default function NewActivityPage() {
                     </Button>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" disabled={selectedToDelete.length === 0}>
-                          Hapus ({selectedToDelete.length})
+                        <Button variant="destructive" size="sm" disabled={selectedToDelete.length === 0 || isDeleting}>
+                          {isDeleting ? "Menghapus..." : `Hapus (${selectedToDelete.length})`}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -242,6 +210,7 @@ export default function NewActivityPage() {
                 )}
               </div>
             )}
+          <CardContent>
             <div 
               className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center"
             >
@@ -260,15 +229,12 @@ export default function NewActivityPage() {
                         key={activity.id} 
                         className={cn(
                           "relative flex flex-col items-center gap-2 flex-shrink-0 transition-all duration-200",
-                          // Mobile-specific styles for delete mode
-                          isMobile && isDeleteMode && "cursor-pointer rounded-lg p-2",
-                          isMobile && isDeleteMode && isSelectedForDelete && "bg-destructive/20 ring-2 ring-destructive",
-                          isMobile && isDeleteMode && !isSelectedForDelete && "hover:bg-muted",
-                          // Desktop-specific style for hover effect
-                          !isMobile && "group"
+                          isDeleteMode && "cursor-pointer rounded-lg p-2",
+                          isDeleteMode && isSelectedForDelete && "bg-destructive/20 ring-2 ring-destructive",
+                          isDeleteMode && !isSelectedForDelete && "hover:bg-muted"
                         )}
                         onClick={() => {
-                          if (isMobile && isDeleteMode) {
+                          if (isDeleteMode) {
                             setSelectedToDelete(prev => 
                               prev.includes(activity.id)
                                 ? prev.filter(id => id !== activity.id)
@@ -277,52 +243,17 @@ export default function NewActivityPage() {
                           }
                         }}
                       >
-                        {/* Mobile checkbox for delete mode */}
-                        {isMobile && isDeleteMode && (
+                        {isDeleteMode && role === 'admin' && (
                             <Checkbox
                                 checked={isSelectedForDelete}
                                 className="absolute top-1 left-1 z-10 bg-background"
                                 aria-label={`Pilih ${activity.title}`}
                             />
                         )}
-
-                        {/* Desktop hover delete button */}
-                        {!isMobile && role === 'admin' && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="destructive"
-                                size="icon"
-                                className="absolute top-0 right-0 z-10 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => { e.stopPropagation(); }}
-                                aria-label={`Hapus folder ${activity.title}`}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Anda akan menghapus folder kegiatan "{activity.title}" beserta semua isinya. Tindakan ini tidak dapat dibatalkan.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Batal</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleSingleDelete(activity.id, activity.title)}
-                                  disabled={isDeleting}
-                                >
-                                  {isDeleting ? "Menghapus..." : "Ya, Hapus"}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
                         
                         <Link 
-                          href={(isMobile && isDeleteMode) ? '#' : `/new-activity/gallery?id=${activity.id}`} 
-                          onClick={(e) => { if (isMobile && isDeleteMode) e.preventDefault(); }}
+                          href={isDeleteMode ? '#' : `/new-activity/gallery?id=${activity.id}`} 
+                          onClick={(e) => { if (isDeleteMode) e.preventDefault(); }}
                           aria-label={`Buka galeri ${activity.title}`}
                         >
                           <Folder color={activity.color} size={0.8} />
