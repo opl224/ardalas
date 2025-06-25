@@ -818,7 +818,7 @@ export default function LessonsPage() {
                     {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
                     {!isMobile && (role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
                     {!isMobile && <TableHead className="w-[100px]">Hari</TableHead>}
-                    <TableHead className={cn(!isMobile ? "w-[120px]" : "w-auto", isMobile && canManageLessons && "pl-4")}>Waktu</TableHead>
+                    <TableHead className={cn(!isMobile ? "w-[120px]" : "w-auto", "px-4")}>Waktu</TableHead>
                     {!isMobile && canManageLessons && <TableHead>Topik</TableHead>}
                     <TableHead className={cn("text-right", !isMobile ? "w-[100px]" : "w-auto")}>Aksi</TableHead>
                   </TableRow>
@@ -835,37 +835,36 @@ export default function LessonsPage() {
                         {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell className="truncate" title={lesson.teacherName || lesson.teacherId}>{lesson.teacherName || lesson.teacherId}</TableCell>}
                         {!isMobile && <TableCell>{lesson.dayOfWeek}</TableCell>}
                         
-                        <TableCell className={cn(isMobile && "text-xs", isMobile && canManageLessons ? "pl-4" : (isMobile && "px-2") )}>{lesson.startTime} - {lesson.endTime}</TableCell>
+                        <TableCell className={cn("text-xs", isMobile && "px-4")}>{lesson.startTime} - {lesson.endTime}</TableCell>
                         
                         {!isMobile && canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
                         
-                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
+                        <TableCell className={cn("text-right", isMobile ? "px-2" : "")}>
                           {isStudentOrParent ? (
                             role === "orangtua" ? (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={true}
-                                className={cn(isMobile && "w-full justify-start")}
-                                aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)"
-                              >
-                                <LogIn className="mr-2 h-4 w-4" /> {isMobile ? "" : "Masuk Kelas"}
-                              </Button>
+                               isMobile ? (
+                                <Button size="icon" variant="outline" disabled={true} aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)">
+                                  <LogIn className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button size="sm" variant="outline" disabled={true} aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)">
+                                  <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                </Button>
+                              )
                             ) : ( // For 'siswa' role
-                              <Button
-                                asChild
-                                size="sm"
-                                variant={!isActiveNow ? "outline" : "default"}
-                                disabled={!isActiveNow}
-                                className={cn(
-                                  isActiveNow && "border-primary text-primary hover:bg-primary/10",
-                                  isMobile && "w-full justify-start"
-                                )}
-                              >
-                                <Link href={`/lessons/${lesson.id}`}>
-                                  <LogIn className="mr-2 h-4 w-4" /> {isMobile ? "" : "Masuk Kelas"}
-                                </Link>
-                              </Button>
+                               isMobile ? (
+                                <Button asChild size="icon" variant={!isActiveNow ? "outline" : "default"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
+                                  <Link href={`/lessons/${lesson.id}`} aria-label="Masuk Kelas">
+                                    <LogIn className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                              ) : (
+                                <Button asChild size="sm" variant={!isActiveNow ? "outline" : "default"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
+                                  <Link href={`/lessons/${lesson.id}`}>
+                                    <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                  </Link>
+                                </Button>
+                              )
                             )
                           ) : canManageLessons ? (
                             <DropdownMenu>
