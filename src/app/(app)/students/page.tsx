@@ -869,7 +869,7 @@ export default function StudentsPage() {
               <Table className="w-full table-fixed">
                 <TableHeader>
                   <TableRow>
-                    {isMobile && authRole === 'guru' ? (
+                    {isMobile && (authRole === 'admin' || authRole === 'guru') ? (
                       <>
                         <TableHead className="w-10 px-2 text-center">No.</TableHead>
                         <TableHead className="px-2">Nama</TableHead>
@@ -901,7 +901,7 @@ export default function StudentsPage() {
                 <TableBody>
                   {currentTableData.map((student, index) => (
                     <TableRow key={student.id}>
-                      {isMobile && authRole === 'guru' ? (
+                      {isMobile && (authRole === 'admin' || authRole === 'guru') ? (
                         <>
                           <TableCell className="text-center px-2">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                           <TableCell className="font-medium truncate px-2" title={student.name}>{student.name}</TableCell>
@@ -918,6 +918,38 @@ export default function StudentsPage() {
                                     <Eye className="mr-2 h-4 w-4" />
                                     Lihat Detail
                                   </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openEditDialog(student)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <DropdownMenuItem
+                                        onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }}
+                                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Hapus
+                                      </DropdownMenuItem>
+                                    </AlertDialogTrigger>
+                                    {selectedStudent && selectedStudent.id === student.id && (
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel>
+                                          <AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>
+                                            Ya, Hapus Data
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    )}
+                                  </AlertDialog>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                           </TableCell>
