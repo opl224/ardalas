@@ -853,13 +853,13 @@ export default function LessonsPage() {
                               )
                             ) : ( // For 'siswa' role
                                isMobile ? (
-                                <Button asChild size="icon" variant={!isActiveNow ? "outline" : "default"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
+                                <Button asChild size="icon" variant={"outline"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
                                   <Link href={`/lessons/${lesson.id}`} aria-label="Masuk Kelas">
                                     <LogIn className="h-4 w-4" />
                                   </Link>
                                 </Button>
                               ) : (
-                                <Button asChild size="sm" variant={!isActiveNow ? "outline" : "default"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
+                                <Button asChild size="sm" variant={"outline"} disabled={!isActiveNow} className={cn(isActiveNow && "border-primary text-primary hover:bg-primary/10")}>
                                   <Link href={`/lessons/${lesson.id}`}>
                                     <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
                                   </Link>
