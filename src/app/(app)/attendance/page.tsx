@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -202,7 +203,7 @@ function TeacherAdminAttendanceManagement() {
             setClassesForDropdown(teacherClasses);
 
             const allSubjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
             setSubjectsForDropdown([]); 
         }
       } catch (error) {
@@ -845,7 +846,7 @@ function TeacherAdminAttendanceManagement() {
       </form>
 
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader><CardTitle className="flex items-center gap-2"><FileDown className="h-6 w-6 text-primary" /><span>Rekap &amp; Ekspor Kehadiran</span></CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><FileDown className="h-6 w-6 text-primary" /><span>Rekap & Ekspor Kehadiran</span></CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
@@ -921,6 +922,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
         ...doc.data(),
       } as StudentAttendanceHistoryEntry));
 
+      // Sort client-side
       history.sort((a, b) => {
         const timeA = a.attendedAt?.toMillis() || 0;
         const timeB = b.attendedAt?.toMillis() || 0;
@@ -1045,10 +1047,18 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                     <TableRow>
                       <TableHead>Tanggal</TableHead>
                       <TableHead>Mata Pelajaran</TableHead>
-                      <TableHead>Status</TableHead>
-                      {!isMobile && <TableHead>Waktu Pelajaran</TableHead>}
-                      {!isMobile && <TableHead>Jam Absen</TableHead>}
-                      {isMobile && <TableHead className="text-right">Aksi</TableHead>}
+                       {isMobile ? (
+                        <>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Aksi</TableHead>
+                        </>
+                       ) : (
+                        <>
+                            <TableHead>Waktu Pelajaran</TableHead>
+                            <TableHead>Jam Absen</TableHead>
+                            <TableHead>Status</TableHead>
+                        </>
+                       )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1056,21 +1066,32 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                       <TableRow key={record.id}>
                         <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
                         <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
-                        <TableCell>
-                          <span className="flex items-center gap-1.5 font-medium text-green-600">
-                            <CheckCircle className="h-4 w-4" />
-                            {record.status}
-                          </span>
-                        </TableCell>
-                        {!isMobile && <TableCell>{record.lessonTime || "N/A"}</TableCell>}
-                        {!isMobile && <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>}
-                        {isMobile && (
-                          <TableCell className="text-right">
-                             <Button variant="ghost" size="icon" onClick={() => handleViewDetails(record)}>
-                              <Eye className="h-4 w-4" />
-                              <span className="sr-only">Lihat Detail</span>
-                            </Button>
-                          </TableCell>
+                        {isMobile ? (
+                           <>
+                             <TableCell>
+                                <span className="flex items-center gap-1.5 font-medium text-green-600">
+                                  <CheckCircle className="h-4 w-4" />
+                                  {record.status}
+                                </span>
+                             </TableCell>
+                             <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => handleViewDetails(record)}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Lihat Detail</span>
+                                </Button>
+                             </TableCell>
+                           </>
+                        ) : (
+                           <>
+                             <TableCell>{record.lessonTime || "N/A"}</TableCell>
+                             <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>
+                             <TableCell>
+                               <span className="flex items-center gap-1.5 font-medium text-green-600">
+                                 <CheckCircle className="h-4 w-4" />
+                                 {record.status}
+                               </span>
+                             </TableCell>
+                           </>
                         )}
                       </TableRow>
                     ))}
