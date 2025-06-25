@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -20,9 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink, Eye, MoreHorizontal } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -51,6 +50,10 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useSidebar } from "@/components/ui/sidebar";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 
 
 // --- Types for Teacher/Admin View ---
@@ -199,7 +202,7 @@ function TeacherAdminAttendanceManagement() {
             setClassesForDropdown(teacherClasses);
 
             const allSubjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
             setSubjectsForDropdown([]); 
         }
       } catch (error) {
@@ -842,7 +845,7 @@ function TeacherAdminAttendanceManagement() {
       </form>
 
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader><CardTitle className="flex items-center gap-2"><FileDown className="h-6 w-6 text-primary" /><span>Rekap & Ekspor Kehadiran</span></CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><FileDown className="h-6 w-6 text-primary" /><span>Rekap &amp; Ekspor Kehadiran</span></CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
@@ -890,8 +893,14 @@ function TeacherAdminAttendanceManagement() {
 
 function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAttendanceViewProps) {
   const { toast } = useToast();
+  const { isMobile } = useSidebar();
   const [attendanceHistory, setAttendanceHistory] = useState<StudentAttendanceHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedRecordForView, setSelectedRecordForView] = useState<StudentAttendanceHistoryEntry | null>(null);
+  const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
+  
+  const ITEMS_PER_PAGE = 10;
 
   const fetchStudentHistory = useCallback(async () => {
     if (!targetStudentId) {
@@ -904,8 +913,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
     try {
       const attendanceQuery = query(
         collection(db, "studentAttendanceRecords"),
-        where("studentId", "==", targetStudentId),
-        limit(50)
+        where("studentId", "==", targetStudentId)
       );
       const snapshot = await getDocs(attendanceQuery);
       let history: StudentAttendanceHistoryEntry[] = snapshot.docs.map(doc => ({
@@ -932,6 +940,64 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
     fetchStudentHistory();
   }, [fetchStudentHistory]);
 
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return attendanceHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [currentPage, attendanceHistory]);
+  
+  const totalPages = Math.ceil(attendanceHistory.length / ITEMS_PER_PAGE);
+
+  const renderPageNumbers = () => {
+    const pageNumbers = [];
+    const maxPagesToShow = 3;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+      startPage = 1;
+      endPage = totalPages;
+    } else {
+      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+        startPage = 1;
+        endPage = maxPagesToShow;
+      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        startPage = totalPages - maxPagesToShow + 1;
+        endPage = totalPages;
+      } else {
+        startPage = currentPage - Math.floor(maxPagesToShow / 2) + 1;
+        endPage = currentPage + Math.floor(maxPagesToShow / 2) -1;
+      }
+    }
+
+    if (startPage > 1) {
+      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
+      if (startPage > 2) {
+        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(
+        <PaginationItem key={i}>
+          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
+            {i}
+          </PaginationLink>
+        </PaginationItem>
+      );
+    }
+
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
+      }
+      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
+    }
+    return pageNumbers;
+  };
+  
+  const handleViewDetails = (record: StudentAttendanceHistoryEntry) => {
+    setSelectedRecordForView(record);
+    setIsViewDetailDialogOpen(true);
+  };
 
   if (isLoading) {
     return (
@@ -972,38 +1038,115 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                 <Button asChild variant="outline"><Link href="/lessons">Lihat Jadwal Pelajaran</Link></Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tanggal</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    <TableHead>Waktu Pelajaran</TableHead>
-                    <TableHead>Jam Absen</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {attendanceHistory.map(record => (
-                    <TableRow key={record.id}>
-                      <TableCell>{format(record.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</TableCell>
-                      <TableCell>{record.subjectName || "N/A"}</TableCell>
-                      <TableCell>{record.lessonTime || "N/A"}</TableCell>
-                      <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>
-                      <TableCell>
-                        <span className="flex items-center gap-1.5 font-medium text-green-600">
-                          <CheckCircle className="h-4 w-4" />
-                          {record.status}
-                        </span>
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table className="w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Status</TableHead>
+                      {!isMobile && <TableHead>Waktu Pelajaran</TableHead>}
+                      {!isMobile && <TableHead>Jam Absen</TableHead>}
+                      {isMobile && <TableHead className="text-right">Aksi</TableHead>}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedHistory.map(record => (
+                      <TableRow key={record.id}>
+                        <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                        <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
+                        <TableCell>
+                          <span className="flex items-center gap-1.5 font-medium text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            {record.status}
+                          </span>
+                        </TableCell>
+                        {!isMobile && <TableCell>{record.lessonTime || "N/A"}</TableCell>}
+                        {!isMobile && <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>}
+                        {isMobile && (
+                          <TableCell className="text-right">
+                             <Button variant="ghost" size="icon" onClick={() => handleViewDetails(record)}>
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">Lihat Detail</span>
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <Pagination className="mt-6">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        aria-disabled={currentPage === 1}
+                        className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                      />
+                    </PaginationItem>
+                    {renderPageNumbers()}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        aria-disabled={currentPage === totalPages}
+                        className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
+      
+      <Dialog open={isViewDetailDialogOpen} onOpenChange={setIsViewDetailDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Detail Riwayat Absensi</DialogTitle>
+            <DialogDescription>
+              Informasi lengkap untuk absensi yang dipilih.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRecordForView && (
+            <div className="grid gap-4 py-4 text-sm">
+                <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+                  <Label>Tanggal</Label>
+                  <p>{format(selectedRecordForView.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p>
+                </div>
+                <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+                  <Label>Mata Pelajaran</Label>
+                  <p>{selectedRecordForView.subjectName || "N/A"}</p>
+                </div>
+                 <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+                  <Label>Waktu Pelajaran</Label>
+                  <p>{selectedRecordForView.lessonTime || "N/A"}</p>
+                </div>
+                 <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+                  <Label>Jam Absen</Label>
+                  <p>{format(selectedRecordForView.attendedAt.toDate(), "HH:mm:ss", { locale: indonesiaLocale })}</p>
+                </div>
+                <div className="grid grid-cols-[120px_1fr] items-center gap-4">
+                  <Label>Status</Label>
+                  <p className="flex items-center gap-1.5 font-medium text-green-600">
+                    <CheckCircle className="h-4 w-4" />
+                    {selectedRecordForView.status}
+                  </p>
+                </div>
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Tutup
+              </Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
