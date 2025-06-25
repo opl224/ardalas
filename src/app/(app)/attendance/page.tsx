@@ -965,8 +965,8 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
         startPage = totalPages - maxPagesToShow + 1;
         endPage = totalPages;
       } else {
-        startPage = currentPage - Math.floor(maxPagesToShow / 2) + 1;
-        endPage = currentPage + Math.floor(maxPagesToShow / 2) -1;
+        startPage = currentPage - Math.floor(maxPagesToShow / 2);
+        endPage = currentPage + Math.floor(maxPagesToShow / 2);
       }
     }
 
