@@ -817,10 +817,10 @@ export default function LessonsPage() {
                     <TableHead>Mata Pelajaran</TableHead>
                     {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
                     {!isMobile && (role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
-                    {!isMobile && <TableHead className="w-100">Hari</TableHead>}
-                    <TableHead className="w-50">Waktu</TableHead>
+                    {!isMobile && <TableHead className="w-[100px]">Hari</TableHead>}
+                    <TableHead className={cn(!isMobile ? "w-[120px]" : "w-auto", isMobile && canManageLessons && "pl-4")}>Waktu</TableHead>
                     {!isMobile && canManageLessons && <TableHead>Topik</TableHead>}
-                    <TableHead className="text-right w-40">Aksi</TableHead>
+                    <TableHead className={cn("text-right", !isMobile ? "w-[100px]" : "w-auto")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -835,11 +835,11 @@ export default function LessonsPage() {
                         {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell className="truncate" title={lesson.teacherName || lesson.teacherId}>{lesson.teacherName || lesson.teacherId}</TableCell>}
                         {!isMobile && <TableCell>{lesson.dayOfWeek}</TableCell>}
                         
-                        <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
+                        <TableCell className={cn(isMobile && "text-xs", isMobile && canManageLessons ? "pl-4" : (isMobile && "px-2") )}>{lesson.startTime} - {lesson.endTime}</TableCell>
                         
                         {!isMobile && canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
                         
-                        <TableCell className="text-right">
+                        <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                           {isStudentOrParent ? (
                             role === "orangtua" ? (
                               <Button
