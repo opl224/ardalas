@@ -905,14 +905,20 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
       const attendanceQuery = query(
         collection(db, "studentAttendanceRecords"),
         where("studentId", "==", targetStudentId),
-        orderBy("attendedAt", "desc"),
         limit(50)
       );
       const snapshot = await getDocs(attendanceQuery);
-      const history: StudentAttendanceHistoryEntry[] = snapshot.docs.map(doc => ({
+      let history: StudentAttendanceHistoryEntry[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       } as StudentAttendanceHistoryEntry));
+
+      history.sort((a, b) => {
+        const timeA = a.attendedAt?.toMillis() || 0;
+        const timeB = b.attendedAt?.toMillis() || 0;
+        return timeB - timeA;
+      });
+      
       setAttendanceHistory(history);
     } catch (error) {
       console.error("Error fetching student attendance history:", error);
