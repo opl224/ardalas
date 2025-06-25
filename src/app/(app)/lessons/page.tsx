@@ -817,10 +817,10 @@ export default function LessonsPage() {
                     <TableHead>Mata Pelajaran</TableHead>
                     {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
                     {!isMobile && (role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
-                    {!isMobile && <TableHead className="w-28">Hari</TableHead>}
-                    <TableHead className="w-32">Waktu</TableHead>
+                    {!isMobile && <TableHead className="w-100">Hari</TableHead>}
+                    <TableHead className="w-50">Waktu</TableHead>
                     {!isMobile && canManageLessons && <TableHead>Topik</TableHead>}
-                    <TableHead className="text-right w-24">Aksi</TableHead>
+                    <TableHead className="text-right w-40">Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

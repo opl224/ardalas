@@ -148,6 +148,7 @@ export default function DashboardPage() {
   const [selectedDateEvents, setSelectedDateEvents] = useState<CalendarEvent[]>([]);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const { isMobile } = useSidebar();
+  const [isWaliKelasExpanded, setIsWaliKelasExpanded] = useState(false);
 
 
   useEffect(() => {
@@ -517,6 +518,8 @@ export default function DashboardPage() {
     }
   };
 
+  const isWaliKelasNameLong = (stats.waliKelasName || "").length > 25;
+
 
   return (
     <div className="space-y-8">
@@ -665,7 +668,33 @@ export default function DashboardPage() {
                             {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                         </CardContent>
                     </Card>
-                    <StatCard title="Wali Kelas Anak" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                    <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-base font-medium">Wali Kelas Anak</CardTitle>
+                          <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                          {loadingStats ? (
+                              <Skeleton className="h-8 w-20 my-1" />
+                          ) : (
+                              <>
+                                  <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isWaliKelasExpanded && "line-clamp-2")}>
+                                      {stats.waliKelasName || "-"}
+                                  </div>
+                                  {isWaliKelasNameLong && (
+                                      <Button
+                                          variant="link"
+                                          size="sm"
+                                          className="p-0 h-auto text-xs mt-2 text-primary"
+                                          onClick={() => setIsWaliKelasExpanded(!isWaliKelasExpanded)}
+                                      >
+                                          {isWaliKelasExpanded ? "Tutup" : "Lihat"}
+                                      </Button>
+                                  )}
+                              </>
+                          )}
+                      </CardContent>
+                    </Card>
                     <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
                     <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
                     <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
@@ -693,7 +722,33 @@ export default function DashboardPage() {
                         {user.linkedStudentClassId && !loadingStats && <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href={'/classes'}>Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>}
                     </CardContent>
                 </Card>
-                <StatCard title="Wali Kelas Anak" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-base font-medium">Wali Kelas Anak</CardTitle>
+                        <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        {loadingStats ? (
+                            <Skeleton className="h-8 w-20 my-1" />
+                        ) : (
+                            <>
+                                <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isWaliKelasExpanded && "line-clamp-2")}>
+                                    {stats.waliKelasName || "-"}
+                                </div>
+                                {isWaliKelasNameLong && (
+                                    <Button
+                                        variant="link"
+                                        size="sm"
+                                        className="p-0 h-auto text-xs mt-2 text-primary"
+                                        onClick={() => setIsWaliKelasExpanded(!isWaliKelasExpanded)}
+                                    >
+                                        {isWaliKelasExpanded ? "Tutup" : "Lihat"}
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </CardContent>
+                </Card>
                 <StatCard title="Jadwal Pelajaran Anak" value={loadingStats ? "" : (stats.parentChildTotalLessons || 0)} icon={BookCopy} loading={loadingStats} description="Total pelajaran dijadwalkan." href="/lessons"/>
                 <StatCard title="Tugas Anak" value={loadingStats ? "" : (stats.parentChildTotalAssignments || 0)} icon={ClipboardCheck} loading={loadingStats} description="Total tugas untuk kelas anak." href="/assignments"/>
                 <StatCard title="Kehadiran Anak" value={loadingStats ? "" : (stats.parentChildAttendancePercentage || "0%")} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran anak." href="/attendance"/>
@@ -720,7 +775,7 @@ export default function DashboardPage() {
             {recentAnnouncements.map((announcement) => (
               <Card key={announcement.id} className="bg-card/70 backdrop-blur-sm border-border shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-lg line-clamp-2">{announcement.title}</CardTitle>
+                  <CardTitle className={cn("text-lg", isMobile && "line-clamp-2")}>{announcement.title}</CardTitle>
                   <CardDescription>
                      {announcement.date ? format(announcement.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "Tanggal tidak tersedia"}
                      {announcement.targetAudience && announcement.targetAudience.length > 0 && (
