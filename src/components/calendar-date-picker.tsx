@@ -15,7 +15,7 @@ import {
   endOfDay,
 } from "date-fns";
 import { toDate, formatInTimeZone } from "date-fns-tz";
-import { DateRange } from "react-day-picker";
+import { DateRange, SelectSingleEventHandler, SelectRangeEventHandler } from "react-day-picker";
 import { cva, VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
@@ -140,43 +140,63 @@ export const CalendarDatePicker = React.forwardRef<
       closeOnSelect && setIsPopoverOpen(false);
     };
 
-    const handleDateSelect = (range: DateRange | undefined) => {
-      if (range && range.from) { // Ensure range.from is defined
-        let from = startOfDay(toDate(range.from, { timeZone }));
-        let to = range.to ? endOfDay(toDate(range.to, { timeZone })) : from;
-        if (numberOfMonths === 1) {
-           to = from; 
-        }
-        onDateSelect({ from, to });
-        setMonthFrom(from);
-        setYearFrom(from.getFullYear());
-        if (numberOfMonths === 2) {
-            setMonthTo(to);
-            setYearTo(to.getFullYear());
+    const handleDateSelect = (
+      day: DateRange | Date | undefined,
+    ) => {
+      if (!day) return;
+
+      let from: Date | undefined;
+      let to: Date | undefined;
+
+      if (day instanceof Date) { // Single mode
+        from = day;
+        to = day;
+      } else { // Range mode
+        from = day.from;
+        to = day.to;
+      }
+      
+      if (from) {
+        const startDate = startOfDay(toDate(from, { timeZone }));
+        // For single mode, 'to' will be same as 'from'. For range, it might be undefined during selection.
+        const endDate = to ? endOfDay(toDate(to, { timeZone })) : startDate;
+        
+        onDateSelect({ from: startDate, to: endDate });
+        
+        // Update internal state for month/year pickers
+        setMonthFrom(startDate);
+        setYearFrom(startDate.getFullYear());
+        if (numberOfMonths === 2 && to) {
+            setMonthTo(endDate);
+            setYearTo(endDate.getFullYear());
         } else {
-            setMonthTo(from); 
-            setYearTo(from.getFullYear());
+            setMonthTo(startDate);
+            setYearTo(startDate.getFullYear());
         }
       }
-      setSelectedRange(null);
-      if (closeOnSelect && range && range.from) { 
+      
+      setSelectedRange(null); // Clear preset range selection
+      if (closeOnSelect && from) {
         setIsPopoverOpen(false);
       }
     };
+
 
     const handleMonthChange = (newMonthIndex: number, part: string) => {
         setSelectedRange(null);
         if (part === "from") {
             if (yearFrom !== undefined) {
                 if (newMonthIndex < 0 || newMonthIndex > 11) return;
-                const dayOfMonth = date?.from?.getDate() ?? 1;
-                const newDate = new Date(yearFrom, newMonthIndex, dayOfMonth);
-                const from = numberOfMonths === 2 ? startOfMonth(toDate(newDate, { timeZone })) : newDate;
-                const to = numberOfMonths === 2 ? (date?.to ? endOfDay(toDate(date.to, { timeZone })) : endOfMonth(toDate(newDate, { timeZone }))) : from;
-                if (!date?.to || from <= to) {
-                    onDateSelect({ from, to });
-                    setMonthFrom(newDate);
-                }
+                const currentDay = date?.from?.getDate() ?? 1; // Use day from current date if available
+                const newDate = new Date(yearFrom, newMonthIndex, 1); // Start with 1st to avoid month overflow
+                const daysInNewMonth = new Date(yearFrom, newMonthIndex + 1, 0).getDate();
+                newDate.setDate(Math.min(currentDay, daysInNewMonth)); // Set to original day or last day of new month
+
+                const from = startOfDay(toDate(newDate, { timeZone }));
+                const to = numberOfMonths === 2 ? (date?.to ?? from) : from; // Use existing 'to' or fallback
+                
+                onDateSelect({ from, to: endOfDay(toDate(to, { timeZone })) });
+                setMonthFrom(newDate);
             }
         } else { // part === 'to'
             if (yearTo !== undefined && numberOfMonths === 2) {
@@ -197,15 +217,17 @@ export const CalendarDatePicker = React.forwardRef<
         if (part === "from") {
             if (years.includes(newYear)) {
                 const currentMonthFrom = monthFrom?.getMonth() ?? date?.from?.getMonth() ?? 0;
-                const dayOfMonth = date?.from?.getDate() ?? 1;
-                const newDate = new Date(newYear, currentMonthFrom, dayOfMonth);
-                const from = numberOfMonths === 2 ? startOfMonth(toDate(newDate, { timeZone })) : newDate;
-                const to = numberOfMonths === 2 ? (date?.to ? endOfDay(toDate(date.to, { timeZone })) : endOfMonth(toDate(newDate, { timeZone }))) : from;
-                if (!date?.to || from <= to) {
-                    onDateSelect({ from, to });
-                    setYearFrom(newYear);
-                    setMonthFrom(newDate);
-                }
+                const currentDay = date?.from?.getDate() ?? 1; // Use day from current date if available
+                const newDate = new Date(newYear, currentMonthFrom, 1); // Start with 1st to avoid month overflow
+                const daysInNewMonth = new Date(newYear, currentMonthFrom + 1, 0).getDate();
+                newDate.setDate(Math.min(currentDay, daysInNewMonth)); // Set to original day or last day of new month
+
+                const from = startOfDay(toDate(newDate, { timeZone }));
+                const to = numberOfMonths === 2 ? (date?.to ?? from) : from;
+                
+                onDateSelect({ from, to: endOfDay(toDate(to, { timeZone })) });
+                setYearFrom(newYear);
+                setMonthFrom(newDate);
             }
         } else { // part === 'to'
             if (years.includes(newYear) && numberOfMonths === 2) {
@@ -221,7 +243,6 @@ export const CalendarDatePicker = React.forwardRef<
             }
         }
     };
-
 
     const today = new Date();
 
@@ -385,7 +406,7 @@ export const CalendarDatePicker = React.forwardRef<
               <CalendarIcon className="mr-2 h-4 w-4" />
               <span>
                 {date?.from ? (
-                  date.to && numberOfMonths === 2 ? ( 
+                  date.to && numberOfMonths === 2 && date.from !== date.to ? ( 
                     <>
                       <span
                         id={`firstDay-${id}`}
@@ -513,7 +534,6 @@ export const CalendarDatePicker = React.forwardRef<
             <PopoverContent
               className="w-auto"
               align="center"
-              
               onInteractOutside={handleClose}
               onEscapeKeyDown={handleClose}
               style={{
@@ -638,8 +658,8 @@ export const CalendarDatePicker = React.forwardRef<
                       defaultMonth={monthFrom}
                       month={monthFrom}
                       onMonthChange={setMonthFrom}
-                      selected={date}
-                      onSelect={handleDateSelect}
+                      selected={numberOfMonths === 1 ? date?.from : date}
+                      onSelect={handleDateSelect as SelectSingleEventHandler | SelectRangeEventHandler | undefined}
                       numberOfMonths={numberOfMonths}
                       showOutsideDays={false}
                       className={className}
