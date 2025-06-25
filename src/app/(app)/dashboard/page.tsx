@@ -148,7 +148,8 @@ export default function DashboardPage() {
   const [selectedDateEvents, setSelectedDateEvents] = useState<CalendarEvent[]>([]);
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
   const { isMobile } = useSidebar();
-  const [isWaliKelasExpanded, setIsWaliKelasExpanded] = useState(false);
+  const [isParentWaliKelasExpanded, setIsParentWaliKelasExpanded] = useState(false);
+  const [isSiswaWaliKelasExpanded, setIsSiswaWaliKelasExpanded] = useState(false);
 
 
   useEffect(() => {
@@ -614,7 +615,33 @@ export default function DashboardPage() {
                             <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                         </CardContent>
                     </Card>
-                    <StatCard title="Wali Kelas Saya" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                    <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
+                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-base font-medium">Wali Kelas Saya</CardTitle>
+                        <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                      </CardHeader>
+                      <CardContent>
+                        {loadingStats ? (
+                          <Skeleton className="h-8 w-20 my-1" />
+                        ) : (
+                          <>
+                            <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isSiswaWaliKelasExpanded && "line-clamp-2")}>
+                              {stats.waliKelasName || "-"}
+                            </div>
+                            {isWaliKelasNameLong && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-0 h-auto text-xs mt-2 text-primary"
+                                onClick={() => setIsSiswaWaliKelasExpanded(!isSiswaWaliKelasExpanded)}
+                              >
+                                {isSiswaWaliKelasExpanded ? "Tutup" : "Lihat"}
+                              </Button>
+                            )}
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
                     <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
                     <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
                   </div>
@@ -633,7 +660,33 @@ export default function DashboardPage() {
                         <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                     </CardContent>
                 </Card>
-                <StatCard title="Wali Kelas Saya" value={stats.waliKelasName || "-"} icon={GraduationCap} loading={loadingStats} />
+                <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md hover:shadow-lg transition-shadow duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-base font-medium">Wali Kelas Saya</CardTitle>
+                    <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    {loadingStats ? (
+                      <Skeleton className="h-8 w-20 my-1" />
+                    ) : (
+                      <>
+                        <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isSiswaWaliKelasExpanded && "line-clamp-2")}>
+                          {stats.waliKelasName || "-"}
+                        </div>
+                        {isWaliKelasNameLong && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            className="p-0 h-auto text-xs mt-2 text-primary"
+                            onClick={() => setIsSiswaWaliKelasExpanded(!isSiswaWaliKelasExpanded)}
+                          >
+                            {isSiswaWaliKelasExpanded ? "Tutup" : "Lihat"}
+                          </Button>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
                 <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
                 <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
               </div>
@@ -678,7 +731,7 @@ export default function DashboardPage() {
                               <Skeleton className="h-8 w-20 my-1" />
                           ) : (
                               <>
-                                  <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isWaliKelasExpanded && "line-clamp-2")}>
+                                  <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isParentWaliKelasExpanded && "line-clamp-2")}>
                                       {stats.waliKelasName || "-"}
                                   </div>
                                   {isWaliKelasNameLong && (
@@ -686,9 +739,9 @@ export default function DashboardPage() {
                                           variant="link"
                                           size="sm"
                                           className="p-0 h-auto text-xs mt-2 text-primary"
-                                          onClick={() => setIsWaliKelasExpanded(!isWaliKelasExpanded)}
+                                          onClick={() => setIsParentWaliKelasExpanded(!isParentWaliKelasExpanded)}
                                       >
-                                          {isWaliKelasExpanded ? "Tutup" : "Lihat"}
+                                          {isParentWaliKelasExpanded ? "Tutup" : "Lihat"}
                                       </Button>
                                   )}
                               </>
@@ -732,7 +785,7 @@ export default function DashboardPage() {
                             <Skeleton className="h-8 w-20 my-1" />
                         ) : (
                             <>
-                                <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isWaliKelasExpanded && "line-clamp-2")}>
+                                <div className={cn("text-3xl font-bold", isWaliKelasNameLong && !isParentWaliKelasExpanded && "line-clamp-2")}>
                                     {stats.waliKelasName || "-"}
                                 </div>
                                 {isWaliKelasNameLong && (
@@ -740,9 +793,9 @@ export default function DashboardPage() {
                                         variant="link"
                                         size="sm"
                                         className="p-0 h-auto text-xs mt-2 text-primary"
-                                        onClick={() => setIsWaliKelasExpanded(!isWaliKelasExpanded)}
+                                        onClick={() => setIsParentWaliKelasExpanded(!isParentWaliKelasExpanded)}
                                     >
-                                        {isWaliKelasExpanded ? "Tutup" : "Lihat"}
+                                        {isParentWaliKelasExpanded ? "Tutup" : "Lihat"}
                                     </Button>
                                 )}
                             </>
