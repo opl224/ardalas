@@ -20,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink, Eye, MoreHorizontal } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink, Eye, MoreHorizontal, Filter } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
@@ -901,6 +901,9 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
   const [selectedRecordForView, setSelectedRecordForView] = useState<StudentAttendanceHistoryEntry | null>(null);
   const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
   
+  const [selectedSubject, setSelectedSubject] = useState<string>('all');
+  const [isExporting, setIsExporting] = useState(false);
+
   const ITEMS_PER_PAGE = 10;
 
   const fetchStudentHistory = useCallback(async () => {
@@ -922,7 +925,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
         ...doc.data(),
       } as StudentAttendanceHistoryEntry));
 
-      // Sort client-side
       history.sort((a, b) => {
         const timeA = a.attendedAt?.toMillis() || 0;
         const timeB = b.attendedAt?.toMillis() || 0;
@@ -941,13 +943,83 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
   useEffect(() => {
     fetchStudentHistory();
   }, [fetchStudentHistory]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSubject]);
+  
+  const uniqueSubjects = useMemo(() => {
+    const subjects = new Set<string>();
+    attendanceHistory.forEach(record => {
+      if (record.subjectName) {
+        subjects.add(record.subjectName);
+      }
+    });
+    return Array.from(subjects).sort();
+  }, [attendanceHistory]);
+
+  const filteredHistory = useMemo(() => {
+    if (selectedSubject === 'all') {
+      return attendanceHistory;
+    }
+    return attendanceHistory.filter(record => record.subjectName === selectedSubject);
+  }, [attendanceHistory, selectedSubject]);
 
   const paginatedHistory = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return attendanceHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [currentPage, attendanceHistory]);
+    return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [currentPage, filteredHistory]);
   
-  const totalPages = Math.ceil(attendanceHistory.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+
+  const handleExport = (format: 'pdf' | 'xlsx') => {
+    if (filteredHistory.length === 0) {
+      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+      return;
+    }
+    setIsExporting(true);
+
+    const studentName = targetStudentName || "Siswa";
+    const subjectName = selectedSubject === 'all' ? 'Semua_Mapel' : selectedSubject.replace(/\s+/g, '_');
+    const fileName = `Riwayat_Absen_${studentName.replace(/\s+/g, '_')}_${subjectName}`;
+
+    const dataToExport = filteredHistory.map(record => ({
+      "Tanggal": format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }),
+      "Mata Pelajaran": record.subjectName || "N/A",
+      "Waktu Pelajaran": record.lessonTime || "N/A",
+      "Jam Absen": format(record.attendedAt.toDate(), "HH:mm:ss", { locale: indonesiaLocale }),
+      "Status": record.status,
+    }));
+
+    if (format === 'pdf') {
+      const doc = new jsPDF();
+      doc.setFontSize(16);
+      doc.text(`Riwayat Absensi: ${studentName}`, 14, 20);
+      doc.setFontSize(12);
+      doc.text(`Mata Pelajaran: ${selectedSubject === 'all' ? 'Semua' : selectedSubject}`, 14, 28);
+      autoTable(doc, {
+        startY: 35,
+        head: [Object.keys(dataToExport[0])],
+        body: dataToExport.map(Object.values),
+        theme: 'grid',
+        headStyles: { fillColor: [64, 149, 237] },
+      });
+      doc.save(`${fileName}.pdf`);
+    } else if (format === 'xlsx') {
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
+       XLSX.utils.sheet_add_aoa(worksheet, [
+        [`Riwayat Absensi - ${studentName}`],
+        [`Mata Pelajaran: ${selectedSubject === 'all' ? 'Semua' : selectedSubject}`],
+      ], { origin: "A1" });
+      XLSX.writeFile(workbook, `${fileName}.xlsx`);
+    }
+
+    toast({ title: "Ekspor Berhasil", description: `${fileName}.${format} telah diunduh.` });
+    setIsExporting(false);
+  };
+
 
   const renderPageNumbers = () => {
     const pageNumbers = [];
@@ -1027,17 +1099,54 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
       
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
          <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarCheck className="h-6 w-6 text-primary" />
-            <span>Riwayat Absensi</span>
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarCheck className="h-6 w-6 text-primary" />
+              <span>Riwayat Absensi</span>
+            </CardTitle>
+            <div className="flex w-full sm:w-auto gap-2">
+              <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={uniqueSubjects.length === 0}>
+                <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
+                  <Filter className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="Filter Mata Pelajaran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
+                  {uniqueSubjects.map(subject => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" disabled={isExporting || filteredHistory.length === 0} aria-label="Ekspor Data">
+                    {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    <span>Unduh sebagai PDF</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExport('xlsx')}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    <span>Unduh sebagai Excel</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {attendanceHistory.length === 0 ? (
+          {filteredHistory.length === 0 ? (
             <div className="pt-6 text-center text-muted-foreground flex flex-col items-center gap-4">
                 <Info className="mx-auto h-12 w-12 text-primary" />
-                <p>Belum ada riwayat absensi yang tercatat. Lakukan absensi melalui halaman detail pelajaran.</p>
-                <Button asChild variant="outline"><Link href="/lessons">Lihat Jadwal Pelajaran</Link></Button>
+                 <p>
+                  {attendanceHistory.length > 0
+                    ? `Tidak ada riwayat absensi untuk mata pelajaran "${selectedSubject}".`
+                    : "Belum ada riwayat absensi yang tercatat."}
+                </p>
+                {attendanceHistory.length === 0 && <Button asChild variant="outline"><Link href="/lessons">Lihat Jadwal Pelajaran</Link></Button>}
             </div>
           ) : (
             <>
