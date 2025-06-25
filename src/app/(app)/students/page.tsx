@@ -870,15 +870,15 @@ export default function StudentsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className="w-1/4">Nama</TableHead>
+                    <TableHead className={cn((authRole === 'admin' || authRole === 'guru') ? "w-1/4" : "w-1/2")}>Nama</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && (
                       <>
                         <TableHead className="w-1/5">NIS</TableHead>
                         <TableHead className="w-1/4">Email</TableHead>
                       </>
                     )}
-                    {authRole === 'siswa' && <TableHead className="w-1/5">No. Absen</TableHead>}
-                     <TableHead className="w-1/5">Kelas</TableHead>
+                    {authRole === 'siswa' && <TableHead className="w-2/12">No. Absen</TableHead>}
+                     <TableHead className={cn("w-1/5", authRole === 'siswa' && "w-3/12")}>Kelas</TableHead>
                     {(authRole === 'admin' || authRole === 'guru') && (
                       <>
                         <TableHead className="w-[80px]">Gender</TableHead>
