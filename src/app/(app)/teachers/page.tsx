@@ -539,7 +539,7 @@ export default function TeachersPage() {
               <DialogHeader>
                 <DialogTitle>Tambah Profil Guru Baru</DialogTitle>
                 <DialogDescription>
-                  Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.
+                  Isi detail profil guru. anda dapat menautkannya ke akun pengguna yang sudah ada.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -667,7 +667,7 @@ export default function TeachersPage() {
                               {selectedTeacher && selectedTeacher.id === teacher.id && ( 
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                    <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                     <AlertDialogDescription>
                                       Tindakan ini akan menghapus profil guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
                                     </AlertDialogDescription>
@@ -714,7 +714,7 @@ export default function TeachersPage() {
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || subjectFilter !== "all" 
-                ? "Tidak ada profil guru yang cocok dengan filter atau pencarian Anda."
+                ? "Tidak ada profil guru yang cocok dengan filter atau pencarian."
                 : "Tidak ada data profil guru. Klik \"Tambah Profil Guru\" untuk membuat data baru."
               }
             </div>

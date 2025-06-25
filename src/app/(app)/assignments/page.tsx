@@ -945,7 +945,7 @@ export default function AssignmentsPage() {
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Tugas</h1>
         <p className="text-muted-foreground">
-          {isStudentRole ? "Lihat dan kerjakan tugas Anda." : isParentRole ? "Lihat tugas anak Anda." : "Kelola pemberian tugas, pengumpulan, dan penilaian."}
+          {isStudentRole ? "Lihat dan kerjakan tugas." : isParentRole ? "Lihat tugas anak." : "Kelola pemberian tugas, pengumpulan, dan penilaian."}
         </p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
@@ -1245,7 +1245,7 @@ export default function AssignmentsPage() {
                                               <Trash2 className="mr-2 h-4 w-4" /> Hapus
                                           </DropdownMenuItem>
                                           </AlertDialogTrigger>
-                                          {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title || 'ini'}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                          {selectedAssignment && selectedAssignment.id === assignment.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus tugas <span className="font-semibold">{selectedAssignment?.title || 'ini'}</span> beserta semua data pengumpulannya.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedAssignment(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteAssignment(selectedAssignment.id)}>Ya, Hapus Tugas</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                                       </AlertDialog>
                                   </>
                               )}
@@ -1304,7 +1304,7 @@ export default function AssignmentsPage() {
             </>
           ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {(searchTerm || (isAdminRole && (selectedClassFilter !== "all" || selectedSubjectFilter !== "all")) || (isTeacherRole && teacherUniqueClassCount ===1 && meetingNumberFilter) || (isTeacherRole && teacherUniqueClassCount && teacherUniqueClassCount > 1 && (selectedClassFilter !== "all" || selectedSubjectFilter !== "all")))
-                  ? "Tidak ada tugas yang cocok dengan filter atau pencarian Anda."
+                  ? "Tidak ada tugas yang cocok dengan filter atau pencarian."
                   : "Belum ada tugas."
                 }
               </div> )}
@@ -1556,8 +1556,8 @@ export default function AssignmentsPage() {
                {(isStudentRole || isParentRole) && (
                 <>
                   {selectedAssignmentForDetail.submissionStatus && <div><Label className="text-muted-foreground">Status Pengumpulan:</Label><p className={cn(selectedAssignmentForDetail.submissionStatus === "Sudah Dikerjakan" && "text-green-600", selectedAssignmentForDetail.submissionStatus === "Terlambat" && "text-destructive", "font-medium")}>{selectedAssignmentForDetail.submissionStatus}</p></div>}
-                  {selectedAssignmentForDetail.studentSubmissionLink && <div><Label className="text-muted-foreground">Link Pengumpulan Anda:</Label><Button variant="link" asChild className="p-0 h-auto block"><NextLink href={selectedAssignmentForDetail.studentSubmissionLink} target="_blank" rel="noopener noreferrer"><LinkIcon className="inline-block mr-1 h-4 w-4"/> Lihat File Anda</NextLink></Button></div>}
-                  {selectedAssignmentForDetail.studentSubmissionNotes && <div><Label className="text-muted-foreground">Catatan Pengumpulan Anda:</Label><p className="whitespace-pre-line">{selectedAssignmentForDetail.studentSubmissionNotes}</p></div>}
+                  {selectedAssignmentForDetail.studentSubmissionLink && <div><Label className="text-muted-foreground">Link Pengumpulan:</Label><Button variant="link" asChild className="p-0 h-auto block"><NextLink href={selectedAssignmentForDetail.studentSubmissionLink} target="_blank" rel="noopener noreferrer"><LinkIcon className="inline-block mr-1 h-4 w-4"/> Lihat File</NextLink></Button></div>}
+                  {selectedAssignmentForDetail.studentSubmissionNotes && <div><Label className="text-muted-foreground">Catatan Pengumpulan:</Label><p className="whitespace-pre-line">{selectedAssignmentForDetail.studentSubmissionNotes}</p></div>}
                   {selectedAssignmentForDetail.result && (
                     <div className="mt-3 pt-3 border-t">
                       <Label className="text-base font-semibold text-primary">Hasil Penilaian:</Label>

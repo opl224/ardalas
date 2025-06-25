@@ -537,7 +537,7 @@ export default function EventsPage() {
                                   </AlertDialogTrigger>
                                   {selectedEvent && selectedEvent.id === event.id && (
                                     <AlertDialogContent>
-                                      <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus acara <span className="font-semibold">{selectedEvent?.title}</span>.</AlertDialogDescription></AlertDialogHeader>
+                                      <AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus acara <span className="font-semibold">{selectedEvent?.title}</span>.</AlertDialogDescription></AlertDialogHeader>
                                       <AlertDialogFooter>
                                         <AlertDialogCancel onClick={() => setSelectedEvent(null)}>Batal</AlertDialogCancel>
                                         <AlertDialogAction onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}>Ya, Hapus Acara</AlertDialogAction>

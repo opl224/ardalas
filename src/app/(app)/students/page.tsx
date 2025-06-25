@@ -744,15 +744,15 @@ export default function StudentsPage() {
   const pageDescription = (authRole === 'admin' || authRole === 'guru')
     ? "Kelola data murid, absensi, nilai, dan informasi terkait."
     : (authRole === 'siswa' && authUser?.className
-      ? `Daftar teman sekelas Anda.`
+      ? `Daftar teman sekelas.`
       : "Informasi murid.");
 
   const showClassFilter = ((authRole === 'admin' || authRole === 'guru') && allClassesForFilter.length > 0);
   const isLoadingCombined = isLoadingStudents || authLoading || isLoadingInitialData;
 
   const getNoStudentsMessage = () => {
-    if (authRole === 'siswa') return "Tidak ada siswa lain di kelas Anda.";
-    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini, atau kelas yang Anda asuh belum memiliki murid.";
+    if (authRole === 'siswa') return "Tidak ada siswa lain di kelas anda.";
+    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini, atau kelas yang anda asuh belum memiliki murid.";
     return "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.";
   };
 
@@ -936,7 +936,7 @@ export default function StudentsPage() {
                                     {selectedStudent && selectedStudent.id === student.id && (
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                          <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                           <AlertDialogDescription>
                                             Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
                                           </AlertDialogDescription>
@@ -1007,7 +1007,7 @@ export default function StudentsPage() {
                                       {selectedStudent && selectedStudent.id === student.id && (
                                         <AlertDialogContent>
                                           <AlertDialogHeader>
-                                            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                            <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                             <AlertDialogDescription>
                                               Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.
                                             </AlertDialogDescription>
@@ -1057,7 +1057,7 @@ export default function StudentsPage() {
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || selectedClassFilter !== "all"
-                ? "Tidak ada murid yang cocok dengan filter atau pencarian Anda."
+                ? "Tidak ada murid yang cocok dengan filter atau pencarian."
                 : getNoStudentsMessage()
               }
             </div>

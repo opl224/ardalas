@@ -988,7 +988,7 @@ export default function ResultsPage() {
     const batch = writeBatch(db);
     const notificationBase = {
       title: `Nilai Semester Tersedia: ${selectedSubject?.name || 'Mapel'}`,
-      description: `Guru Anda telah mengirimkan nilai semester untuk mata pelajaran ${selectedSubject?.name || 'Mata Pelajaran Ini'}. Silakan periksa di halaman Hasil Belajar.`,
+      description: `Guru anda telah mengirimkan nilai semester untuk mata pelajaran ${selectedSubject?.name || 'Mata Pelajaran Ini'}. Silakan periksa di halaman Hasil Belajar.`,
       href: "/my-grades",
       read: false,
       createdAt: serverTimestamp(),
@@ -1234,12 +1234,12 @@ export default function ResultsPage() {
   let pageDescription = "Catat, lihat, dan kelola nilai serta rapor siswa.";
   if (role === "siswa") {
       pageTitle = `Hasil Belajar Saya (${user?.displayName || 'Siswa'})`;
-      pageDescription = "Lihat daftar nilai dan hasil asesmen Anda.";
+      pageDescription = "Lihat daftar nilai dan hasil asesmen.";
   } else if (role === "orangtua") {
       pageTitle = `Hasil Belajar Anak (${user?.linkedStudentName || 'Siswa'})`;
-      pageDescription = `Lihat daftar nilai dan hasil asesmen ${user?.linkedStudentName || 'anak Anda'}.`;
+      pageDescription = `Lihat daftar nilai dan hasil asesmen ${user?.linkedStudentName || 'anak anda'}.`;
       if (!user?.linkedStudentId) {
-           pageDescription = "Akun Anda belum terhubung dengan data siswa. Hubungi admin sekolah.";
+           pageDescription = "Akun belum terhubung dengan data siswa. Hubungi admin sekolah.";
       }
   }
 
@@ -1489,7 +1489,7 @@ export default function ResultsPage() {
                                   {selectedResult && selectedResult.id === result.id && (
                                     <AlertDialogContent>
                                       <AlertDialogHead>
-                                        <AlertDialogT>Apakah Anda yakin?</AlertDialogT>
+                                        <AlertDialogT>Apakah Kamu Yakin?</AlertDialogT>
                                         <AlertDialogDesc>
                                           Tindakan ini akan menghapus hasil belajar <span className="font-semibold">{selectedResult?.assessmentTitle}</span> untuk siswa <span className="font-semibold">{selectedResult?.studentName}</span>.
                                         </AlertDialogDesc>
@@ -1535,10 +1535,10 @@ export default function ResultsPage() {
             </>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {role === 'orangtua' && !user?.linkedStudentId ? "Akun Anda belum terhubung ke data siswa. Hubungi administrator." :
+                {role === 'orangtua' && !user?.linkedStudentId ? "Akun anda belum terhubung ke data siswa. Hubungi administrator." :
                  (role === 'siswa' && (!user || !user.uid)) ? "Tidak dapat memuat data siswa. Silakan coba lagi." :
                  searchTerm || selectedAssessmentTypeFilter !== "all" || selectedClassFilterForTable !== "all" || selectedSubjectFilterForTable !== "all" || semesterFilter !== "all"
-                 ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian Anda."
+                 ? "Tidak ada hasil belajar yang cocok dengan filter atau pencarian."
                  : "Belum ada data hasil belajar yang sesuai."}
             </div>
           )}

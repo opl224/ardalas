@@ -1218,7 +1218,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
             <CardHeader><CardTitle>Jadwal Hari Ini</CardTitle></CardHeader>
             <CardContent className="pt-6 text-center text-muted-foreground">
                 <Info className="mx-auto h-12 w-12 mb-4 text-primary" />
-                Tidak ada jadwal pelajaran untuk {isParentView ? `anak Anda (${studentToView.name || '...'})` : 'Anda'} hari ini.
+                Tidak ada jadwal pelajaran untuk {isParentView ? `anak anda (${studentToView.name || '...'})` : 'anda'} hari ini.
             </CardContent>
         </Card>
       ) : (
@@ -1253,8 +1253,8 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
             <CardHeader><CardTitle className="text-lg">Catatan Penting</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-1">
                 <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui tombol <ExternalLink className="inline h-3.5 w-3.5 align-text-bottom" /> di samping masing-masing pelajaran.</p>
-                <p>&bull; Pastikan Anda melakukan absen selama jam pelajaran berlangsung.</p>
-                <p>&bull; Jika ada kendala teknis atau alasan lain tidak bisa absen, segera hubungi guru mata pelajaran atau wali kelas Anda.</p>
+                <p>&bull; Pastikan melakukan absen selama jam pelajaran berlangsung.</p>
+                <p>&bull; Jika ada kendala teknis atau alasan lain tidak bisa absen, segera hubungi guru mata pelajaran atau wali kelas.</p>
             </CardContent>
         </Card>
     </div>
@@ -1291,7 +1291,7 @@ export default function AttendancePageWrapper() {
       return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold font-headline">Kehadiran Anak</h1>
-             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6"><div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground"><AlertCircle className="w-12 h-12 mb-4 text-warning" /><p className="font-semibold">Siswa Belum Tertaut</p><p>Akun Anda belum terhubung dengan data siswa. Silakan hubungi administrator sekolah.</p></div></CardContent></Card>
+             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6"><div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground"><AlertCircle className="w-12 h-12 mb-4 text-warning" /><p className="font-semibold">Siswa Belum Tertaut</p><p>Akun belum terhubung dengan data siswa. Silakan hubungi administrator sekolah.</p></div></CardContent></Card>
         </div>
       );
     }

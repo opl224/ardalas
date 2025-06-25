@@ -370,7 +370,7 @@ export default function SubjectsPage() {
   );
 
   const pageDescription = role === "guru"
-    ? "Daftar mata pelajaran yang menjadi tanggung jawab Anda."
+    ? "Daftar mata pelajaran yang menjadi tanggung jawab."
     : "Kelola daftar mata pelajaran yang diajarkan.";
 
   const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingAuthUsers);
@@ -557,7 +557,7 @@ export default function SubjectsPage() {
                                 {selectedSubject && selectedSubject.id === subject.id && (
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                      <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                       <AlertDialogDescription>
                                         Tindakan ini akan menghapus mata pelajaran <span className="font-semibold">{selectedSubject?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
                                       </AlertDialogDescription>
@@ -604,7 +604,7 @@ export default function SubjectsPage() {
             </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {role === "admin" ? (searchTerm ? 'Tidak ada mata pelajaran yang cocok dengan pencarian Anda.' : 'Tidak ada data mata pelajaran. Klik "Tambah Mata Pelajaran" untuk membuat data baru.') : 'Tidak ada mata pelajaran yang ditugaskan kepada Anda.'}
+              {role === "admin" ? (searchTerm ? 'Tidak ada mata pelajaran yang cocok dengan pencarian.' : 'Tidak ada data mata pelajaran. Klik "Tambah Mata Pelajaran" untuk membuat data baru.') : 'Tidak ada mata pelajaran yang ditugaskan kepada anda.'}
             </div>
           )}
         </CardContent>

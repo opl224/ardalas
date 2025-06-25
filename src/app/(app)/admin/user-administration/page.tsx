@@ -207,7 +207,7 @@ export default function UserAdministrationPage() {
       setAllClasses(querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
       console.error("Error fetching classes: ", error);
-      toast({ title: "Gagal Memuat Daftar Kelas", description: "Pastikan Anda memiliki koneksi internet dan coba lagi. Jika berlanjut, hubungi administrator.", variant: "destructive" });
+      toast({ title: "Gagal Memuat Daftar Kelas", description: "Pastikan memiliki koneksi internet dan coba lagi. Jika berlanjut, hubungi administrator.", variant: "destructive" });
     } finally {
       setIsLoadingClasses(false);
     }
@@ -824,7 +824,7 @@ export default function UserAdministrationPage() {
                               </AlertDialogTrigger>
                               {selectedUser && selectedUser.id === user.id && (
                                 <AlertDialogContent>
-                                  <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
+                                  <AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data pengguna <span className="font-semibold">{selectedUser?.name}</span> dari database. Ini tidak menghapus akun dari Firebase Authentication.</AlertDialogDescription></AlertDialogHeader>
                                   <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedUser(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteUser(selectedUser.id, selectedUser.name)}>Ya, Hapus</AlertDialogAction></AlertDialogFooter>
                                 </AlertDialogContent>
                               )}
@@ -861,7 +861,7 @@ export default function UserAdministrationPage() {
             </>
           ) : ( <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || roleFilter.length > 0
-                ? "Tidak ada pengguna yang cocok dengan filter atau pencarian Anda."
+                ? "Tidak ada pengguna yang cocok dengan filter atau pencarian."
                 : "Tidak ada pengguna. Pastikan pengguna telah ditambahkan melalui fitur \"Tambah Pengguna\"."
               }
             </div>

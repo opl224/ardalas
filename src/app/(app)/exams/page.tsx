@@ -798,7 +798,7 @@ export default function ExamsPage() {
                                       {selectedExam && selectedExam.id === exam.id && (
                                         <AlertDialogContent>
                                           <AlertDialogHeader>
-                                            <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                            <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                             <AlertDialogDescription>
                                               Tindakan ini akan menghapus jadwal ujian <span className="font-semibold">{selectedExam?.title}</span>.
                                             </AlertDialogDescription>
@@ -845,7 +845,7 @@ export default function ExamsPage() {
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || selectedSubjectFilter !== "all"
-                ? "Tidak ada ujian yang cocok dengan filter atau pencarian Anda."
+                ? "Tidak ada ujian yang cocok dengan filter atau pencarian."
                 : "Belum ada jadwal ujian yang ditambahkan."
               }
             </div>

@@ -55,7 +55,7 @@ export function LoginForm() {
       router.push("/dashboard");
     } catch (error) {
       const firebaseError = error as FirebaseError;
-      let errorMessage = "Login gagal. Periksa kembali email dan password Anda.";
+      let errorMessage = "Login gagal. Periksa kembali email dan password kamu.";
       if (firebaseError.code === "auth/user-not-found" || firebaseError.code === "auth/wrong-password" || firebaseError.code === "auth/invalid-credential") {
         errorMessage = "Email atau password salah.";
       } else if (firebaseError.code === "auth/invalid-email") {
@@ -77,7 +77,7 @@ export function LoginForm() {
       <CardHeader>
         <CardTitle className="text-2xl font-headline text-center">Login Ardalas</CardTitle>
         <CardDescription className="text-center">
-          Masuk ke akun Anda untuk melanjutkan.
+          Masuk ke akun anda untuk melanjutkan.
         </CardDescription>
       </CardHeader>
       <CardContent>

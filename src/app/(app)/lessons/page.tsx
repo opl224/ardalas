@@ -632,10 +632,10 @@ export default function LessonsPage() {
 
   const getNoLessonsMessage = () => {
     if (role === "guru") {
-      return "Tidak ada pelajaran yang ditugaskan kepada Anda.";
+      return "Tidak ada pelajaran yang ditugaskan kepada anda.";
     }
     if (role === "siswa") {
-      return "Tidak ada jadwal pelajaran untuk kelas Anda saat ini.";
+      return "Tidak ada jadwal pelajaran untuk kelas saat ini.";
     }
     if (role === "orangtua") {
       if (!authUser?.linkedStudentClassId) {
@@ -647,7 +647,7 @@ export default function LessonsPage() {
           </div>
         );
       }
-      return "Tidak ada jadwal pelajaran yang terdaftar untuk kelas anak Anda saat ini.";
+      return "Tidak ada jadwal pelajaran yang terdaftar untuk kelas anak anda saat ini.";
     }
     return "Belum ada jadwal pelajaran yang ditambahkan.";
   };
@@ -660,7 +660,7 @@ export default function LessonsPage() {
           {canManageLessons 
             ? "Kelola jadwal pelajaran, materi ajar, dan silabus."
             : isStudentOrParent
-            ? (role === "siswa" ? "Lihat jadwal pelajaran Anda." : `Lihat jadwal pelajaran anak Anda (${authUser?.linkedStudentName || 'Siswa'}).`)
+            ? (role === "siswa" ? "Lihat jadwal pelajaran." : `Lihat jadwal pelajaran anak (${authUser?.linkedStudentName || 'Siswa'}).`)
             : "Lihat jadwal pelajaran."
           }
         </p>
@@ -898,7 +898,7 @@ export default function LessonsPage() {
                                   {selectedLesson && selectedLesson.id === lesson.id && ( 
                                     <AlertDialogContent>
                                       <AlertDialogHeader>
-                                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                        <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                         <AlertDialogDescription>
                                           Tindakan ini akan menghapus jadwal pelajaran <span className="font-semibold">{selectedLesson?.subjectName} ({selectedLesson?.className})</span> pada hari {selectedLesson?.dayOfWeek}.
                                         </AlertDialogDescription>

@@ -552,7 +552,7 @@ function GalleryContent() {
         {selectedMediaForDeletion && (
            <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Apakah Anda Yakin?</AlertDialogTitle>
+                <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                 <AlertDialogDescription>
                   Tindakan ini akan menghapus media secara permanen dan tidak dapat dibatalkan.
                   {selectedMediaForDeletion.type === 'photo' && ` Foto dengan keterangan "${selectedMediaForDeletion.caption || '(tanpa keterangan)'}" akan dihapus.`}

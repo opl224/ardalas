@@ -51,7 +51,7 @@ export async function uploadActivityMedia(activityId: string, formData: FormData
       if (uploadError.message.includes("Bucket not found")) {
           return { error: "Gagal mengunggah: Bucket 'activities' tidak ditemukan di Supabase. Pastikan bucket sudah dibuat dan bersifat publik." };
       }
-      return { error: `Kesalahan Supabase: ${uploadError.message}. Periksa kebijakan bucket Anda.` };
+      return { error: `Kesalahan Supabase: ${uploadError.message}. Periksa kebijakan bucket.` };
     }
 
     const { data: publicUrlData } = supabase.storage

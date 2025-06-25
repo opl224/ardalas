@@ -185,7 +185,7 @@ export default function AllNotificationsPage() {
           <BellRing className="h-7 w-7" />
           Semua Notifikasi
         </h1>
-        <p className="text-muted-foreground">Lihat semua pemberitahuan yang Anda terima.</p>
+        <p className="text-muted-foreground">Lihat semua pemberitahuan yang anda terima.</p>
       </div>
 
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">

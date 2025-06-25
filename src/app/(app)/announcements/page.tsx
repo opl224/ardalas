@@ -254,7 +254,7 @@ export default function AnnouncementsPage() {
 
   const handleAddAnnouncementSubmit: SubmitHandler<AnnouncementFormValues> = async (data) => {
      if (!user) {
-        toast({ title: "Aksi Ditolak", description: "Anda harus login.", variant: "destructive"});
+        toast({ title: "Aksi Ditolak", description: "Kamu harus login.", variant: "destructive"});
         return;
     }
     addAnnouncementForm.clearErrors();
@@ -560,7 +560,7 @@ export default function AnnouncementsPage() {
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-3xl font-bold font-headline">Pengumuman Sekolah</h1>
-          <p className="text-muted-foreground">Informasi terbaru dan penting untuk Anda.</p>
+          <p className="text-muted-foreground">Informasi terbaru dan penting untuk Kamu.</p>
         </div>
         {canManageAnnouncements && (
            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
@@ -656,7 +656,7 @@ export default function AnnouncementsPage() {
                         </AlertDialogTrigger>
                         {selectedAnnouncement && selectedAnnouncement.id === announcement.id && (
                           <AlertDialogContent>
-                            <AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus pengumuman <span className="font-semibold">"{selectedAnnouncement?.title}"</span>.</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus pengumuman <span className="font-semibold">"{selectedAnnouncement?.title}"</span>.</AlertDialogDescription></AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel onClick={() => setSelectedAnnouncement(null)}>Batal</AlertDialogCancel>
                               <AlertDialogAction onClick={() => handleDeleteAnnouncement(selectedAnnouncement.id, selectedAnnouncement.title)}>Ya, Hapus Pengumuman</AlertDialogAction>

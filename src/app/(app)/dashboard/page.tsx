@@ -611,7 +611,7 @@ export default function DashboardPage() {
                         <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">{user.className || user.classId || "Belum ada kelas"}</div>
-                            <p className="text-xs text-muted-foreground pt-1">Informasi kelas Anda saat ini.</p>
+                            <p className="text-xs text-muted-foreground pt-1">Informasi kelas saat ini.</p>
                             <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                         </CardContent>
                     </Card>
@@ -643,7 +643,7 @@ export default function DashboardPage() {
                       </CardContent>
                     </Card>
                     <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
-                    <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+                    <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran." href="/attendance"/>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -656,7 +656,7 @@ export default function DashboardPage() {
                     <CardHeader className="pb-2"><CardTitle className="text-base font-medium">Kelas Saya</CardTitle></CardHeader>
                     <CardContent>
                         <div className="text-3xl font-bold">{user.className || user.classId || "Belum ada kelas"}</div>
-                        <p className="text-xs text-muted-foreground pt-1">Informasi kelas Anda saat ini.</p>
+                        <p className="text-xs text-muted-foreground pt-1">Informasi kelas saat ini.</p>
                         <Button variant="link" size="sm" asChild className="p-0 h-auto text-xs mt-2 text-primary"><Link href="/my-class">Detail Kelas <ExternalLink className="ml-1 h-3 w-3" /></Link></Button>
                     </CardContent>
                 </Card>
@@ -688,7 +688,7 @@ export default function DashboardPage() {
                   </CardContent>
                 </Card>
                 <StatCard title="Jumlah Tugas" value={0} icon={ClipboardCheck} loading={loadingStats} description="Tugas aktif dan belum dikerjakan." href="/assignments"/>
-                <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran Anda." href="/attendance"/>
+                <StatCard title="Kehadiran Bulan Ini" value={"0%"} icon={CalendarCheck} loading={loadingStats} description="Persentase kehadiran." href="/attendance"/>
               </div>
             </>
           )}

@@ -45,7 +45,7 @@ export default function SettingsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold font-headline">Pengaturan Akun</h1>
-        <p className="text-muted-foreground">Kelola preferensi dan informasi akun Anda.</p>
+        <p className="text-muted-foreground">Kelola preferensi dan informasi akun anda.</p>
       </div>
 
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
@@ -55,7 +55,7 @@ export default function SettingsPage() {
             <span>Preferensi Akun</span>
           </CardTitle>
           <CardDescription>
-            Atur berbagai aspek akun Anda untuk pengalaman yang lebih personal.
+            Atur berbagai aspek akun anda untuk pengalaman yang lebih personal.
           </CardDescription> */}
         </CardHeader>
         <CardContent className="space-y-6">
@@ -65,7 +65,7 @@ export default function SettingsPage() {
               Profil Pengguna
             </h3>
             <p className="text-sm text-muted-foreground">
-              Lihat dan perbarui informasi profil Anda seperti nama, foto, dan detail kontak. (Fitur ini akan segera hadir)
+              Lihat dan perbarui informasi profil anda seperti nama, foto, dan detail kontak. (Fitur ini akan segera hadir)
             </p>
           </div>
 
@@ -75,7 +75,7 @@ export default function SettingsPage() {
               Keamanan Akun
             </h3>
             <p className="text-sm text-muted-foreground">
-              Ubah kata sandi Anda secara berkala untuk menjaga keamanan akun. (Fitur ini akan segera hadir)
+              Ubah kata sandi anda secara berkala untuk menjaga keamanan akun. (Fitur ini akan segera hadir)
             </p>
           </div>
 
@@ -98,7 +98,7 @@ export default function SettingsPage() {
                 <Label htmlFor="dark-mode-toggle" className="flex flex-col space-y-1">
                     <span>Mode Gelap</span>
                     <span className="font-normal leading-snug text-muted-foreground text-xs">
-                        Sesuaikan tampilan aplikasi dengan preferensi visual Anda.
+                        Sesuaikan tampilan aplikasi dengan preferensi visual.
                     </span>
                 </Label>
                 <Switch

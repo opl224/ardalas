@@ -303,7 +303,7 @@ export default function MyGradesPage() {
             <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
               <AlertCircle className="w-12 h-12 mb-4 text-warning" />
               <p className="font-semibold">Siswa Belum Tertaut</p>
-              <p>Akun Anda belum terhubung dengan data siswa. Silakan hubungi administrator sekolah.</p>
+              <p>Akun anda belum terhubung dengan data siswa. Silakan hubungi administrator sekolah.</p>
             </div>
           </CardContent>
         </Card>

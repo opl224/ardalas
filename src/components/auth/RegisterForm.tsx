@@ -82,7 +82,7 @@ export function RegisterForm() {
       
       toast({
         title: "Registrasi Berhasil",
-        description: "Akun Anda telah berhasil dibuat. Silakan login.",
+        description: "Akun telah berhasil dibuat. Silakan login.",
       });
       router.push("/login");
 
@@ -125,7 +125,7 @@ export function RegisterForm() {
                 <FormItem>
                   <FormLabel>Nama Lengkap</FormLabel>
                   <FormControl>
-                    <Input placeholder="Nama Anda" {...field} />
+                    <Input placeholder="Nama" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -203,7 +203,7 @@ export function RegisterForm() {
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih peran Anda" />
+                        <SelectValue placeholder="Pilih peran" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

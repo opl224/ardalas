@@ -48,7 +48,7 @@ export default function MyClassPage() {
             <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
               <AlertCircle className="w-12 h-12 mb-4 text-destructive" />
               <p className="font-semibold">Halaman ini hanya untuk siswa.</p>
-              <p>Silakan login sebagai siswa untuk melihat informasi kelas Anda.</p>
+              <p>Silakan login sebagai siswa untuk melihat informasi kelas.</p>
             </div>
           </CardContent>
         </Card>
@@ -60,7 +60,7 @@ export default function MyClassPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Informasi Kelas Saya</h1>
-        <p className="text-muted-foreground">Detail mengenai kelas Anda saat ini.</p>
+        <p className="text-muted-foreground">Detail mengenai kelas saat ini.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader>

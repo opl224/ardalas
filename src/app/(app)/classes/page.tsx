@@ -362,7 +362,7 @@ export default function ClassesPage() {
 
   const pageTitle = authRole === "orangtua" ? `Kelas Anak Saya (${user?.linkedStudentName || 'Siswa'})` : "Manajemen Kelas";
   const pageDescription = authRole === "orangtua" 
-    ? "Informasi mengenai kelas anak Anda."
+    ? "Informasi mengenai kelas anak."
     : "Kelola daftar kelas, wali kelas, dan siswa per kelas.";
 
 
@@ -614,7 +614,7 @@ export default function ClassesPage() {
                                     {selectedClass && selectedClass.id === classItem.id && ( 
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
-                                          <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                                          <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                           <AlertDialogDescription>
                                             Tindakan ini akan menghapus kelas <span className="font-semibold">{selectedClass?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
                                           </AlertDialogDescription>
@@ -663,7 +663,7 @@ export default function ClassesPage() {
             </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {searchTerm || selectedClassNameFilter !== "all" ? 'Tidak ada kelas yang cocok dengan filter atau pencarian Anda.' :
+                {searchTerm || selectedClassNameFilter !== "all" ? 'Tidak ada kelas yang cocok dengan filter atau pencarian.' :
                  authRole === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
                  authRole === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
                  authRole === 'orangtua' && !user?.linkedStudentClassId ? (
@@ -673,7 +673,7 @@ export default function ClassesPage() {
                      <span>Pastikan anak sudah terdaftar di kelas dan akun orang tua sudah ditautkan dengan benar.</span>
                    </div>
                  ) :
-                 authRole === 'orangtua' ? 'Data kelas anak Anda tidak ditemukan.' :
+                 authRole === 'orangtua' ? 'Data kelas anak tidak ditemukan.' :
                  'Tidak ada data kelas untuk ditampilkan.'
                 }
             </div>

@@ -925,9 +925,9 @@ export default function ParentsPage() {
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
               {searchTerm || selectedClassFilter !== "all"
-                ? "Tidak ada data orang tua yang cocok dengan filter atau pencarian Anda."
+                ? "Tidak ada data orang tua yang cocok dengan filter atau pencarian."
                 : (teacherResponsibleClassIds && teacherResponsibleClassIds.length === 0 && authRole === 'guru' )
-                ? "Anda tidak menjadi wali kelas untuk kelas manapun, atau kelas yang Anda asuh belum memiliki murid yang terdata orang tuanya."
+                ? "Anda tidak menjadi wali kelas untuk kelas manapun, atau kelas yang anda asuh belum memiliki murid yang terdata orang tuanya."
                 : "Tidak ada data orang tua untuk ditampilkan. Klik \"Tambah Orang Tua\" untuk membuat data baru."
               }
             </div>

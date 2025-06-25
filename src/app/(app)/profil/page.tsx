@@ -133,7 +133,7 @@ export default function ProfilePage() {
     try {
       await updateProfile(currentUser, { photoURL: selectedAvatar });
       await refreshUser(); 
-      toast({ title: "Avatar Diperbarui", description: "Foto profil Anda berhasil diubah." });
+      toast({ title: "Avatar Diperbarui", description: "Foto profil berhasil diubah." });
       setIsAvatarDialogOpen(false);
     } catch (error) {
       console.error("Error updating avatar:", error);
@@ -168,7 +168,7 @@ export default function ProfilePage() {
 
         toast({
             title: "Profil Diperbarui",
-            description: "Informasi profil Anda telah berhasil disimpan.",
+            description: "Informasi profil telah berhasil disimpan.",
         });
 
         setIsDetailDialogOpen(false);
@@ -211,7 +211,7 @@ export default function ProfilePage() {
             <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
               <AlertCircle className="w-12 h-12 mb-4 text-destructive" />
               <p className="font-semibold">Pengguna tidak ditemukan.</p>
-              <p>Silakan login untuk melihat profil Anda.</p>
+              <p>Silakan login untuk melihat profil.</p>
             </div>
           </CardContent>
         </Card>
@@ -248,7 +248,7 @@ export default function ProfilePage() {
                     <DialogHeader>
                         <DialogTitle>Pilih Avatar Baru</DialogTitle>
                         <DialogDescription>
-                            Pilih salah satu gambar di bawah ini untuk dijadikan foto profil Anda.
+                            Pilih salah satu gambar di bawah ini untuk dijadikan foto profil.
                         </DialogDescription>
                     </DialogHeader>
                     <ScrollArea className="max-h-[60vh]">
@@ -340,8 +340,8 @@ export default function ProfilePage() {
                     <DialogTitle>Detail Profil</DialogTitle>
                     <DialogDescription>
                       {role === 'admin'
-                        ? "Perbarui informasi profil Anda. Perubahan akan disimpan di seluruh sistem."
-                        : "Informasi detail profil Anda."
+                        ? "Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem."
+                        : "Informasi detail profil."
                       }
                     </DialogDescription>
                   </DialogHeader>
@@ -356,7 +356,7 @@ export default function ProfilePage() {
                             <FormItem>
                               <FormLabel>Nama Lengkap</FormLabel>
                               <FormControl>
-                                <Input placeholder="Nama lengkap Anda" {...field} />
+                                <Input placeholder="Nama lengkap" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -381,7 +381,7 @@ export default function ProfilePage() {
                             <FormItem>
                               <FormLabel>Alamat</FormLabel>
                               <FormControl>
-                                <Textarea placeholder="Masukkan alamat Anda" {...field} />
+                                <Textarea placeholder="Masukkan alamat" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
