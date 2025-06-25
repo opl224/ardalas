@@ -199,7 +199,7 @@ function TeacherAdminAttendanceManagement() {
             setClassesForDropdown(teacherClasses);
 
             const allSubjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
             setSubjectsForDropdown([]); 
         }
       } catch (error) {
