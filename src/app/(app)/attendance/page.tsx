@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -50,6 +50,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import Link from "next/link";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
 // --- Types for Teacher/Admin View ---
@@ -100,34 +101,19 @@ const months = [
 const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
 // --- Types for Student View ---
-interface StudentLessonDisplay {
-  id: string; 
+interface StudentAttendanceHistoryEntry {
+  id: string;
   subjectName?: string;
-  dayOfWeek: string;
-  startTime: string; 
-  endTime: string;   
-  statusText?: string; 
-  statusIcon?: React.ReactNode; 
-}
-
-export interface StudentSelfAttendanceRecord { 
-  id?: string; 
-  studentId: string;
-  studentName: string;
-  classId: string;
-  className: string;
+  lessonTime?: string;
+  date: Timestamp;
+  status: "Hadir";
+  attendedAt: Timestamp;
   lessonId: string;
-  subjectName?: string;
-  lessonTime: string; 
-  date: Timestamp; 
-  status: "Hadir"; 
-  attendedAt: Timestamp; 
 }
 
 interface StudentAttendanceViewProps {
   targetStudentId?: string;
   targetStudentName?: string;
-  targetStudentClassId?: string;
 }
 
 
@@ -138,11 +124,8 @@ function TeacherAdminAttendanceManagement() {
   const [classesForDropdown, setClassesForDropdown] = useState<ClassMin[]>([]);
   const [subjectsForDropdown, setSubjectsForDropdown] = useState<SubjectMin[]>([]);
 
-  const [studentsInClassForForm, setStudentsInClassForForm] = useState<StudentMin[]>([]);
-  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
-  const [isLoadingSubjects, setIsLoadingSubjects] = useState(true); 
-  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
-  const [isLoadingExistingAttendance, setIsLoadingExistingAttendance] = useState(false);
+  const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(true);
+  const [isLoadingFormData, setIsLoadingFormData] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>();
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); 
@@ -174,8 +157,7 @@ function TeacherAdminAttendanceManagement() {
     if (authLoading || !user || !role) return; 
 
     const fetchInitialDropdownData = async () => {
-      setIsLoadingClasses(true);
-      setIsLoadingSubjects(true);
+      setIsLoadingDropdowns(true);
       try {
         if (role === 'admin') {
           const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
@@ -188,21 +170,16 @@ function TeacherAdminAttendanceManagement() {
           setAllSubjects(adminSubjects);
           setSubjectsForDropdown(adminSubjects); 
         } else if (role === 'guru' && user.uid) {
-            // 1. Find teacher profile ID using Auth UID
             const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
             if (teacherProfileSnapshot.empty) {
                 toast({ title: "Profil Guru Tidak Ditemukan", description: "Tidak dapat memuat kelas karena profil guru tidak ditemukan.", variant: "warning" });
-                setAllClasses([]);
-                setClassesForDropdown([]);
-                setIsLoadingClasses(false);
-                setIsLoadingSubjects(false);
+                setAllClasses([]); setClassesForDropdown([]);
                 return;
             }
             const teacherProfileId = teacherProfileSnapshot.docs[0].id;
 
-            // 2. Fetch lessons taught by this teacher using their profile ID
             const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
             const lessonsSnapshot = await getDocs(lessonsQuery);
             const taughtLessons = lessonsSnapshot.docs.map(d => d.data());
@@ -221,22 +198,15 @@ function TeacherAdminAttendanceManagement() {
             setAllClasses(teacherClasses); 
             setClassesForDropdown(teacherClasses);
 
-            // Fetch all subjects for admin to simplify denormalization for now
-            // or if needed for other logic. Teacher subjects are filtered later.
             const allSubjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
             setSubjectsForDropdown([]); 
         }
       } catch (error) {
-        console.error("Error fetching initial dropdown data for attendance:", error);
+        console.error("Error fetching initial dropdown data:", error);
         toast({ title: "Gagal Memuat Data Awal", variant: "destructive" });
-        setAllClasses([]);
-        setAllSubjects([]);
-        setClassesForDropdown([]);
-        setSubjectsForDropdown([]);
       } finally {
-        setIsLoadingClasses(false);
-        setIsLoadingSubjects(false); 
+        setIsLoadingDropdowns(false);
       }
     };
     fetchInitialDropdownData();
@@ -252,7 +222,7 @@ function TeacherAdminAttendanceManagement() {
             else setSubjectsForDropdown([]);
             return;
         }
-        setIsLoadingSubjects(true);
+        
         try {
             if (role === 'admin') {
                 const lessonsInClassQuery = query(collection(db, "lessons"), where("classId", "==", selectedClassId));
@@ -275,9 +245,7 @@ function TeacherAdminAttendanceManagement() {
                 const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
                 if (teacherProfileSnapshot.empty) {
-                    setSubjectsForDropdown([]);
-                    setIsLoadingSubjects(false);
-                    return;
+                    setSubjectsForDropdown([]); return;
                 }
                 const teacherProfileId = teacherProfileSnapshot.docs[0].id;
 
@@ -307,64 +275,21 @@ function TeacherAdminAttendanceManagement() {
         } catch (error) {
             console.error("Error updating subjects for class:", error);
             toast({title: "Gagal Memuat Mata Pelajaran Kelas", variant: "destructive"});
-            setSubjectsForDropdown([]);
-        } finally {
-            setIsLoadingSubjects(false);
         }
     };
-
     updateSubjectsForSelectedClass();
   }, [selectedClassId, role, user, authLoading, toast, allSubjects]); 
 
 
   useEffect(() => {
     if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
-    if (!selectedClassId) {
-      setStudentsInClassForForm([]);
-      replace([]); 
-      return;
-    }
-    const fetchStudentsForClassForm = async () => {
-      setIsLoadingStudents(true);
-      form.setValue("studentAttendances", []); 
-      try {
-        const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
-        const studentsSnapshot = await getDocs(studentsQuery);
-
-        const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
-        setStudentsInClassForForm(fetchedStudents);
-        
-      } catch (error) {
-        console.error("Error fetching students: ", error);
-        toast({ title: "Gagal Memuat Siswa", description: "Pastikan siswa memiliki field 'classId' yang benar di koleksi 'users'.", variant: "destructive" });
-        setStudentsInClassForForm([]);
-        replace([]);
-      } finally {
-        setIsLoadingStudents(false);
-      }
-    };
-    fetchStudentsForClassForm();
-  }, [selectedClassId, toast, replace, form, authLoading, role]);
-
-
-  useEffect(() => {
-    if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
-    if (!selectedClassId || !selectedSubjectId || !selectedDate) { 
-      setExistingAttendanceDocId(null);
-      if (studentsInClassForForm.length > 0 && (!selectedClassId || !selectedSubjectId || !selectedDate)) {
-         const resetAttendance = studentsInClassForForm.map(student => ({
-          studentId: student.id,
-          studentName: student.name,
-          status: "Alpa" as AttendanceStatus, 
-          notes: "",
-        }));
-        form.setValue("studentAttendances", resetAttendance);
-      }
-      return;
-    }
 
     const fetchAttendanceData = async () => {
-      setIsLoadingExistingAttendance(true);
+      if (!selectedClassId || !selectedSubjectId || !selectedDate) {
+        replace([]);
+        return;
+      }
+      setIsLoadingFormData(true);
       setExistingAttendanceDocId(null);
       const dateToQuery = Timestamp.fromDate(startOfDay(selectedDate));
       const currentDayName = DAY_NAMES_ID[getDay(selectedDate)];
@@ -373,84 +298,74 @@ function TeacherAdminAttendanceManagement() {
         const attendanceQuery = query(
           collection(db, "attendances"),
           where("classId", "==", selectedClassId),
-          where("subjectId", "==", selectedSubjectId), 
+          where("subjectId", "==", selectedSubjectId),
           where("date", "==", dateToQuery)
         );
         const attendanceSnapshot = await getDocs(attendanceQuery);
 
+        const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+
+        if (fetchedStudents.length === 0) {
+            replace([]);
+            setIsLoadingFormData(false);
+            return;
+        }
+        
         if (!attendanceSnapshot.empty) {
           const attendanceDoc = attendanceSnapshot.docs[0];
           setExistingAttendanceDocId(attendanceDoc.id);
           const data = attendanceDoc.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[], subjectId: string };
           
-          const currentClassStudents = studentsInClassForForm.length > 0 ? studentsInClassForForm : (await getDocs(query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc")))).docs.map(d => ({id: d.id, name: d.data().name}));
-
-          const mergedStudentAttendances = currentClassStudents.map(student => {
+          const mergedStudentAttendances = fetchedStudents.map(student => {
             const existingRecord = data.studentAttendances.find(sa => sa.studentId === student.id);
             return existingRecord || { 
-              studentId: student.id,
-              studentName: student.name,
-              status: "Alpa" as AttendanceStatus, 
-              notes: "",
+              studentId: student.id, studentName: student.name, status: "Alpa" as AttendanceStatus, notes: ""
             };
           });
-          form.setValue("studentAttendances", mergedStudentAttendances);
-
+          replace(mergedStudentAttendances);
         } else { 
-          if (studentsInClassForForm.length > 0) {
-            const lessonsQuery = query(collection(db, "lessons"),
-              where("classId", "==", selectedClassId),
-              where("subjectId", "==", selectedSubjectId),
-              where("dayOfWeek", "==", currentDayName)
-            );
-            const lessonsSnapshot = await getDocs(lessonsQuery);
-            const relevantLessonIds = lessonsSnapshot.docs.map(doc => doc.id);
+          const lessonsQuery = query(collection(db, "lessons"),
+            where("classId", "==", selectedClassId),
+            where("subjectId", "==", selectedSubjectId),
+            where("dayOfWeek", "==", currentDayName)
+          );
+          const lessonsSnapshot = await getDocs(lessonsQuery);
+          const relevantLessonIds = lessonsSnapshot.docs.map(doc => doc.id);
 
-            const studentAttendancePromises = studentsInClassForForm.map(async (student) => {
-              let studentStatus: AttendanceStatus = "Alpa"; 
-              if (relevantLessonIds.length > 0) {
-                const selfAttendanceQuery = query(
-                  collection(db, "studentAttendanceRecords"),
-                  where("studentId", "==", student.id),
-                  where("date", "==", dateToQuery),
-                  where("lessonId", "in", relevantLessonIds) 
-                );
-                const selfAttendanceSnapshot = await getDocs(selfAttendanceQuery);
-                if (!selfAttendanceSnapshot.empty) {
-                  selfAttendanceSnapshot.forEach(doc => {
-                    if (doc.data().status === "Hadir") {
-                      studentStatus = "Hadir";
-                    }
-                  });
-                }
+          const studentAttendancePromises = fetchedStudents.map(async (student) => {
+            let studentStatus: AttendanceStatus = "Alpa"; 
+            if (relevantLessonIds.length > 0) {
+              const selfAttendanceQuery = query(
+                collection(db, "studentAttendanceRecords"),
+                where("studentId", "==", student.id),
+                where("date", "==", dateToQuery),
+                where("lessonId", "in", relevantLessonIds) 
+              );
+              const selfAttendanceSnapshot = await getDocs(selfAttendanceQuery);
+              if (!selfAttendanceSnapshot.empty && selfAttendanceSnapshot.docs.some(doc => doc.data().status === "Hadir")) {
+                  studentStatus = "Hadir";
               }
-              return {
-                studentId: student.id,
-                studentName: student.name,
-                status: studentStatus,
-                notes: "",
-              };
-            });
-            
-            const initialAttendanceWithSelfCheck = await Promise.all(studentAttendancePromises);
-            form.setValue("studentAttendances", initialAttendanceWithSelfCheck);
-          } else {
-            form.setValue("studentAttendances", []);
-          }
+            }
+            return { studentId: student.id, studentName: student.name, status: studentStatus, notes: "" };
+          });
+          
+          const initialAttendanceWithSelfCheck = await Promise.all(studentAttendancePromises);
+          replace(initialAttendanceWithSelfCheck);
         }
       } catch (error) {
         console.error("Error fetching attendance: ", error);
         toast({ title: "Gagal Memuat Data Kehadiran", variant: "destructive" });
+        replace([]);
       } finally {
-        setIsLoadingExistingAttendance(false);
+        setIsLoadingFormData(false);
       }
     };
+    
+    fetchAttendanceData();
+  }, [selectedClassId, selectedSubjectId, selectedDate, replace, form, toast, authLoading, role]);
 
-    if(studentsInClassForForm.length > 0 || !isLoadingStudents) { 
-        fetchAttendanceData();
-    }
-
-  }, [selectedClassId, selectedSubjectId, selectedDate, toast, form, studentsInClassForForm, isLoadingStudents, authLoading, role]);
 
   const handleSaveAttendance: SubmitHandler<TeacherAttendanceFormValues> = async (data) => {
     setIsSubmitting(true);
@@ -499,17 +414,15 @@ function TeacherAdminAttendanceManagement() {
   const handleClassChange = (classId: string) => {
     setSelectedClassId(classId);
     form.setValue("classId", classId);
-    form.setValue("studentAttendances", []); 
-    setStudentsInClassForForm([]); 
-    setExistingAttendanceDocId(null); 
     setSelectedSubjectId(undefined); 
     form.setValue("subjectId", undefined);
+    replace([]); 
   };
   
   const handleSubjectChange = (subjectId: string) => {
     setSelectedSubjectId(subjectId);
     form.setValue("subjectId", subjectId);
-    setExistingAttendanceDocId(null); 
+    replace([]);
   };
 
   const handleDateChange = (date?: Date) => {
@@ -517,7 +430,7 @@ function TeacherAdminAttendanceManagement() {
       const newDate = startOfDay(date);
       setSelectedDate(newDate);
       form.setValue("date", newDate);
-      setExistingAttendanceDocId(null); 
+      replace([]);
     }
   };
 
@@ -812,15 +725,15 @@ function TeacherAdminAttendanceManagement() {
                 <Select
                   value={selectedClassId}
                   onValueChange={handleClassChange}
-                  disabled={isLoadingClasses || isSubmitting}
+                  disabled={isLoadingDropdowns || isSubmitting}
                 >
                   <SelectTrigger id="classId-teacher" className="mt-1">
-                    <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : "Pilih kelas"} />
+                    <SelectValue placeholder={isLoadingDropdowns ? "Memuat kelas..." : "Pilih kelas"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                    {isLoadingDropdowns && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
                     {classesForDropdown.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    {classesForDropdown.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
+                    {classesForDropdown.length === 0 && !isLoadingDropdowns && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.classId && <p className="text-sm text-destructive mt-1">{form.formState.errors.classId.message}</p>}
@@ -830,15 +743,15 @@ function TeacherAdminAttendanceManagement() {
                 <Select
                   value={selectedSubjectId}
                   onValueChange={handleSubjectChange}
-                  disabled={isLoadingSubjects || isSubmitting || !selectedClassId || (subjectsForDropdown.length === 0 && !!selectedClassId)}
+                  disabled={isLoadingDropdowns || isSubmitting || !selectedClassId || (subjectsForDropdown.length === 0 && !!selectedClassId)}
                 >
                   <SelectTrigger id="subjectId-teacher" className="mt-1">
-                    <SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat mapel..." : ((subjectsForDropdown.length === 0 && !!selectedClassId) ? "Tidak ada mapel di kelas ini" : "Pilih mata pelajaran"))} />
+                    <SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingDropdowns ? "Memuat mapel..." : ((subjectsForDropdown.length === 0 && !!selectedClassId) ? "Tidak ada mapel di kelas ini" : "Pilih mata pelajaran"))} />
                   </SelectTrigger>
                   <SelectContent>
-                    {isLoadingSubjects && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                    {isLoadingDropdowns && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
                     {subjectsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    {subjectsForDropdown.length === 0 && !isLoadingSubjects && selectedClassId && <SelectItem value="no-subjects" disabled>Tidak ada mapel di kelas ini.</SelectItem>}
+                    {subjectsForDropdown.length === 0 && !isLoadingDropdowns && selectedClassId && <SelectItem value="no-subjects" disabled>Tidak ada mapel di kelas ini.</SelectItem>}
                   </SelectContent>
                 </Select>
                 {form.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{form.formState.errors.subjectId.message}</p>}
@@ -850,7 +763,7 @@ function TeacherAdminAttendanceManagement() {
                     <Button
                       variant={"outline"}
                       className="w-full justify-start text-left font-normal mt-1"
-                      disabled={isLoadingExistingAttendance || isSubmitting || !selectedClassId || !selectedSubjectId}
+                      disabled={isLoadingFormData || isSubmitting || !selectedClassId || !selectedSubjectId}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {selectedDate ? format(selectedDate, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
@@ -862,7 +775,7 @@ function TeacherAdminAttendanceManagement() {
                       selected={selectedDate}
                       onSelect={handleDateChange}
                       initialFocus
-                      disabled={isLoadingExistingAttendance || isSubmitting}
+                      disabled={isLoadingFormData || isSubmitting}
                     />
                   </PopoverContent>
                 </Popover>
@@ -871,11 +784,11 @@ function TeacherAdminAttendanceManagement() {
             </div>
 
             {selectedClassId && selectedSubjectId && selectedDate && (
-              isLoadingStudents || isLoadingExistingAttendance ? (
+              isLoadingFormData ? (
                 <div className="space-y-2 mt-4">
                   <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" />
                 </div>
-              ) : studentsInClassForForm.length === 0 && !isLoadingStudents ? (
+              ) : fields.length === 0 ? (
                  <div className="mt-4 p-4 border border-dashed border-border rounded-md text-center text-muted-foreground">
                     Tidak ada siswa di kelas ini atau data siswa belum termuat.
                  </div>
@@ -912,11 +825,11 @@ function TeacherAdminAttendanceManagement() {
                   {form.formState.errors.studentAttendances && !form.formState.errors.studentAttendances.message && (<p className="text-sm text-destructive mt-1">Periksa kembali input kehadiran siswa.</p>)}
                    {form.formState.errors.studentAttendances?.message && (<p className="text-sm text-destructive mt-1">{form.formState.errors.studentAttendances?.message}</p>)}
                 </div>
-              ) :  (selectedClassId && selectedSubjectId && selectedDate && !isLoadingStudents && !isLoadingExistingAttendance && studentsInClassForForm.length > 0 && fields.length === 0 && <p className="mt-4 text-center text-muted-foreground">Memuat data siswa atau status kehadiran...</p>)
+              ) : null
             )}
-            {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingStudents && !isLoadingExistingAttendance && (
+            {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingFormData && (
               <div className="flex justify-end mt-6">
-                <Button type="submit" disabled={isSubmitting || isLoadingExistingAttendance || isLoadingStudents}>
+                <Button type="submit" disabled={isSubmitting || isLoadingFormData}>
                   {isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
                   {isSubmitting ? "Menyimpan..." : (existingAttendanceDocId ? "Perbarui Kehadiran" : "Simpan Kehadiran")}
                   {!isSubmitting && <Save className="ml-2 h-4 w-4" />}
@@ -934,15 +847,15 @@ function TeacherAdminAttendanceManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
             <div>
               <Label htmlFor="exportClassId">Kelas</Label>
-              <Select value={selectedClassId} onValueChange={(value) => setSelectedClassId(value)} disabled={isLoadingClasses || isExporting}>
-                <SelectTrigger id="exportClassId" className="mt-1"><SelectValue placeholder={isLoadingClasses ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
+              <Select value={selectedClassId} onValueChange={(value) => setSelectedClassId(value)} disabled={isLoadingDropdowns || isExporting}>
+                <SelectTrigger id="exportClassId" className="mt-1"><SelectValue placeholder={isLoadingDropdowns ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
                 <SelectContent>{classesForDropdown.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
              <div>
               <Label htmlFor="exportSubjectId">Mata Pelajaran</Label>
-              <Select value={selectedSubjectId} onValueChange={(value) => setSelectedSubjectId(value)} disabled={isLoadingSubjects || isExporting || !selectedClassId}>
-                <SelectTrigger id="exportSubjectId" className="mt-1"><SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingSubjects ? "Memuat..." : "Pilih mapel")} /></SelectTrigger>
+              <Select value={selectedSubjectId} onValueChange={(value) => setSelectedSubjectId(value)} disabled={isLoadingDropdowns || isExporting || !selectedClassId}>
+                <SelectTrigger id="exportSubjectId" className="mt-1"><SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingDropdowns ? "Memuat..." : "Pilih mapel")} /></SelectTrigger>
                 <SelectContent>{subjectsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
@@ -975,209 +888,53 @@ function TeacherAdminAttendanceManagement() {
 }
 
 
-function StudentAttendanceView({ targetStudentId, targetStudentName, targetStudentClassId }: StudentAttendanceViewProps) {
-  const { user: authUser, loading: authLoading, role } = useAuth(); 
+function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAttendanceViewProps) {
   const { toast } = useToast();
-  const [todayLessons, setTodayLessons] = useState<StudentLessonDisplay[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<Map<string, StudentSelfAttendanceRecord>>(new Map());
-  const [isLoadingView, setIsLoadingView] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
+  const [attendanceHistory, setAttendanceHistory] = useState<StudentAttendanceHistoryEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const studentToView = {
-    id: targetStudentId || authUser?.uid,
-    name: targetStudentName || authUser?.displayName,
-    classId: targetStudentClassId || authUser?.classId,
-  };
-  
-  const isParentView = !!targetStudentId;
-
-  const fetchStudentScheduleAndAttendance = async () => {
-    if (!studentToView.id || !studentToView.classId) {
-      setIsLoadingView(false);
-      setTodayLessons([]);
+  const fetchStudentHistory = useCallback(async () => {
+    if (!targetStudentId) {
+      setIsLoading(false);
+      setAttendanceHistory([]);
       return;
     }
-    setIsLoadingView(true);
+    setIsLoading(true);
 
     try {
-      const todayObj = new Date();
-      const currentDayName = DAY_NAMES_ID[todayObj.getDay()];
-
-      const lessonsQueryInstance = query(
-        collection(db, "lessons"),
-        where("classId", "==", studentToView.classId),
-        where("dayOfWeek", "==", currentDayName),
-        orderBy("startTime", "asc")
+      const attendanceQuery = query(
+        collection(db, "studentAttendanceRecords"),
+        where("studentId", "==", targetStudentId),
+        orderBy("date", "desc"),
+        orderBy("attendedAt", "desc"),
+        limit(50)
       );
-      const lessonsSnapshot = await getDocs(lessonsQueryInstance);
-      const fetchedLessons: StudentLessonDisplay[] = lessonsSnapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return { id: docSnap.id, subjectName: data.subjectName, dayOfWeek: data.dayOfWeek, startTime: data.startTime, endTime: data.endTime };
-      });
-      
-      const currentRunRecordsMap = new Map<string, StudentSelfAttendanceRecord>();
-      if (fetchedLessons.length > 0) {
-        const lessonIds = fetchedLessons.map(l => l.id);
-        const attendanceQueryInstance = query(
-          collection(db, "studentAttendanceRecords"),
-          where("studentId", "==", studentToView.id),
-          where("date", "==", Timestamp.fromDate(startOfDay(todayObj))), 
-          where("lessonId", "in", lessonIds.length > 0 ? lessonIds : ["_empty_"]) 
-        );
-        const attendanceSnapshot = await getDocs(attendanceQueryInstance);
-        attendanceSnapshot.forEach(docSnap => {
-          const data = docSnap.data() as Omit<StudentSelfAttendanceRecord, 'id'>; 
-          currentRunRecordsMap.set(data.lessonId, { id: docSnap.id, ...data });
-        });
-      }
-      setAttendanceRecords(currentRunRecordsMap);
-      
-      const lessonsWithStatus = fetchedLessons.map(lesson => {
-         const statusInfo = getLessonStatus(lesson, currentRunRecordsMap); 
-         return {...lesson, statusText: statusInfo.text, statusIcon: statusInfo.icon }
-      });
-      setTodayLessons(lessonsWithStatus);
-
+      const snapshot = await getDocs(attendanceQuery);
+      const history: StudentAttendanceHistoryEntry[] = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as StudentAttendanceHistoryEntry));
+      setAttendanceHistory(history);
     } catch (error) {
-      console.error("Error fetching student schedule/attendance: ", error);
-      toast({ title: "Gagal Memuat Jadwal", variant: "destructive" });
+      console.error("Error fetching student attendance history:", error);
+      toast({ title: "Gagal Memuat Riwayat Absensi", variant: "destructive" });
     } finally {
-      setIsLoadingView(false);
+      setIsLoading(false);
     }
-  };
+  }, [targetStudentId, toast]);
 
   useEffect(() => {
-    if (!authLoading && studentToView.id) {
-      fetchStudentScheduleAndAttendance();
-    } else if (!authLoading && !studentToView.id){
-        setIsLoadingView(false);
-    }
-  }, [authLoading, studentToView.id, studentToView.classId]); 
-
-  const getLessonStatus = (lesson: StudentLessonDisplay, currentAttendanceRecords: Map<string, StudentSelfAttendanceRecord>) => {
-    const now = new Date(); 
-    const today = startOfDay(now);
-
-    const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
-    const lessonEnd = lesson.endTime ? parse(lesson.endTime, "HH:mm", today) : null;
-
-    if (!lessonStart || !lessonEnd || !isValid(lessonStart) || !isValid(lessonEnd)) {
-        return { text: "Jadwal Error", icon: <Info className="h-5 w-5 text-orange-400" /> };
-    }
-    
-    const attendedRecord = currentAttendanceRecords.get(lesson.id);
-    if (attendedRecord) {
-      return { text: `Hadir (${format(attendedRecord.attendedAt.toDate(), "HH:mm")})`, icon: <CheckCircle className="h-5 w-5 text-green-500" /> };
-    }
-    if (now < lessonStart) {
-      return { text: "Belum Dimulai", icon: <Clock className="h-5 w-5 text-gray-400" /> };
-    }
-    if (now >= lessonStart && now <= lessonEnd) {
-      return { text: "Sesi Berlangsung (Belum Absen)", icon: <Clock className="h-5 w-5 text-blue-500" /> };
-    }
-    return { text: "Sesi Berakhir (Belum Absen)", icon: <XCircle className="h-5 w-5 text-red-500" /> };
-  };
+    fetchStudentHistory();
+  }, [fetchStudentHistory]);
 
 
-  const handleExportStudentDailyPdf = async () => {
-    if (!studentToView.name || todayLessons.length === 0) {
-      toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran harian untuk diekspor.", variant: "info" });
-      return;
-    }
-    setIsExporting(true);
-    try {
-      const studentName = studentToView.name;
-      const currentDate = format(new Date(), "dd MMMM yyyy", { locale: indonesiaLocale });
-      const fileName = `Kehadiran_Harian_${studentName.replace(/\s+/g, '_')}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
-
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text(`Laporan Kehadiran Harian`, 14, 15);
-      doc.setFontSize(12);
-      doc.text(`Nama Siswa: ${studentName}`, 14, 22);
-      doc.text(`Tanggal: ${currentDate}`, 14, 29);
-
-      const tableColumn = ["No", "Mata Pelajaran", "Waktu", "Status Kehadiran"];
-      const tableRows: (string | number)[][] = [];
-
-      todayLessons.forEach((lesson, index) => {
-        const lessonData = [
-          index + 1,
-          lesson.subjectName || "N/A",
-          `${lesson.startTime} - ${lesson.endTime}`,
-          lesson.statusText || "N/A", 
-        ];
-        tableRows.push(lessonData);
-      });
-
-      autoTable(doc, {
-        startY: 36,
-        head: [tableColumn],
-        body: tableRows,
-        theme: 'grid',
-        headStyles: { fillColor: [64, 149, 237] }, 
-      });
-
-      doc.save(fileName);
-      toast({ title: "Ekspor PDF Harian Berhasil", description: `${fileName} telah diunduh.` });
-    } catch (error) {
-      console.error("Error exporting student daily to PDF:", error);
-      toast({ title: "Gagal Mengekspor PDF Harian", variant: "destructive" });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleExportStudentDailyExcel = async () => {
-    if (!studentToView.name || todayLessons.length === 0) {
-      toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran harian untuk diekspor.", variant: "info" });
-      return;
-    }
-    setIsExporting(true);
-    try {
-      const studentName = studentToView.name;
-      const currentDate = format(new Date(), "dd MMMM yyyy", { locale: indonesiaLocale });
-      const fileName = `Kehadiran_Harian_${studentName.replace(/\s+/g, '_')}_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-
-      const dataToExport = todayLessons.map((lesson, index) => ({
-        "No": index + 1,
-        "Mata Pelajaran": lesson.subjectName || "N/A",
-        "Waktu": `${lesson.startTime} - ${lesson.endTime}`,
-        "Status Kehadiran": lesson.statusText || "N/A",
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet([]);
-      XLSX.utils.sheet_add_aoa(worksheet, [
-        [`Laporan Kehadiran Harian - Nama Siswa: ${studentName}`],
-        [`Tanggal: ${currentDate}`],
-        [] 
-      ], { origin: "A1" });
-      XLSX.utils.sheet_add_json(worksheet, dataToExport, { origin: "A4", skipHeader: false });
-
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, `Kehadiran ${format(new Date(), "yyyy-MM-dd")}`);
-      
-      const cols = Object.keys(dataToExport[0] || {}).map(key => ({ wch: Math.max(15, key.length + 5) }));
-      worksheet['!cols'] = cols;
-
-      XLSX.writeFile(workbook, fileName);
-      toast({ title: "Ekspor Excel Harian Berhasil", description: `${fileName} telah diunduh.` });
-    } catch (error) {
-      console.error("Error exporting student daily to Excel:", error);
-      toast({ title: "Gagal Mengekspor Excel Harian", variant: "destructive" });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  if (isLoadingView) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold font-headline">Kehadiran {isParentView ? `Anak (${studentToView.name || '...'})` : 'Saya'}</h1>
+        <Skeleton className="h-10 w-3/4" />
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-          <CardHeader><CardTitle>Jadwal Hari Ini</CardTitle></CardHeader>
-          <CardContent className="pt-6"> <Skeleton className="h-10 w-full mb-4" /> <Skeleton className="h-10 w-full mb-4" /> </CardContent>
+          <CardHeader><Skeleton className="h-8 w-1/2" /></CardHeader>
+          <CardContent className="pt-6"> <Skeleton className="h-40 w-full" /> </CardContent>
         </Card>
       </div>
     );
@@ -1187,76 +944,61 @@ function StudentAttendanceView({ targetStudentId, targetStudentName, targetStude
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
         <div>
-            <h1 className="text-3xl font-bold font-headline">Rekap Kehadiran {isParentView ? `Anak (${studentToView.name || '...'})` : 'Saya'}</h1>
-            <p className="text-muted-foreground">Hari/Tanggal: {format(new Date(), "eeee, dd MMMM yyyy", { locale: indonesiaLocale })}</p>
+            <h1 className="text-3xl font-bold font-headline">Rekap Kehadiran {targetStudentName ? `Anak (${targetStudentName})` : 'Saya'}</h1>
+            <p className="text-muted-foreground">Riwayat absensi mandiri yang telah tercatat.</p>
         </div>
-        <div className="flex gap-2 self-start sm:self-center">
-            <Button onClick={fetchStudentScheduleAndAttendance} variant="outline" size="sm">
-                <RefreshCw className="mr-2 h-4 w-4" /> Refresh Status
-            </Button>
-             <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isExporting || todayLessons.length === 0} className="w-full sm:w-auto">
-                        {isExporting && <LottieLoader width={16} height={16} className="mr-2" />}
-                        <FileDown className="mr-2 h-4 w-4" /> Ekspor
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleExportStudentDailyPdf} disabled={isExporting || todayLessons.length === 0}>
-                        <FileDown className="mr-2 h-4 w-4" /> PDF Harian
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportStudentDailyExcel} disabled={isExporting || todayLessons.length === 0}>
-                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
+        <Button onClick={fetchStudentHistory} variant="outline" size="sm">
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
+        </Button>
       </div>
       
-      {todayLessons.length === 0 ? (
-         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-            <CardHeader><CardTitle>Jadwal Hari Ini</CardTitle></CardHeader>
-            <CardContent className="pt-6 text-center text-muted-foreground">
-                <Info className="mx-auto h-12 w-12 mb-4 text-primary" />
-                Tidak ada jadwal pelajaran untuk {isParentView ? `anak anda (${studentToView.name || '...'})` : 'anda'} hari ini.
-            </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {todayLessons.map(lesson => {
-            const status = getLessonStatus(lesson, attendanceRecords);
-            return (
-              <Card key={lesson.id} className="bg-card/80 backdrop-blur-sm border shadow-md">
-                <CardContent className="p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div className="flex-grow flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <h3 className="text-lg font-semibold text-primary whitespace-nowrap">{lesson.subjectName || "Pelajaran Tanpa Nama"}</h3>
-                        <p className="text-sm text-muted-foreground whitespace-nowrap">
-                            Waktu: {lesson.startTime} - {lesson.endTime}
-                        </p>
-                        <div className="flex items-center gap-1 text-sm font-medium whitespace-nowrap">
-                            {status.icon}
-                            <span>{status.text}</span>
-                        </div>
-                    </div>
-                    <Button variant="outline" size="icon" asChild className="shrink-0">
-                        <Link href={`/lessons/${lesson.id}`} aria-label={`Detail pelajaran ${lesson.subjectName}`}>
-                            <ExternalLink className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-       <Card className="mt-6 bg-card/70 backdrop-blur-sm border-border shadow-sm">
-            <CardHeader><CardTitle className="text-lg">Catatan Penting</CardTitle></CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-1">
-                <p>&bull; Untuk melakukan absen, silakan masuk ke detail pelajaran melalui tombol <ExternalLink className="inline h-3.5 w-3.5 align-text-bottom" /> di samping masing-masing pelajaran.</p>
-                <p>&bull; Pastikan melakukan absen selama jam pelajaran berlangsung.</p>
-                <p>&bull; Jika ada kendala teknis atau alasan lain tidak bisa absen, segera hubungi guru mata pelajaran atau wali kelas.</p>
-            </CardContent>
-        </Card>
+      <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarCheck className="h-6 w-6 text-primary" />
+            <span>Riwayat Absensi</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {attendanceHistory.length === 0 ? (
+            <div className="pt-6 text-center text-muted-foreground flex flex-col items-center gap-4">
+                <Info className="mx-auto h-12 w-12 text-primary" />
+                <p>Belum ada riwayat absensi yang tercatat. Lakukan absensi melalui halaman detail pelajaran.</p>
+                <Button asChild variant="outline"><Link href="/lessons">Lihat Jadwal Pelajaran</Link></Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tanggal</TableHead>
+                    <TableHead>Mata Pelajaran</TableHead>
+                    <TableHead>Waktu Pelajaran</TableHead>
+                    <TableHead>Jam Absen</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attendanceHistory.map(record => (
+                    <TableRow key={record.id}>
+                      <TableCell>{format(record.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                      <TableCell>{record.subjectName || "N/A"}</TableCell>
+                      <TableCell>{record.lessonTime || "N/A"}</TableCell>
+                      <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>
+                      <TableCell>
+                        <span className="flex items-center gap-1.5 font-medium text-green-600">
+                          <CheckCircle className="h-4 w-4" />
+                          {record.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1285,9 +1027,9 @@ export default function AttendancePageWrapper() {
   if (role === 'admin' || role === 'guru') {
     return <TeacherAdminAttendanceManagement />;
   } else if (role === 'siswa') {
-    return <StudentAttendanceView />;
+    return <StudentAttendanceView targetStudentId={user.uid} targetStudentName={user.displayName || "Saya"} />;
   } else if (role === 'orangtua') {
-    if (!user.linkedStudentId || !user.linkedStudentName || !user.linkedStudentClassId) {
+    if (!user.linkedStudentId || !user.linkedStudentName) {
       return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold font-headline">Kehadiran Anak</h1>
@@ -1295,7 +1037,7 @@ export default function AttendancePageWrapper() {
         </div>
       );
     }
-    return <StudentAttendanceView targetStudentId={user.linkedStudentId} targetStudentName={user.linkedStudentName} targetStudentClassId={user.linkedStudentClassId} />;
+    return <StudentAttendanceView targetStudentId={user.linkedStudentId} targetStudentName={user.linkedStudentName} />;
   } else {
     return (
          <div className="space-y-6">
