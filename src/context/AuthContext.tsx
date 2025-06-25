@@ -36,7 +36,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const LAST_ACTIVITY_STORAGE_KEY = 'lastUserActivityTimestamp';
-const INACTIVITY_TIMEOUT_MS = 1.5 * 60 * 60 * 1000; // 1.5 hours in milliseconds
+const INACTIVITY_TIMEOUT_MS = 1.5 * 60 * 60 * 1000; // 1.5 jam di miliseconds
 
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
