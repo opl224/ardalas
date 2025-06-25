@@ -905,7 +905,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
       const attendanceQuery = query(
         collection(db, "studentAttendanceRecords"),
         where("studentId", "==", targetStudentId),
-        orderBy("date", "desc"),
         orderBy("attendedAt", "desc"),
         limit(50)
       );
@@ -1047,5 +1046,3 @@ export default function AttendancePageWrapper() {
     );
   }
 }
-
-    
