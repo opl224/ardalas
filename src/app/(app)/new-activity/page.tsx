@@ -150,6 +150,52 @@ export default function NewActivityPage() {
     }
   };
 
+  const AdminButtons = () => (
+    <div className="flex items-center gap-2">
+      {isDeleteMode ? (
+        <>
+          <span className="text-sm font-medium mr-auto hidden md:inline">Pilih folder...</span>
+          <Button variant="outline" size="sm" onClick={() => { setIsDeleteMode(false); setSelectedToDelete([]); }}>
+            Batal
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={selectedToDelete.length === 0 || isDeleting}>
+                {isDeleting ? "Menghapus..." : `Hapus (${selectedToDelete.length})`}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Anda akan menghapus {selectedToDelete.length} folder kegiatan beserta semua isinya. Tindakan ini tidak dapat dibatalkan.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Batal</AlertDialogCancel>
+                <AlertDialogAction onClick={handleMultipleDelete} disabled={isDeleting}>
+                  {isDeleting ? "Menghapus..." : "Ya, Hapus Semua"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      ) : (
+        <>
+          <DialogTrigger asChild>
+            <Button size="sm">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Tambah Kegiatan
+            </Button>
+          </DialogTrigger>
+          <Button variant="outline" size="icon" onClick={() => setIsDeleteMode(true)} aria-label="Aktifkan mode hapus">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+    </div>
+  );
+
 
   return (
     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -165,52 +211,17 @@ export default function NewActivityPage() {
               <span>Dokumentasi Kegiatan</span>
             </CardTitle>
             {role === 'admin' && (
-              <div className="flex items-center gap-2">
-                {isDeleteMode ? (
-                  <>
-                    <span className="text-sm font-medium mr-auto hidden md:inline">Pilih folder...</span>
-                    <Button variant="outline" size="sm" onClick={() => { setIsDeleteMode(false); setSelectedToDelete([]); }}>
-                      Batal
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="sm" disabled={selectedToDelete.length === 0 || isDeleting}>
-                          {isDeleting ? "Menghapus..." : `Hapus (${selectedToDelete.length})`}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Konfirmasi Penghapusan</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Anda akan menghapus {selectedToDelete.length} folder kegiatan beserta semua isinya. Tindakan ini tidak dapat dibatalkan.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Batal</AlertDialogCancel>
-                          <AlertDialogAction onClick={handleMultipleDelete} disabled={isDeleting}>
-                            {isDeleting ? "Menghapus..." : "Ya, Hapus Semua"}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                ) : (
-                  <>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Tambah Kegiatan
-                      </Button>
-                    </DialogTrigger>
-                    <Button variant="outline" size="icon" onClick={() => setIsDeleteMode(true)} aria-label="Aktifkan mode hapus">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </>
-                )}
+              <div className="hidden md:flex">
+                 <AdminButtons />
               </div>
             )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
+             {role === 'admin' && (
+              <div className="flex justify-end gap-2 p-4 border-b md:hidden">
+                <AdminButtons />
+              </div>
+            )}
             <div 
               className="flex flex-row gap-4 p-4 overflow-x-auto md:grid md:grid-cols-3 md:gap-6 md:p-12 md:overflow-x-visible justify-start md:justify-center"
             >
@@ -264,7 +275,7 @@ export default function NewActivityPage() {
                     );
                   })
               ) : (
-                <p className="col-span-3 text-center text-muted-foreground">Belum ada kegiatan yang ditambahkan.</p>
+                <p className="col-span-3 text-center text-muted-foreground py-10">Belum ada kegiatan yang ditambahkan.</p>
               )}
             </div>
           </CardContent>
