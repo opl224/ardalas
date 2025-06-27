@@ -94,23 +94,36 @@ export default function ProfilePage() {
         setDetailedProfileData(null);
         try {
           let profileData = null;
-          if (role === 'siswa' || role === 'admin') {
-            const userDocRef = doc(db, "users", user.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-              profileData = userDocSnap.data();
-            }
-          } else if (role === 'guru') {
-            const teacherQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
-            const teacherSnapshot = await getDocs(teacherQuery);
-            if (!teacherSnapshot.empty) {
-              profileData = teacherSnapshot.docs[0].data();
-            }
-          } else if (role === 'orangtua') {
-            const parentQuery = query(collection(db, "parents"), where("uid", "==", user.uid), limit(1));
-            const parentSnapshot = await getDocs(parentQuery);
-            if (!parentSnapshot.empty) {
-              profileData = parentSnapshot.docs[0].data();
+          let profileCollectionName: string | null = null;
+          let queryField = "uid";
+
+          switch(role) {
+            case 'admin':
+            case 'siswa':
+              profileCollectionName = "users";
+              break;
+            case 'guru':
+              profileCollectionName = "teachers";
+              break;
+            case 'orangtua':
+              profileCollectionName = "parents";
+              break;
+          }
+          
+          if(profileCollectionName) {
+            let docRef;
+            if(profileCollectionName === "users") {
+                docRef = doc(db, profileCollectionName, user.uid);
+                const docSnap = await getDoc(docRef);
+                 if (docSnap.exists()) {
+                    profileData = docSnap.data();
+                 }
+            } else {
+                const q = query(collection(db, profileCollectionName), where(queryField, "==", user.uid), limit(1));
+                const snapshot = await getDocs(q);
+                if (!snapshot.empty) {
+                    profileData = snapshot.docs[0].data();
+                }
             }
           }
           
@@ -350,14 +363,16 @@ export default function ProfilePage() {
               <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
-                    {'Lihat & Edit Detail'}
+                    {role === 'admin' || role === 'guru' ? 'Lihat & Edit Detail' : 'Lihat Detail Lengkap'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-xl">
                   <DialogHeader>
                     <DialogTitle>Detail Profil</DialogTitle>
                     <DialogDescription>
-                      Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem.
+                      {role === 'admin' || role === 'guru'
+                        ? 'Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem.'
+                        : 'Informasi lengkap mengenai profil anda.'}
                     </DialogDescription>
                   </DialogHeader>
 
