@@ -439,10 +439,16 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportDailyExcel = async () => {
-    if (!selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+    if (!selectedClassId || !selectedSubjectId || !selectedDate) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, dan tanggal terlebih dahulu.", variant: "destructive" });
       return;
     }
+    const studentAttendances = form.getValues('studentAttendances');
+    if (!studentAttendances || studentAttendances.length === 0) {
+      toast({ title: "Data Tidak Lengkap", description: "Pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+      return;
+    }
+
     setIsExporting(true);
     try {
       const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
@@ -452,7 +458,7 @@ function TeacherAdminAttendanceManagement() {
       const formattedDate = format(selectedDate, "yyyy-MM-dd", { locale: indonesiaLocale });
       const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${formattedDate}.xlsx`;
 
-      const dataToExport = fields.map(record => ({
+      const dataToExport = studentAttendances.map(record => ({
         "Nama Siswa": record.studentName,
         "Status": record.status,
         "Catatan": record.notes || "",
@@ -481,10 +487,16 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportDailyPdf = async () => {
-    if (!selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, tanggal, dan pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+    if (!selectedClassId || !selectedSubjectId || !selectedDate) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, dan tanggal terlebih dahulu.", variant: "destructive" });
       return;
     }
+    const studentAttendances = form.getValues('studentAttendances');
+    if (!studentAttendances || studentAttendances.length === 0) {
+      toast({ title: "Data Tidak Lengkap", description: "Pastikan ada data kehadiran untuk diekspor.", variant: "destructive" });
+      return;
+    }
+
     setIsExporting(true);
     try {
       const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
@@ -506,7 +518,7 @@ function TeacherAdminAttendanceManagement() {
       const tableColumn = ["No", "Nama Siswa", "Status", "Catatan"];
       const tableRows: (string | number)[][] = [];
 
-      fields.forEach((record, index) => {
+      studentAttendances.forEach((record, index) => {
         const attendanceData = [
           index + 1,
           record.studentName,
@@ -877,7 +889,7 @@ function TeacherAdminAttendanceManagement() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
-          <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting} className="w-full sm:w-auto">{isExporting && <LottieLoader width={16} height={16} className="mr-2" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
+          <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting || isLoadingFormData} className="w-full sm:w-auto">{isExporting && <LottieLoader width={16} height={16} className="mr-2" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
@@ -1155,14 +1167,16 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                 <Table className="w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Tanggal</TableHead>
-                      <TableHead>Mata Pelajaran</TableHead>
                        {isMobile ? (
                         <>
+                          <TableHead>Tanggal</TableHead>
+                          <TableHead>Mata Pelajaran</TableHead>
                           <TableHead className="text-right">Aksi</TableHead>
                         </>
                        ) : (
                         <>
+                            <TableHead>Tanggal</TableHead>
+                            <TableHead>Mata Pelajaran</TableHead>
                             <TableHead>Waktu Pelajaran</TableHead>
                             <TableHead>Jam Absen</TableHead>
                             <TableHead>Status</TableHead>
@@ -1173,10 +1187,10 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                   <TableBody>
                     {paginatedHistory.map(record => (
                       <TableRow key={record.id}>
-                        <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
-                        <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
                         {isMobile ? (
                            <>
+                             <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                             <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
                              <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" onClick={() => handleViewDetails(record)}>
                                 <Eye className="h-4 w-4" />
@@ -1186,6 +1200,8 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
                            </>
                         ) : (
                            <>
+                             <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                             <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
                              <TableCell>{record.lessonTime || "N/A"}</TableCell>
                              <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>
                              <TableCell>
