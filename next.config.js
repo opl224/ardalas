@@ -23,6 +23,12 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'akrjxbqdqmmstppxlnbs.supabase.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'www.bing.com',
         port: '',
         pathname: '/**',
