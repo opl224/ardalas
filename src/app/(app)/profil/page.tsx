@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home, School } from "lucide-react";
+import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home, School, Phone, BookOpen, GraduationCap, Calendar as CalendarIcon, Hash, MapPin, Milestone } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import LottieLoader from "@/components/ui/LottieLoader";
 import {
@@ -27,7 +27,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { updateProfile } from "firebase/auth";
 import { auth, db } from "@/lib/firebase/config";
-import { doc, getDoc, updateDoc, setDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, Timestamp, collection, query, where, limit, getDocs } from "firebase/firestore";
 import { cn } from "@/lib/utils";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,7 +55,6 @@ const availableAvatars = [
   "/avatars/ronaldo.png",
 ];
 
-// Schema for the profile edit form
 const profileFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email(), // Keep email for display, but it won't be editable
@@ -74,13 +73,8 @@ export default function ProfilePage() {
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(user?.photoURL || null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [additionalUserData, setAdditionalUserData] = useState<{
-    address?: string;
-    nis?: string;
-    gender?: "laki-laki" | "perempuan";
-    dateOfBirth?: Timestamp;
-    attendanceNumber?: number;
-  }>({});
+  const [detailedProfileData, setDetailedProfileData] = useState<any>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
@@ -91,31 +85,51 @@ export default function ProfilePage() {
     },
   });
 
-  // Fetch additional data like address from Firestore when the dialog opens
   useEffect(() => {
-    if (isDetailDialogOpen && user) {
+    if (isDetailDialogOpen && user && role) {
       const fetchExtraData = async () => {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const data = userDocSnap.data();
-          setAdditionalUserData({
-            address: data.address,
-            nis: data.nis,
-            gender: data.gender,
-            dateOfBirth: data.dateOfBirth,
-            attendanceNumber: data.attendanceNumber,
-          });
-          form.reset({
-            name: user.displayName || "",
-            email: user.email || "",
-            address: data.address || "",
-          });
+        setIsLoadingDetails(true);
+        setDetailedProfileData(null);
+        try {
+          let profileData = null;
+          if (role === 'siswa') {
+            const userDocRef = doc(db, "users", user.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            if (userDocSnap.exists()) {
+              profileData = userDocSnap.data();
+            }
+          } else if (role === 'guru') {
+            const teacherQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+            const teacherSnapshot = await getDocs(teacherQuery);
+            if (!teacherSnapshot.empty) {
+              profileData = teacherSnapshot.docs[0].data();
+            }
+          } else if (role === 'orangtua') {
+            const parentQuery = query(collection(db, "parents"), where("uid", "==", user.uid), limit(1));
+            const parentSnapshot = await getDocs(parentQuery);
+            if (!parentSnapshot.empty) {
+              profileData = parentSnapshot.docs[0].data();
+            }
+          }
+          
+          if (profileData) {
+            setDetailedProfileData(profileData);
+            form.reset({
+              name: user.displayName || "",
+              email: user.email || "",
+              address: profileData.address || "",
+            });
+          }
+        } catch (e) {
+          console.error("Error fetching detailed profile", e);
+          toast({ title: "Gagal memuat detail profil", variant: "destructive" });
+        } finally {
+          setIsLoadingDetails(false);
         }
       };
       fetchExtraData();
     }
-  }, [isDetailDialogOpen, user, form.reset]);
+  }, [isDetailDialogOpen, user, role, form, toast]);
 
 
   const handleAvatarUpdate = async () => {
@@ -152,17 +166,30 @@ export default function ProfilePage() {
       setIsUpdatingProfile(true);
 
       try {
-        // Update Firebase Auth profile (only displayName can be updated this way)
         if (currentUser.displayName !== values.name) {
             await updateProfile(currentUser, { displayName: values.name });
         }
 
-        // Update Firestore 'users' document
         const userDocRef = doc(db, "users", currentUser.uid);
         await setDoc(userDocRef, { 
             name: values.name,
             address: values.address || null 
         }, { merge: true });
+
+        // Update corresponding profile collection if it exists
+        if (role === 'guru') {
+            const teacherQuery = query(collection(db, "teachers"), where("uid", "==", currentUser.uid), limit(1));
+            const teacherSnapshot = await getDocs(teacherQuery);
+            if (!teacherSnapshot.empty) {
+                await updateDoc(teacherSnapshot.docs[0].ref, { name: values.name, address: values.address || null });
+            }
+        } else if (role === 'orangtua') {
+            const parentQuery = query(collection(db, "parents"), where("uid", "==", currentUser.uid), limit(1));
+            const parentSnapshot = await getDocs(parentQuery);
+            if (!parentSnapshot.empty) {
+                await updateDoc(parentSnapshot.docs[0].ref, { name: values.name, address: values.address || null });
+            }
+        }
 
         await refreshUser(); 
 
@@ -225,6 +252,16 @@ export default function ProfilePage() {
     if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
     return (names[0][0] + names[names.length - 1][0]).toUpperCase();
   };
+  
+  const DetailItem = ({ icon: Icon, label, value }: { icon: React.ElementType, label: string, value: React.ReactNode }) => (
+    <div className="flex items-start gap-3">
+        <Icon className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+        <div>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="font-medium">{value || "-"}</p>
+        </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -284,47 +321,17 @@ export default function ProfilePage() {
             <div className="border-t border-border pt-4">
                 <h3 className="text-lg font-semibold mb-2">Detail Akun</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                        <UserIcon className="h-5 w-5 text-muted-foreground shrink-0"/>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Nama Lengkap</p>
-                            <p className="font-medium">{user.displayName || "-"}</p>
-                        </div>
-                    </div>
-                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                        <Mail className="h-5 w-5 text-muted-foreground shrink-0"/>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Email</p>
-                            <p className="font-medium">{user.email || "-"}</p>
-                        </div>
-                    </div>
-                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                        <Shield className="h-5 w-5 text-muted-foreground shrink-0"/>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Peran</p>
-                            <p className="font-medium">{role ? roleDisplayNames[role] : "Tidak diketahui"}</p>
-                        </div>
-                    </div>
+                    <DetailItem icon={UserIcon} label="Nama Lengkap" value={user.displayName} />
+                    <DetailItem icon={Mail} label="Email" value={user.email} />
+                    <DetailItem icon={Shield} label="Peran" value={role ? roleDisplayNames[role] : "Tidak diketahui"} />
                 </div>
             </div>
             {role === 'orangtua' && user.linkedStudentName && (
                <div className="border-t border-border pt-4">
                 <h3 className="text-lg font-semibold mb-2">Informasi Anak</h3>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                        <UserIcon className="h-5 w-5 text-muted-foreground shrink-0"/>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Nama Anak</p>
-                            <p className="font-medium">{user.linkedStudentName || "-"}</p>
-                        </div>
-                    </div>
-                     <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-md">
-                        <School className="h-5 w-5 text-muted-foreground shrink-0"/>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Kelas Anak</p>
-                            <p className="font-medium">{user.linkedStudentClassName || "-"}</p>
-                        </div>
-                    </div>
+                    <DetailItem icon={UserIcon} label="Nama Anak" value={user.linkedStudentName} />
+                    <DetailItem icon={School} label="Kelas Anak" value={user.linkedStudentClassName} />
                 </div>
               </div>
             )}
@@ -332,7 +339,7 @@ export default function ProfilePage() {
               <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
-                    {role === 'admin' ? 'Lihat & Edit Detail' : 'Lihat Detail'}
+                    {(role === 'admin' || role === 'guru') ? 'Lihat & Edit Detail' : 'Lihat Detail Lengkap'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -341,12 +348,20 @@ export default function ProfilePage() {
                     <DialogDescription>
                       {role === 'admin'
                         ? "Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem."
-                        : "Informasi detail profil."
+                        : "Informasi detail profil Anda."
                       }
                     </DialogDescription>
                   </DialogHeader>
 
-                  {role === 'admin' ? (
+                  {isLoadingDetails ? (
+                     <div className="space-y-4 py-4">
+                        <Skeleton className="h-6 w-3/4" />
+                        <Skeleton className="h-6 w-1/2" />
+                        <Skeleton className="h-6 w-2/3" />
+                     </div>
+                  ) : !detailedProfileData && !isLoadingDetails ? (
+                     <p className="py-4 text-muted-foreground">Detail profil tambahan tidak ditemukan.</p>
+                  ) : (role === 'admin' || role === 'guru') && detailedProfileData ? (
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleProfileUpdate)} className="space-y-4">
                         <FormField
@@ -374,6 +389,9 @@ export default function ProfilePage() {
                             </FormItem>
                           )}
                         />
+                         {role === 'guru' && <DetailItem icon={Milestone} label="NIP" value={detailedProfileData.nip} />}
+                         {role === 'guru' && <DetailItem icon={BookOpen} label="Mapel Utama" value={detailedProfileData.subject} />}
+                         {role === 'guru' && <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />}
                         <FormField
                           control={form.control}
                           name="address"
@@ -397,62 +415,35 @@ export default function ProfilePage() {
                         </DialogFooter>
                       </form>
                     </Form>
-                  ) : (
+                  ) : detailedProfileData ? (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
-                        <div>
-                          <Label className="text-muted-foreground">Nama Lengkap</Label>
-                          <p className="font-medium">{user.displayName || "-"}</p>
-                        </div>
-                        <div>
-                          <Label className="text-muted-foreground">Email</Label>
-                          <p className="font-medium">{user.email || "-"}</p>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <Label className="text-muted-foreground">Alamat</Label>
-                          <p className="font-medium">{additionalUserData.address || "Belum diatur"}</p>
-                        </div>
+                        <DetailItem icon={UserIcon} label="Nama Lengkap" value={user.displayName} />
+                        <DetailItem icon={Mail} label="Email" value={user.email} />
+                        <DetailItem icon={Home} label="Alamat" value={detailedProfileData.address} />
                         
                         {role === 'siswa' && (
                           <>
                             <div className="pt-2 border-t sm:col-span-2 mt-2">
                               <h4 className="font-semibold text-base mt-2">Info Akademik</h4>
                             </div>
-                            <div>
-                              <Label className="text-muted-foreground">NIS</Label>
-                              <p className="font-medium">{additionalUserData.nis || "Belum diatur"}</p>
-                            </div>
-                            <div>
-                              <Label className="text-muted-foreground">Kelas</Label>
-                              <p className="font-medium">{user.className || "Belum ada kelas"}</p>
-                            </div>
-                            <div>
-                              <Label className="text-muted-foreground">Tanggal Lahir</Label>
-                              <p className="font-medium">{additionalUserData.dateOfBirth ? format(additionalUserData.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "Belum diatur"}</p>
-                            </div>
-                            <div>
-                              <Label className="text-muted-foreground">Jenis Kelamin</Label>
-                              <p className="font-medium capitalize">{additionalUserData.gender || "Belum diatur"}</p>
-                            </div>
-                             <div>
-                              <Label className="text-muted-foreground">Nomor Absen</Label>
-                              <p className="font-medium">{additionalUserData.attendanceNumber != null ? additionalUserData.attendanceNumber : "Belum diatur"}</p>
-                            </div>
+                            <DetailItem icon={Milestone} label="NIS" value={detailedProfileData.nis} />
+                            <DetailItem icon={School} label="Kelas" value={user.className} />
+                            <DetailItem icon={CalendarIcon} label="Tanggal Lahir" value={detailedProfileData.dateOfBirth ? format(detailedProfileData.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : null} />
+                            <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />
+                            <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />
+                            <DetailItem icon={Hash} label="Nomor Absen" value={detailedProfileData.attendanceNumber} />
+                            <DetailItem icon={UserIcon} label="Orang Tua Terhubung" value={detailedProfileData.parentName} />
                           </>
                         )}
-                        {role === 'orangtua' && (
+                         {role === 'orangtua' && (
                           <>
-                            <div className="pt-2 border-t sm:col-span-2 mt-2">
-                              <h4 className="font-semibold text-base mt-2">Info Anak</h4>
+                             <div className="pt-2 border-t sm:col-span-2 mt-2">
+                              <h4 className="font-semibold text-base mt-2">Info Pribadi</h4>
                             </div>
-                            <div>
-                              <Label className="text-muted-foreground">Nama Anak Terhubung</Label>
-                              <p className="font-medium">{user.linkedStudentName || "Belum terhubung"}</p>
-                            </div>
-                            <div>
-                              <Label className="text-muted-foreground">Kelas Anak</Label>
-                              <p className="font-medium">{user.linkedStudentClassName || "Belum ada kelas"}</p>
-                            </div>
+                            <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />
+                             <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />
+                             <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />
                           </>
                         )}
                       </div>
@@ -462,7 +453,7 @@ export default function ProfilePage() {
                           </DialogClose>
                         </DialogFooter>
                     </>
-                  )}
+                  ) : null}
                 </DialogContent>
               </Dialog>
             </div>
