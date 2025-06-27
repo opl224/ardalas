@@ -1390,7 +1390,6 @@ export default function ResultsPage() {
                             {(role === 'admin' || role === 'guru') && <TableHead className="w-1/6">Mapel</TableHead>}
                             <TableHead className="w-1/4">Asesmen</TableHead>
                             <TableHead className="w-16">Nilai</TableHead>
-                            <TableHead className="w-auto">Feedback Guru</TableHead>
                             <TableHead className="w-[120px]">Tanggal</TableHead>
                           </>
                         )}
