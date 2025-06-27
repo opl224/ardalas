@@ -12,7 +12,7 @@ import { AlertCircle, BookOpen, User, Clock, Info, FileText, CheckCircle, XCircl
 import LottieLoader from "@/components/ui/LottieLoader";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { format, startOfDay, parse, isValid, isWithinInterval } from "date-fns";
+import { format, startOfDay, parse, isValid, isWithinInterval, getDay } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 
@@ -61,6 +61,8 @@ export default function LessonDetailPage() {
   const [isCheckingAttendance, setIsCheckingAttendance] = useState(true);
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Update time every 30s
@@ -177,23 +179,31 @@ export default function LessonDetailPage() {
     const today = startOfDay(now);
     const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
     const lessonEnd = lesson.endTime ? parse(lesson.endTime, "HH:mm", today) : null;
+    
+    const currentDayName = DAY_NAMES_ID[getDay(now)];
+    const isTodayTheLessonDay = lesson.dayOfWeek === currentDayName;
 
     if (lessonStart && lessonEnd && isValid(lessonStart) && isValid(lessonEnd)) {
-      if (isWithinInterval(now, { start: lessonStart, end: lessonEnd })) {
-        setIsEligibleToAttend(true);
-        setAttendanceStatusMessage("Sesi absen sedang berlangsung.");
-      } else if (now < lessonStart) {
-        setIsEligibleToAttend(false);
-        setAttendanceStatusMessage(`Sesi absen akan dimulai pukul ${lesson.startTime}.`);
-      } else {
-        setIsEligibleToAttend(false);
-        setAttendanceStatusMessage("Sesi absen telah berakhir.");
-      }
+        if (isTodayTheLessonDay) {
+            if (isWithinInterval(now, { start: lessonStart, end: lessonEnd })) {
+                setIsEligibleToAttend(true);
+                setAttendanceStatusMessage("Sesi absen sedang berlangsung.");
+            } else if (now < lessonStart) {
+                setIsEligibleToAttend(false);
+                setAttendanceStatusMessage(`Pelajaran hari ini akan dimulai pukul ${lesson.startTime}.`);
+            } else {
+                setIsEligibleToAttend(false);
+                setAttendanceStatusMessage("Sesi absen hari ini telah berakhir.");
+            }
+        } else {
+            setIsEligibleToAttend(false);
+            setAttendanceStatusMessage(`Jadwal pelajaran ini adalah hari ${lesson.dayOfWeek || 'tidak diketahui'}.`);
+        }
     } else {
       setIsEligibleToAttend(false);
       setAttendanceStatusMessage("Jadwal pelajaran tidak valid untuk absen.");
     }
-  }, [lesson, attendanceRecord, currentTime, role, isCheckingAttendance]);
+  }, [lesson, attendanceRecord, currentTime, role, isCheckingAttendance, DAY_NAMES_ID]);
 
 
   const handleSelfAttend = async () => {
