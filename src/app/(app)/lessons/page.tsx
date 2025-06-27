@@ -88,6 +88,7 @@ import {
 } from "@/components/ui/pagination";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useSidebar } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 
 
 // Minimal interfaces for dropdowns
@@ -108,6 +109,7 @@ interface LessonData {
   endTime: string; // HH:MM
   topic?: string;
   materials?: string;
+  isLive?: boolean;
   createdAt?: Timestamp;
 }
 
@@ -175,6 +177,7 @@ export default function LessonsPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState<LessonData | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [updatingLessonId, setUpdatingLessonId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all"); // Used by admin/guru for table filtering
@@ -357,6 +360,7 @@ export default function LessonsPage() {
           endTime: data.endTime,
           topic: data.topic,
           materials: data.materials,
+          isLive: data.isLive || false,
           createdAt: data.createdAt,
         };
       });
@@ -433,6 +437,7 @@ export default function LessonsPage() {
         subjectName,
         className,
         teacherName,
+        isLive: false,
         createdAt: serverTimestamp(),
       });
       toast({ title: "Pelajaran Ditambahkan", description: "Jadwal pelajaran berhasil disimpan." });
@@ -514,6 +519,31 @@ export default function LessonsPage() {
       toast({ title: "Gagal Menghapus Pelajaran", variant: "destructive" });
     }
   };
+
+  const handleToggleLiveStatus = async (lessonId: string, currentStatus: boolean) => {
+    setUpdatingLessonId(lessonId);
+    try {
+      const lessonDocRef = doc(db, "lessons", lessonId);
+      await updateDoc(lessonDocRef, {
+        isLive: !currentStatus,
+      });
+      setAllLessons(prevLessons => 
+        prevLessons.map(l => 
+          l.id === lessonId ? { ...l, isLive: !currentStatus } : l
+        )
+      );
+      toast({
+        title: `Kelas ${!currentStatus ? "Dimulai" : "Dihentikan"}`,
+        description: `Siswa sekarang ${!currentStatus ? "bisa" : "tidak bisa"} masuk ke kelas.`,
+      });
+    } catch (error) {
+      console.error("Error toggling live status:", error);
+      toast({ title: "Gagal Mengubah Status Kelas", variant: "destructive" });
+    } finally {
+      setUpdatingLessonId(null);
+    }
+  };
+
 
   const openEditDialog = (lesson: LessonData) => {
     setSelectedLesson(lesson);
@@ -825,7 +855,9 @@ export default function LessonsPage() {
                 </TableHeader>
                 <TableBody>
                   {currentTableData.map((lesson, index) => {
-                    const isActiveNow = isStudentOrParent ? isLessonCurrentlyActive(lesson) : false;
+                    const isTimeActive = isLessonCurrentlyActive(lesson);
+                    const isActiveNow = isStudentOrParent ? (isTimeActive && !!lesson.isLive) : false;
+
                     return (
                       <TableRow key={lesson.id}>
                         <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
@@ -841,7 +873,7 @@ export default function LessonsPage() {
                         
                         <TableCell className={cn("text-right", isMobile ? "px-2" : "")}>
                           {isStudentOrParent ? (
-                            role === "orangtua" ? (
+                             role === "orangtua" ? (
                                isMobile ? (
                                 <Button size="icon" variant="outline" disabled={true} aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)">
                                   <LogIn className="h-4 w-4" />
@@ -852,31 +884,17 @@ export default function LessonsPage() {
                                 </Button>
                               )
                             ) : ( // For 'siswa' role
-                               isMobile ? (
-                                    isActiveNow ? (
-                                        <Button asChild size="icon" variant={"outline"} className="border-primary text-primary hover:bg-primary/10">
-                                            <Link href={`/lessons/${lesson.id}`} aria-label="Masuk Kelas">
-                                                <LogIn className="h-4 w-4" />
-                                            </Link>
-                                        </Button>
-                                    ) : (
-                                        <Button size="sm" variant={"outline"} disabled>
-                                            <span className="text-xs">Belum Mulai</span>
-                                        </Button>
-                                    )
-                               ) : (
-                                    isActiveNow ? (
-                                        <Button asChild size="sm" variant={"outline"} className="border-primary text-primary hover:bg-primary/10">
-                                          <Link href={`/lessons/${lesson.id}`}>
-                                            <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
-                                          </Link>
-                                        </Button>
-                                    ) : (
-                                        <Button size="sm" variant={"outline"} disabled>
-                                            Belum Mulai
-                                        </Button>
-                                    )
-                               )
+                                 isActiveNow ? (
+                                  <Button asChild size={isMobile ? "icon" : "sm"} variant={"outline"} className="border-primary text-primary hover:bg-primary/10">
+                                    <Link href={`/lessons/${lesson.id}`} aria-label="Masuk Kelas">
+                                      {isMobile ? <LogIn className="h-4 w-4" /> : <><LogIn className="mr-2 h-4 w-4" /> Masuk Kelas</>}
+                                    </Link>
+                                  </Button>
+                                ) : (
+                                  <Button size={isMobile ? "sm" : "sm"} variant={"outline"} disabled>
+                                    {isMobile ? <span className="text-xs">Belum Mulai</span> : "Belum Mulai"}
+                                  </Button>
+                                )
                             )
                           ) : canManageLessons ? (
                             <DropdownMenu>
@@ -886,6 +904,25 @@ export default function LessonsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                {role === 'guru' && (
+                                    <>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="focus:bg-transparent cursor-default">
+                                            <div className="flex items-center justify-between w-full gap-2">
+                                                <Label htmlFor={`live-switch-${lesson.id}`} className={cn("font-normal cursor-pointer", !isTimeActive && "text-muted-foreground")}>
+                                                    {lesson.isLive ? 'Hentikan Kelas' : 'Mulai Kelas'}
+                                                </Label>
+                                                <Switch
+                                                    id={`live-switch-${lesson.id}`}
+                                                    checked={!!lesson.isLive}
+                                                    onCheckedChange={() => handleToggleLiveStatus(lesson.id, !!lesson.isLive)}
+                                                    disabled={!isTimeActive || updatingLessonId === lesson.id}
+                                                    aria-label={lesson.isLive ? "Hentikan Kelas" : "Mulai Kelas"}
+                                                />
+                                            </div>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                    </>
+                                )}
                                 <DropdownMenuItem asChild>
                                   <Link href={`/lessons/${lesson.id}`}>
                                     <Eye className="mr-2 h-4 w-4" />
