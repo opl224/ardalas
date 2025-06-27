@@ -58,6 +58,7 @@ const availableAvatars = [
 const profileFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email(), // Keep email for display, but it won't be editable
+  phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   address: z.string().optional(),
 });
 
@@ -81,6 +82,7 @@ export default function ProfilePage() {
     defaultValues: {
       name: user?.displayName || "",
       email: user?.email || "",
+      phone: "",
       address: "",
     },
   });
@@ -92,7 +94,7 @@ export default function ProfilePage() {
         setDetailedProfileData(null);
         try {
           let profileData = null;
-          if (role === 'siswa') {
+          if (role === 'siswa' || role === 'admin') {
             const userDocRef = doc(db, "users", user.uid);
             const userDocSnap = await getDoc(userDocRef);
             if (userDocSnap.exists()) {
@@ -117,7 +119,15 @@ export default function ProfilePage() {
             form.reset({
               name: user.displayName || "",
               email: user.email || "",
+              phone: profileData.phone || "",
               address: profileData.address || "",
+            });
+          } else {
+             form.reset({
+              name: user.displayName || "",
+              email: user.email || "",
+              phone: "",
+              address: "",
             });
           }
         } catch (e) {
@@ -173,6 +183,7 @@ export default function ProfilePage() {
         const userDocRef = doc(db, "users", currentUser.uid);
         await setDoc(userDocRef, { 
             name: values.name,
+            phone: values.phone || null,
             address: values.address || null 
         }, { merge: true });
 
@@ -181,13 +192,13 @@ export default function ProfilePage() {
             const teacherQuery = query(collection(db, "teachers"), where("uid", "==", currentUser.uid), limit(1));
             const teacherSnapshot = await getDocs(teacherQuery);
             if (!teacherSnapshot.empty) {
-                await updateDoc(teacherSnapshot.docs[0].ref, { name: values.name, address: values.address || null });
+                await updateDoc(teacherSnapshot.docs[0].ref, { name: values.name, phone: values.phone || null, address: values.address || null });
             }
         } else if (role === 'orangtua') {
             const parentQuery = query(collection(db, "parents"), where("uid", "==", currentUser.uid), limit(1));
             const parentSnapshot = await getDocs(parentQuery);
             if (!parentSnapshot.empty) {
-                await updateDoc(parentSnapshot.docs[0].ref, { name: values.name, address: values.address || null });
+                await updateDoc(parentSnapshot.docs[0].ref, { name: values.name, phone: values.phone || null, address: values.address || null });
             }
         }
 
@@ -339,17 +350,14 @@ export default function ProfilePage() {
               <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
-                    {(role === 'admin' || role === 'guru') ? 'Lihat & Edit Detail' : 'Lihat Detail Lengkap'}
+                    {'Lihat & Edit Detail'}
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-xl">
                   <DialogHeader>
                     <DialogTitle>Detail Profil</DialogTitle>
                     <DialogDescription>
-                      {role === 'admin' || role === 'guru'
-                        ? "Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem."
-                        : "Informasi detail profil Anda."
-                      }
+                      Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -359,9 +367,7 @@ export default function ProfilePage() {
                         <Skeleton className="h-6 w-1/2" />
                         <Skeleton className="h-6 w-2/3" />
                      </div>
-                  ) : !detailedProfileData && !isLoadingDetails ? (
-                     <p className="py-4 text-muted-foreground">Detail profil tambahan tidak ditemukan.</p>
-                  ) : (role === 'admin' || role === 'guru') && detailedProfileData ? (
+                  ) : (role === 'admin' || role === 'guru') ? (
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleProfileUpdate)} className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4">
@@ -390,11 +396,27 @@ export default function ProfilePage() {
                               </FormItem>
                             )}
                           />
-                          {role === 'guru' && <DetailItem icon={Milestone} label="NIP" value={detailedProfileData.nip} />}
-                          {role === 'guru' && <DetailItem icon={BookOpen} label="Mapel Utama" value={detailedProfileData.subject} />}
-                          {role === 'guru' && <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />}
-                          {role === 'guru' && <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />}
-                          {role === 'guru' && <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />}
+                           <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Nomor Telepon</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="08123..." {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          {role === 'guru' && detailedProfileData && (
+                            <>
+                                <DetailItem icon={Milestone} label="NIP" value={detailedProfileData.nip} />
+                                <DetailItem icon={BookOpen} label="Mapel Utama" value={detailedProfileData.subject} />
+                                <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />
+                                <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />
+                            </>
+                          )}
                           <div className="sm:col-span-2">
                             <FormField
                               control={form.control}
@@ -421,11 +443,14 @@ export default function ProfilePage() {
                         </DialogFooter>
                       </form>
                     </Form>
-                  ) : detailedProfileData ? (
+                  ) : !detailedProfileData ? (
+                    <p className="py-4 text-muted-foreground">Detail profil tambahan tidak ditemukan.</p>
+                  ) : (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                         <DetailItem icon={UserIcon} label="Nama Lengkap" value={user.displayName} />
                         <DetailItem icon={Mail} label="Email" value={user.email} />
+                        <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />
                         <DetailItem icon={Home} label="Alamat" value={detailedProfileData.address} />
                         
                         {role === 'siswa' && (
@@ -447,7 +472,6 @@ export default function ProfilePage() {
                              <div className="pt-2 border-t sm:col-span-2 mt-2">
                               <h4 className="font-semibold text-base mt-2">Info Pribadi</h4>
                             </div>
-                            <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />
                              <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />
                              <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />
                           </>
@@ -459,7 +483,7 @@ export default function ProfilePage() {
                           </DialogClose>
                         </DialogFooter>
                     </>
-                  ) : null}
+                  )}
                 </DialogContent>
               </Dialog>
             </div>
@@ -468,3 +492,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
