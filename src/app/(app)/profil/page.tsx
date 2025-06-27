@@ -342,11 +342,11 @@ export default function ProfilePage() {
                     {(role === 'admin' || role === 'guru') ? 'Lihat & Edit Detail' : 'Lihat Detail Lengkap'}
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-xl">
                   <DialogHeader>
                     <DialogTitle>Detail Profil</DialogTitle>
                     <DialogDescription>
-                      {role === 'admin'
+                      {role === 'admin' || role === 'guru'
                         ? "Perbarui informasi profil. Perubahan akan disimpan di seluruh sistem."
                         : "Informasi detail profil Anda."
                       }
@@ -364,48 +364,54 @@ export default function ProfilePage() {
                   ) : (role === 'admin' || role === 'guru') && detailedProfileData ? (
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(handleProfileUpdate)} className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="name"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Nama Lengkap</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Nama lengkap" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="email"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Email (tidak dapat diubah)</FormLabel>
-                              <FormControl>
-                                <Input {...field} readOnly disabled />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                         {role === 'guru' && <DetailItem icon={Milestone} label="NIP" value={detailedProfileData.nip} />}
-                         {role === 'guru' && <DetailItem icon={BookOpen} label="Mapel Utama" value={detailedProfileData.subject} />}
-                         {role === 'guru' && <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />}
-                        <FormField
-                          control={form.control}
-                          name="address"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Alamat</FormLabel>
-                              <FormControl>
-                                <Textarea placeholder="Masukkan alamat" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <DialogFooter>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4">
+                          <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Nama Lengkap</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Nama lengkap" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email (tidak dapat diubah)</FormLabel>
+                                <FormControl>
+                                  <Input {...field} readOnly disabled />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          {role === 'guru' && <DetailItem icon={Milestone} label="NIP" value={detailedProfileData.nip} />}
+                          {role === 'guru' && <DetailItem icon={BookOpen} label="Mapel Utama" value={detailedProfileData.subject} />}
+                          {role === 'guru' && <DetailItem icon={Phone} label="Telepon" value={detailedProfileData.phone} />}
+                          {role === 'guru' && <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />}
+                          {role === 'guru' && <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />}
+                          <div className="sm:col-span-2">
+                            <FormField
+                              control={form.control}
+                              name="address"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Alamat</FormLabel>
+                                  <FormControl>
+                                    <Textarea placeholder="Masukkan alamat" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter className="pt-4">
                           <DialogClose asChild>
                             <Button type="button" variant="outline">Batal</Button>
                           </DialogClose>
