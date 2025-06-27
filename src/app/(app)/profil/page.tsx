@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home, School, Phone, BookOpen, GraduationCap, Calendar as CalendarIcon, Hash, MapPin, Milestone } from "lucide-react";
+import { User as UserIcon, Mail, Shield, AlertCircle, Edit, Home, School, Phone, BookOpen, GraduationCap, Calendar as CalendarIcon, Hash, MapPin, Milestone, Users } from "lucide-react";
 import { roleDisplayNames } from "@/config/roles";
 import LottieLoader from "@/components/ui/LottieLoader";
 import {
