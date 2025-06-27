@@ -1046,5 +1046,3 @@ export default function ParentsPage() {
     </div>
   );
 }
-
-    
