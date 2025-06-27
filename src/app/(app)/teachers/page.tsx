@@ -102,11 +102,13 @@ interface Teacher {
   address?: string;
   phone?: string;
   gender?: "laki-laki" | "perempuan";
+  agama?: string;
   uid?: string; 
   createdAt?: Timestamp; 
 }
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
+const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
 
 const teacherFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
@@ -116,6 +118,7 @@ const teacherFormSchema = z.object({
   address: z.string().trim().optional(),
   phone: z.string().trim().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal('')),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
+  agama: z.string().optional(),
   authUserId: z.string().optional(), 
 });
 type TeacherFormValues = z.infer<typeof teacherFormSchema>;
@@ -156,6 +159,7 @@ export default function TeachersPage() {
       address: "",
       phone: "",
       gender: undefined,
+      agama: undefined,
       authUserId: undefined,
     },
   });
@@ -203,6 +207,7 @@ export default function TeachersPage() {
         address: docSnap.data().address,
         phone: docSnap.data().phone,
         gender: docSnap.data().gender,
+        agama: docSnap.data().agama,
         uid: docSnap.data().uid, 
         createdAt: docSnap.data().createdAt,
       }));
@@ -233,6 +238,7 @@ export default function TeachersPage() {
         address: selectedTeacher.address || "",
         phone: selectedTeacher.phone || "",
         gender: selectedTeacher.gender,
+        agama: selectedTeacher.agama || "",
         authUserId: selectedTeacher.uid || undefined, 
       });
     }
@@ -250,6 +256,7 @@ export default function TeachersPage() {
         address: data.address || null,
         phone: data.phone || null,
         gender: data.gender,
+        agama: data.agama || null,
         uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, 
         createdAt: serverTimestamp(),
       });
@@ -280,6 +287,7 @@ export default function TeachersPage() {
         address: data.address || null,
         phone: data.phone || null,
         gender: data.gender,
+        agama: data.agama || null,
         uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, 
       });
       
@@ -505,6 +513,31 @@ export default function TeachersPage() {
         {formInstance.formState.errors.gender && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.gender.message}</p>
         )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+        <Controller
+          name="agama"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
+              value={field.value || "_NONE_"}
+            >
+              <SelectTrigger id={`${formType}-agama`} className="mt-1">
+                <SelectValue placeholder="Pilih agama" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_NONE_">Tidak ditentukan</SelectItem>
+                {AGAMA_OPTIONS.map((agama) => (
+                  <SelectItem key={agama} value={agama}>
+                    {agama}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
     </>
   );
@@ -738,6 +771,7 @@ export default function TeachersPage() {
                     <div><Label className="text-muted-foreground">Email Profil:</Label><p className="font-medium">{selectedTeacherForView.email}</p></div>
                     <div><Label className="text-muted-foreground">Mata Pelajaran Utama:</Label><p className="font-medium">{selectedTeacherForView.subject}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedTeacherForView.gender || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Agama:</Label><p className="font-medium">{selectedTeacherForView.agama || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{selectedTeacherForView.phone || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedTeacherForView.address || "-"}</p></div>
                     <div>
@@ -797,6 +831,8 @@ export default function TeachersPage() {
     </div>
   );
 }
+    
+
     
 
     

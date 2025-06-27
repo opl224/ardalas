@@ -117,6 +117,7 @@ interface Parent {
   phone?: string;
   address?: string;
   gender?: "laki-laki" | "perempuan";
+  agama?: string;
   studentId: string; // Auth UID of the linked student
   studentName: string; // Denormalized name of the student
   uid?: string; // Auth UID of the parent user (if linked from 'users' collection)
@@ -124,6 +125,7 @@ interface Parent {
 }
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
+const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
 
 const parentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
@@ -131,6 +133,7 @@ const parentFormSchema = z.object({
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   address: z.string().trim().optional(),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
+  agama: z.string().optional(),
   studentId: z.string({ required_error: "Pilih murid terkait (UID)." }), // Student's Auth UID
   authUserId: z.string().optional(), // Parent's Auth UID
 });
@@ -174,6 +177,7 @@ export default function ParentsPage() {
       phone: "",
       address: "",
       gender: undefined,
+      agama: undefined,
       studentId: undefined,
       authUserId: undefined,
     },
@@ -322,6 +326,7 @@ export default function ParentsPage() {
         phone: selectedParent.phone || "",
         address: selectedParent.address || "",
         gender: selectedParent.gender,
+        agama: selectedParent.agama || "",
         studentId: selectedParent.studentId, // Student's UID
         authUserId: selectedParent.uid || undefined, // Parent's Auth UID
       });
@@ -348,6 +353,7 @@ export default function ParentsPage() {
         phone: data.phone || null,
         address: data.address || null,
         gender: data.gender,
+        agama: data.agama || null,
         studentId: data.studentId, // Student's UID
         studentName: selectedStudent.name,
         uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Parent's Auth UID
@@ -363,7 +369,7 @@ export default function ParentsPage() {
 
       toast({ title: "Data Orang Tua Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddDialogOpen(false);
-      addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, studentId: undefined, authUserId: undefined });
+      addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
       fetchPageData();
     } catch (error: any) {
       console.error("Error adding parent:", error);
@@ -397,6 +403,7 @@ export default function ParentsPage() {
       phone: data.phone || null,
       address: data.address || null,
       gender: data.gender,
+      agama: data.agama || null,
       studentId: data.studentId, // Student's UID
       studentName: selectedStudent.name,
       uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Parent's Auth UID
@@ -630,6 +637,31 @@ export default function ParentsPage() {
         )}
       </div>
       <div>
+        <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+        <Controller
+          name="agama"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
+              value={field.value || "_NONE_"}
+            >
+              <SelectTrigger id={`${formType}-agama`} className="mt-1">
+                <SelectValue placeholder="Pilih agama" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_NONE_">Tidak ditentukan</SelectItem>
+                {AGAMA_OPTIONS.map((agama) => (
+                  <SelectItem key={agama} value={agama}>
+                    {agama}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
+      <div>
         <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid)</Label>
         <Controller
           name="studentId"
@@ -733,7 +765,7 @@ export default function ParentsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) {
-                addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, studentId: undefined, authUserId: undefined });
+                addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
                 addParentForm.clearErrors();
               }
             }}>
@@ -835,7 +867,7 @@ export default function ParentsPage() {
                       {!isMobile && <TableCell className="truncate" title={parent.email}>{parent.email || "-"}</TableCell>}
                       <TableCell className="truncate" title={parent.studentName}>{parent.studentName || "-"}</TableCell>
                       {!isMobile && (
-                        <TableCell className="truncate font-mono text-xs" title={parent.uid}>
+                        <TableCell className="font-mono text-xs truncate" title={parent.uid}>
                           {parent.uid ? (
                             <div className="flex items-center gap-1">
                               <UidLinkIcon className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -948,6 +980,7 @@ export default function ParentsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedParentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedParentForView.gender || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">Agama:</Label><p className="font-medium">{selectedParentForView.agama || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedParentForView.email || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{selectedParentForView.phone || "-"}</p></div>
                     <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedParentForView.address || "-"}</p></div>
@@ -1013,3 +1046,5 @@ export default function ParentsPage() {
     </div>
   );
 }
+
+    

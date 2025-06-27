@@ -110,6 +110,7 @@ interface Student {
   className?: string;
   dateOfBirth?: Timestamp;
   gender?: "laki-laki" | "perempuan";
+  agama?: string;
   address?: string;
   linkedParentId?: string;
   parentName?: string;
@@ -118,6 +119,7 @@ interface Student {
 }
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
+const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
 
 const baseStudentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
@@ -126,6 +128,7 @@ const baseStudentFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
   dateOfBirth: z.date().optional(),
   gender: z.enum(GENDERS).optional(),
+  agama: z.string().optional(),
   address: z.string().optional(),
   linkedParentId: z.string().optional(),
   attendanceNumber: z.coerce.number().positive("Nomor absen harus angka positif.").int("Nomor absen harus bilangan bulat.").optional().nullable(),
@@ -171,6 +174,7 @@ export default function StudentsPage() {
       classId: undefined,
       dateOfBirth: undefined,
       gender: undefined,
+      agama: undefined,
       address: "",
       linkedParentId: undefined,
       attendanceNumber: undefined,
@@ -186,6 +190,7 @@ export default function StudentsPage() {
       classId: undefined,
       dateOfBirth: undefined,
       gender: undefined,
+      agama: undefined,
       address: "",
       linkedParentId: undefined,
       attendanceNumber: undefined,
@@ -339,6 +344,7 @@ export default function StudentsPage() {
         classId: selectedStudent.classId,
         dateOfBirth: selectedStudent.dateOfBirth ? selectedStudent.dateOfBirth.toDate() : undefined,
         gender: selectedStudent.gender,
+        agama: selectedStudent.agama || "",
         address: selectedStudent.address || "",
         linkedParentId: selectedStudent.linkedParentId || undefined,
         attendanceNumber: selectedStudent.attendanceNumber ?? undefined,
@@ -451,6 +457,7 @@ export default function StudentsPage() {
         createdAt: serverTimestamp(),
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
+        agama: data.agama || null,
         address: data.address || null,
         linkedParentId: data.linkedParentId || null,
         parentName: selectedParent?.name || null,
@@ -460,7 +467,7 @@ export default function StudentsPage() {
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
-      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
+      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents();
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -499,6 +506,7 @@ export default function StudentsPage() {
         className: selectedClass.name,
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
+        agama: data.agama || null,
         address: data.address || null,
         linkedParentId: data.linkedParentId || null,
         parentName: selectedParent?.name || null,
@@ -673,6 +681,31 @@ export default function StudentsPage() {
             )}
           </div>
           <div>
+            <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+            <Controller
+              name="agama"
+              control={formInstance.control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
+                  value={field.value || "_NONE_"}
+                >
+                  <SelectTrigger id={`${formType}-agama`} className="mt-1">
+                    <SelectValue placeholder="Pilih agama" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_NONE_">Tidak ditentukan</SelectItem>
+                    {AGAMA_OPTIONS.map((agama) => (
+                      <SelectItem key={agama} value={agama}>
+                        {agama}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+          <div>
             <Label htmlFor={`${formType}-student-address`}>Alamat (Opsional)</Label>
             <Textarea
               id={`${formType}-student-address`}
@@ -786,7 +819,7 @@ export default function StudentsPage() {
               onOpenChange={(isOpen) => {
                 setIsAddStudentDialogOpen(isOpen);
                 if (!isOpen) {
-                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
+                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
                   addStudentForm.clearErrors();
                 } else {
                    if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) fetchInitialDropdownAndTeacherData();
@@ -1078,10 +1111,8 @@ export default function StudentsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm overflow-y-auto flex-1 pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{selectedStudentForView.nis || "-"}</p></div>
-
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedStudentForView.email || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedStudentForView.className || selectedStudentForView.classId}</p></div>
-
                     <div>
                         <Label className="text-muted-foreground">Tanggal Lahir:</Label>
                         <p className="font-medium">
@@ -1089,9 +1120,8 @@ export default function StudentsPage() {
                         </p>
                     </div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedStudentForView.gender || "-"}</p></div>
-
+                    <div><Label className="text-muted-foreground">Agama:</Label><p className="font-medium">{selectedStudentForView.agama || "-"}</p></div>
                     <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedStudentForView.address || "-"}</p></div>
-
                     <div>
                         <Label className="text-muted-foreground">Nomor Absen:</Label>
                         <p className="font-medium">{selectedStudentForView.attendanceNumber != null ? selectedStudentForView.attendanceNumber : "-"}</p>
@@ -1102,7 +1132,6 @@ export default function StudentsPage() {
                             {selectedStudentForView.parentName || (selectedStudentForView.linkedParentId ? `${selectedStudentForView.linkedParentId} (Nama tidak tersedia)` : "-")}
                         </p>
                     </div>
-
                     {selectedStudentForView.createdAt && (
                        <div className="sm:col-span-2">
                           <Label className="text-muted-foreground">Tanggal Daftar Profil:</Label>
@@ -1160,3 +1189,5 @@ export default function StudentsPage() {
     </div>
   );
 }
+
+    
