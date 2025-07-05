@@ -551,43 +551,45 @@ export default function TeachersPage() {
         <p className="text-muted-foreground">Kelola data profil guru, termasuk penautan ke akun pengguna.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Users className="h-6 w-6 text-primary" />
-            <span>Daftar Profil Guru</span>
-          </CardTitle>
-          <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
-            setIsAddTeacherDialogOpen(isOpen);
-            if (!isOpen) {
-              addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
-              addTeacherForm.clearErrors();
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="w-full sm:w-auto">
-                <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil Guru
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Tambah Profil Guru Baru</DialogTitle>
-                <DialogDescription>
-                  Isi detail profil guru. anda dapat menautkannya ke akun pengguna yang sudah ada.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                {renderTeacherFormFields(addTeacherForm, 'add')}
-                <DialogFooter>
-                  <DialogClose asChild>
-                     <Button type="button" variant="outline">Batal</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>
-                    {addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Users className="h-6 w-6 text-primary" />
+              <span>Daftar Profil Guru</span>
+            </CardTitle>
+            <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
+              setIsAddTeacherDialogOpen(isOpen);
+              if (!isOpen) {
+                addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+                addTeacherForm.clearErrors();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="w-full md:w-auto">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil Guru
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Tambah Profil Guru Baru</DialogTitle>
+                  <DialogDescription>
+                    Isi detail profil guru. anda dapat menautkannya ke akun pengguna yang sudah ada.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                  {renderTeacherFormFields(addTeacherForm, 'add')}
+                  <DialogFooter>
+                    <DialogClose asChild>
+                       <Button type="button" variant="outline">Batal</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>
+                      {addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="my-4 flex flex-col sm:flex-row gap-2">
@@ -836,3 +838,4 @@ export default function TeachersPage() {
     
 
     
+

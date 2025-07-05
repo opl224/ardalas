@@ -796,69 +796,71 @@ export default function StudentsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Users className="h-6 w-6 text-primary" />
-            <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
-               <span className={cn(isMobile && "block")}>Daftar Murid</span>
-              {!isLoadingStudents && (
-                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
-                  {`(${displayedStudents.length} siswa)`}
-                </span>
-              )}
-              {isLoadingStudents && (
-                <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
-                  (Memuat...)
-                </span>
-              )}
-            </div>
-          </CardTitle>
-          { (authRole === 'admin' || authRole === 'guru') && (
-            <Dialog
-              open={isAddStudentDialogOpen}
-              onOpenChange={(isOpen) => {
-                setIsAddStudentDialogOpen(isOpen);
-                if (!isOpen) {
-                  addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
-                  addStudentForm.clearErrors();
-                } else {
-                   if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) fetchInitialDropdownAndTeacherData();
-                }
-              }}
-            >
-              <DialogTrigger asChild>
-                 <Button size="sm" className="w-full sm:w-auto" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Tambah Murid Baru</DialogTitle>
-                  <DialogDescription>
-                    Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
-                  </DialogDescription>
-                </DialogHeader>
-                <form
-                  id="addStudentDialogForm"
-                  onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)}
-                  className="flex flex-col overflow-hidden flex-1"
-                >
-                  <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
-                    {renderStudentFormFields(addStudentForm, 'add')}
-                  </div>
-                  <DialogFooter className="pt-4 border-t mt-auto">
-                    <DialogClose asChild>
-                       <Button type="button" variant="outline">Batal</Button>
-                    </DialogClose>
-                    <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingInitialData}>
-                      {(addStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
-                      {(addStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Murid"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Users className="h-6 w-6 text-primary" />
+              <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+                 <span className={cn(isMobile && "block")}>Daftar Murid</span>
+                {!isLoadingStudents && (
+                  <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
+                    {`(${displayedStudents.length} siswa)`}
+                  </span>
+                )}
+                {isLoadingStudents && (
+                  <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
+                    (Memuat...)
+                  </span>
+                )}
+              </div>
+            </CardTitle>
+            { (authRole === 'admin' || authRole === 'guru') && (
+              <Dialog
+                open={isAddStudentDialogOpen}
+                onOpenChange={(isOpen) => {
+                  setIsAddStudentDialogOpen(isOpen);
+                  if (!isOpen) {
+                    addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
+                    addStudentForm.clearErrors();
+                  } else {
+                     if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) fetchInitialDropdownAndTeacherData();
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                   <Button size="sm" className="w-full md:w-auto" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Tambah Murid Baru</DialogTitle>
+                    <DialogDescription>
+                      Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form
+                    id="addStudentDialogForm"
+                    onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)}
+                    className="flex flex-col overflow-hidden flex-1"
+                  >
+                    <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                      {renderStudentFormFields(addStudentForm, 'add')}
+                    </div>
+                    <DialogFooter className="pt-4 border-t mt-auto">
+                      <DialogClose asChild>
+                         <Button type="button" variant="outline">Batal</Button>
+                      </DialogClose>
+                      <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingInitialData}>
+                        {(addStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                        {(addStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Murid"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {(authRole === 'admin' || authRole === 'guru') && (
