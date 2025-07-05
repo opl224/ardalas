@@ -832,17 +832,35 @@ export default function ParentsPage() {
               )}
             </div>
             {(authRole === 'admin' || authRole === 'guru') && (
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
                 <div className="w-full md:hidden">
-                  <Dialog open={isAddDialogOpen} onOpenChange={...}>
+                   <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                      setIsAddDialogOpen(isOpen);
+                      if (!isOpen) { addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined }); addParentForm.clearErrors(); }
+                    }}>
                     <DialogTrigger asChild><Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
-                    <DialogContent className="sm:max-w-md">{/* ... Omitted ... */}</DialogContent>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader><DialogTitle>Tambah Profil Orang Tua Baru</DialogTitle><DialogDescription>Isi detail profil orang tua. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+                      <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                        {renderParentFormFields(addParentForm, 'add')}
+                        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>{(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}{(addParentForm.formState.isSubmitting || isLoadingData) ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+                      </form>
+                    </DialogContent>
                   </Dialog>
                 </div>
-                <div className="hidden md:flex items-center gap-2">
-                  <Dialog open={isAddDialogOpen} onOpenChange={...}>
+                <div className="hidden md:flex items-center gap-2 ml-auto">
+                  <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                      setIsAddDialogOpen(isOpen);
+                      if (!isOpen) { addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined }); addParentForm.clearErrors(); }
+                  }}>
                     <DialogTrigger asChild><Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
-                    <DialogContent className="sm:max-w-md">{/* ... Omitted ... */}</DialogContent>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader><DialogTitle>Tambah Profil Orang Tua Baru</DialogTitle><DialogDescription>Isi detail profil orang tua. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+                      <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                          {renderParentFormFields(addParentForm, 'add')}
+                          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>{(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}{(addParentForm.formState.isSubmitting || isLoadingData) ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+                      </form>
+                    </DialogContent>
                   </Dialog>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}<span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span></Button></DropdownMenuTrigger>
@@ -1019,4 +1037,3 @@ export default function ParentsPage() {
     </div>
   );
 }
-

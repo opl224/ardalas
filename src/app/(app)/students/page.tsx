@@ -836,7 +836,7 @@ export default function StudentsPage() {
 
   const getNoStudentsMessage = () => {
     if (authRole === 'siswa') return "Tidak ada siswa lain di kelas anda.";
-    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini, atau kelas yang anda asuh belum memiliki murid.";
+    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun, atau kelas yang anda asuh belum memiliki murid.";
     return "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.";
   };
 
@@ -846,175 +846,145 @@ export default function StudentsPage() {
         <h1 className="text-3xl font-bold font-headline">{pageTitle}</h1>
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
-      <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Users className="h-6 w-6 text-primary" />
-                <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
-                   <span className={cn(isMobile && "block")}>Daftar Murid</span>
-                  {!isLoadingStudents && (
-                    <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
-                      {`(${displayedStudents.length} siswa)`}
-                    </span>
+      <Dialog open={isAddStudentDialogOpen} onOpenChange={(isOpen) => {
+        setIsAddStudentDialogOpen(isOpen);
+        if (!isOpen) { addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined }); addStudentForm.clearErrors(); }
+      }}>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+          <CardHeader className="pb-4">
+              {/* Desktop Header */}
+              <div className="hidden md:flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Users className="h-6 w-6 text-primary" />
+                  <span>Daftar Murid ({displayedStudents.length})</span>
+                </CardTitle>
+                {(authRole === 'admin' || authRole === 'guru') && (
+                  <div className="flex items-center gap-2">
+                    <DialogTrigger asChild>
+                      <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
+                    </DialogTrigger>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={isExporting}>
+                          {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                          <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+              </div>
+              {/* Mobile Header */}
+              <div className="md:hidden flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Users className="h-6 w-6 text-primary" />
+                    <span>Daftar Murid ({displayedStudents.length})</span>
+                  </CardTitle>
+                  {(authRole === 'admin' || authRole === 'guru') && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" disabled={isExporting}>
+                          {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                  {isLoadingStudents && (<span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>(Memuat...)</span>)}
                 </div>
-              </CardTitle>
-              {(authRole === 'admin' || authRole === 'guru') && (
-                <div className="md:hidden">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" disabled={isExporting}>
-                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-            </div>
+                {(authRole === 'admin' || authRole === 'guru') && (
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
+                  </DialogTrigger>
+                )}
+              </div>
+          </CardHeader>
+          <CardContent>
             {(authRole === 'admin' || authRole === 'guru') && (
-              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
-                <div className="w-full md:hidden">
-                  <Dialog open={isAddStudentDialogOpen} onOpenChange={...}>
-                    <DialogTrigger asChild><Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button></DialogTrigger>
-                    <DialogContent ...>{/*...omitted for brevity...*/}</DialogContent>
-                  </Dialog>
+              <div className="my-4 flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari nama, NIS, atau email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-full"
+                  />
                 </div>
-                <div className="hidden md:flex items-center gap-2">
-                  <Dialog open={isAddStudentDialogOpen} onOpenChange={...}>
-                    <DialogTrigger asChild><Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button></DialogTrigger>
-                    <DialogContent ...>{/*...omitted for brevity...*/}</DialogContent>
-                  </Dialog>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}<span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                {showClassFilter && (
+                  <Select
+                    value={selectedClassFilter}
+                    onValueChange={setSelectedClassFilter}
+                    disabled={isLoadingInitialData || allClassesForFilter.length === 0}
+                  >
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Filter per Kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Kelas</SelectItem>
+                      {allClassesForFilter.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {(authRole === 'admin' || authRole === 'guru') && (
-            <div className="my-4 flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cari nama, NIS, atau email..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-full"
-                />
+            {isLoadingCombined ? (
+              <div className="space-y-2 mt-4">
+                  {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
               </div>
-              {showClassFilter && (
-                <Select
-                  value={selectedClassFilter}
-                  onValueChange={setSelectedClassFilter}
-                  disabled={isLoadingInitialData || allClassesForFilter.length === 0}
-                >
-                  <SelectTrigger className="w-full sm:w-[200px]">
-                    <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Filter per Kelas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Kelas</SelectItem>
-                    {allClassesForFilter.map((cls) => (
-                      <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          )}
-
-          {isLoadingCombined ? (
-             <div className="space-y-2 mt-4">
-                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
-             </div>
-          ) : currentTableData.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table className="w-full table-fixed">
-                <TableHeader>
-                  <TableRow>
-                    {isMobile && (authRole === 'admin' || authRole === 'guru') ? (
-                      <>
-                        <TableHead className="w-10 px-2 text-center">No.</TableHead>
-                        <TableHead className="px-2">Nama</TableHead>
-                        <TableHead className="px-2">Kelas</TableHead>
-                        <TableHead className="text-right w-12 px-1">Aksi</TableHead>
-                      </>
-                    ) : (
-                      <>
-                        <TableHead className="w-[50px]">No.</TableHead>
-                        <TableHead className={cn((authRole === 'admin' || authRole === 'guru') ? "w-1/4" : "w-1/2")}>Nama</TableHead>
-                        {(authRole === 'admin' || authRole === 'guru') && (
-                          <>
-                            <TableHead className="w-1/5">NIS</TableHead>
-                            <TableHead className="w-1/4">Email</TableHead>
-                          </>
-                        )}
-                        {authRole === 'siswa' && <TableHead className="w-2/12">No. Absen</TableHead>}
-                        <TableHead className={cn("w-1/5", authRole === 'siswa' && "w-3/12")}>Kelas</TableHead>
-                        {(authRole === 'admin' || authRole === 'guru') && (
-                          <>
-                            <TableHead className="w-[80px]">Gender</TableHead>
-                            <TableHead className="text-center w-16">Aksi</TableHead>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentTableData.map((student, index) => (
-                    <TableRow key={student.id}>
+            ) : currentTableData.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table className="w-full table-fixed">
+                  <TableHeader>
+                    <TableRow>
                       {isMobile && (authRole === 'admin' || authRole === 'guru') ? (
                         <>
-                          <TableCell className="text-center px-2">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                          <TableCell className="font-medium truncate px-2" title={student.name}>{student.name}</TableCell>
-                          <TableCell className="truncate px-2" title={student.className || student.classId}>{student.className || student.classId}</TableCell>
-                          <TableCell className="text-right px-1">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openViewStudentDialog(student)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => openEditDialog(student)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                    {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
-                                  </AlertDialog>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                          </TableCell>
+                          <TableHead className="w-10 px-2 text-center">No.</TableHead>
+                          <TableHead className="px-2">Nama</TableHead>
+                          <TableHead className="px-2">Kelas</TableHead>
+                          <TableHead className="text-right w-12 px-1">Aksi</TableHead>
                         </>
                       ) : (
                         <>
-                          <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                          <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
+                          <TableHead className="w-[50px]">No.</TableHead>
+                          <TableHead className={cn((authRole === 'admin' || authRole === 'guru') ? "w-1/4" : "w-1/2")}>Nama</TableHead>
                           {(authRole === 'admin' || authRole === 'guru') && (
                             <>
-                              <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
-                              <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
+                              <TableHead className="w-1/5">NIS</TableHead>
+                              <TableHead className="w-1/4">Email</TableHead>
                             </>
                           )}
-                          {authRole === 'siswa' && <TableCell>{student.attendanceNumber ?? "-"}</TableCell>}
-                          <TableCell className="truncate" title={student.className || student.classId}>{student.className || student.classId}</TableCell>
+                          {authRole === 'siswa' && <TableHead className="w-2/12">No. Absen</TableHead>}
+                          <TableHead className={cn("w-1/5", authRole === 'siswa' && "w-3/12")}>Kelas</TableHead>
                           {(authRole === 'admin' || authRole === 'guru') && (
                             <>
-                              <TableCell>
-                                {student.gender === "laki-laki" ? (
-                                  <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
-                                ) : student.gender === "perempuan" ? (
-                                  <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
-                                ) : (
-                                  "-"
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center">
+                              <TableHead className="w-[80px]">Gender</TableHead>
+                              <TableHead className="text-center w-16">Aksi</TableHead>
+                            </>
+                          )}
+                        </>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentTableData.map((student, index) => (
+                      <TableRow key={student.id}>
+                        {isMobile && (authRole === 'admin' || authRole === 'guru') ? (
+                          <>
+                            <TableCell className="text-center px-2">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                            <TableCell className="font-medium truncate px-2" title={student.name}>{student.name}</TableCell>
+                            <TableCell className="truncate px-2" title={student.className || student.classId}>{student.className || student.classId}</TableCell>
+                            <TableCell className="text-right px-1">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
@@ -1027,30 +997,85 @@ export default function StudentsPage() {
                                     </AlertDialog>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
-                              </TableCell>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {totalPages > 1 && (
-                <Pagination className="mt-6"><PaginationContent><PaginationItem><PaginationPrevious onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} aria-disabled={currentPage === 1} className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}/></PaginationItem>{renderPageNumbers()}<PaginationItem><PaginationNext onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} aria-disabled={currentPage === totalPages} className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}/></PaginationItem></PaginationContent></Pagination>
-              )}
-            </div>
-          ) : (
-             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {searchTerm || selectedClassFilter !== "all"
-                ? "Tidak ada murid yang cocok dengan filter atau pencarian."
-                : getNoStudentsMessage()
-              }
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
+                            </TableCell>
+                          </>
+                        ) : (
+                          <>
+                            <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                            <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
+                            {(authRole === 'admin' || authRole === 'guru') && (
+                              <>
+                                <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
+                                <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
+                              </>
+                            )}
+                            {authRole === 'siswa' && <TableCell>{student.attendanceNumber ?? "-"}</TableCell>}
+                            <TableCell className="truncate" title={student.className || student.classId}>{student.className || student.classId}</TableCell>
+                            {(authRole === 'admin' || authRole === 'guru') && (
+                              <>
+                                <TableCell>
+                                  {student.gender === "laki-laki" ? (
+                                    <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" />
+                                  ) : student.gender === "perempuan" ? (
+                                    <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" />
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => openViewStudentDialog(student)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => openEditDialog(student)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
+                                        {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                      </AlertDialog>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </TableCell>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {totalPages > 1 && (
+                  <Pagination className="mt-6"><PaginationContent><PaginationItem><PaginationPrevious onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} aria-disabled={currentPage === 1} className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}/></PaginationItem>{renderPageNumbers()}<PaginationItem><PaginationNext onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} aria-disabled={currentPage === totalPages} className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}/></PaginationItem></PaginationContent></Pagination>
+                )}
+              </div>
+            ) : (
+              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
+                {searchTerm || selectedClassFilter !== "all"
+                  ? "Tidak ada murid yang cocok dengan filter atau pencarian."
+                  : getNoStudentsMessage()
+                }
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Tambah Murid Baru</DialogTitle>
+            <DialogDescription>Buat profil murid baru. Ini belum membuat akun login.</DialogDescription>
+          </DialogHeader>
+          <form id="addStudentDialogForm" onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} className="flex flex-col overflow-hidden flex-1">
+            <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">{renderStudentFormFields(addStudentForm, 'add')}</div>
+            <DialogFooter className="pt-4 border-t mt-auto">
+              <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+              <Button type="submit" form="addStudentDialogForm" disabled={addStudentForm.formState.isSubmitting || isLoadingInitialData}>
+                {(addStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                {(addStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Data"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
       <Dialog open={isViewStudentDialogOpen} onOpenChange={(isOpen) => {
           setIsViewStudentDialogOpen(isOpen);
           if (!isOpen) { setSelectedStudentForView(null); }
@@ -1106,4 +1131,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-

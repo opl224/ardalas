@@ -600,254 +600,236 @@ export default function TeachersPage() {
         <h1 className="text-3xl font-bold font-headline">Manajemen Profil Guru</h1>
         <p className="text-muted-foreground">Kelola data profil guru, termasuk penautan ke akun pengguna.</p>
       </div>
-      <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <Users className="h-6 w-6 text-primary" />
-                <span>Daftar Profil Guru</span>
-              </CardTitle>
-              <div className="md:hidden">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="icon" disabled={isExporting}>
-                      {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
-              <div className="w-full md:hidden">
-                <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
-                  setIsAddTeacherDialogOpen(isOpen);
-                  if (!isOpen) {
-                    addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
-                    addTeacherForm.clearErrors();
-                  }
-                }}>
+      <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
+        setIsAddTeacherDialogOpen(isOpen);
+        if (!isOpen) {
+          addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+          addTeacherForm.clearErrors();
+        }
+      }}>
+        <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
+          <CardHeader className="pb-4">
+              {/* Desktop Header */}
+              <div className="hidden md:flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <Users className="h-6 w-6 text-primary" />
+                  <span>Daftar Profil Guru</span>
+                </CardTitle>
+                <div className="flex items-center gap-2">
                   <DialogTrigger asChild>
-                    <Button size="sm" className="w-full">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil
-                    </Button>
+                    <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil</Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
-                    <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                      {renderTeacherFormFields(addTeacherForm, 'add')}
-                      <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>{addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" disabled={isExporting}>
+                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
-              <div className="hidden md:flex items-center gap-2">
-                <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
-                  setIsAddTeacherDialogOpen(isOpen);
-                  if (!isOpen) {
-                    addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
-                    addTeacherForm.clearErrors();
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
-                    <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                      {renderTeacherFormFields(addTeacherForm, 'add')}
-                      <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>{addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={isExporting}>
-                      {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                      <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+              {/* Mobile Header */}
+              <div className="flex flex-col gap-4 md:hidden">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Users className="h-6 w-6 text-primary" />
+                    <span>Daftar Profil Guru</span>
+                  </CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon" disabled={isExporting}>
+                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Profil</Button>
+                </DialogTrigger>
               </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="my-4 flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-grow">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari nama, email, NIP, atau mapel..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-full"
-              />
-            </div>
-            <Select
-              value={subjectFilter}
-              onValueChange={setSubjectFilter}
-              disabled={isLoadingTeachers || uniqueSubjects.length === 0}
-            >
-              <SelectTrigger className="w-full sm:w-[200px]">
-                 <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder="Filter per Mapel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
-                {uniqueSubjects.map((subject) => (
-                  <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {isLoadingTeachers || isLoadingAuthUsers ? (
-             <div className="space-y-2 mt-4">
-                {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
-             </div>
-          ) : currentTableData.length > 0 ? (
-            <>
-            <div className="overflow-x-auto">
-              <Table className="w-full table-fixed">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/4")}>Nama Profil</TableHead>
-                    {!isMobile && <TableHead className="w-1/6">NIP</TableHead>}
-                    {!isMobile && <TableHead className="w-1/5">Email Profil</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/6")}>Mapel</TableHead>
-                    {!isMobile && <TableHead className="w-[80px]">Gender</TableHead>}
-                    {!isMobile && <TableHead className="w-1/6">UID Akun Tertaut</TableHead>}
-                    <TableHead className={cn("text-center", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentTableData.map((teacher, index) => (
-                    <TableRow key={teacher.id}>
-                       <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                      <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={teacher.name}>{teacher.name}</TableCell>
-                      {!isMobile && <TableCell className="truncate" title={teacher.nip}>{teacher.nip || "-"}</TableCell>}
-                      {!isMobile && <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>}
-                      <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={teacher.subject}>{teacher.subject}</TableCell>
-                      {!isMobile && (
-                        <TableCell>
-                          {teacher.gender === "laki-laki" ? 
-                            <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
-                          teacher.gender === "perempuan" ? 
-                            <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
-                          "-"}
-                        </TableCell>
-                      )}
-                      {!isMobile && (
-                        <TableCell className="font-mono text-xs truncate" title={teacher.uid}>
-                          {teacher.uid ? (
-                            <div className="flex items-center gap-1">
-                              <UidLinkIcon className="h-3 w-3 text-muted-foreground shrink-0" /> 
-                              <span className="truncate">{teacher.uid}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic">Belum tertaut</span>
-                          )}
-                        </TableCell>
-                      )}
-                      <TableCell className={cn("text-center", isMobile ? "px-1" : "")}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${teacher.name}`}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openViewDialog(teacher)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Lihat Detail
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEditDialog(teacher)}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem
-                                  onSelect={(e) => {
-                                    e.preventDefault(); 
-                                    openDeleteDialog(teacher);
-                                  }}
-                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Hapus
-                                </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              {selectedTeacher && selectedTeacher.id === teacher.id && ( 
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tindakan ini akan menghapus profil guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel onClick={() => setSelectedTeacher(null)}>Batal</AlertDialogCancel>
-                                    <AlertDialogAction onClick={() => handleDeleteTeacher(selectedTeacher.id, selectedTeacher.name)}>
-                                      Ya, Hapus Profil
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              )}
-                            </AlertDialog>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
+          </CardHeader>
+          <CardContent>
+            <div className="my-4 flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-grow">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari nama, email, NIP, atau mapel..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-full"
+                />
+              </div>
+              <Select
+                value={subjectFilter}
+                onValueChange={setSubjectFilter}
+                disabled={isLoadingTeachers || uniqueSubjects.length === 0}
+              >
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Filter per Mapel" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
+                  {uniqueSubjects.map((subject) => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                   ))}
-                </TableBody>
-              </Table>
+                </SelectContent>
+              </Select>
             </div>
-            {totalPages > 1 && (
-                <Pagination className="mt-6">
-                    <PaginationContent>
-                        <PaginationItem>
-                        <PaginationPrevious 
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                            aria-disabled={currentPage === 1}
-                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
-                        />
-                        </PaginationItem>
-                        {renderPageNumbers()}
-                        <PaginationItem>
-                        <PaginationNext 
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                            aria-disabled={currentPage === totalPages}
-                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
-                        />
-                        </PaginationItem>
-                    </PaginationContent>
-                </Pagination>
+            {isLoadingTeachers || isLoadingAuthUsers ? (
+              <div className="space-y-2 mt-4">
+                  {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+              </div>
+            ) : currentTableData.length > 0 ? (
+              <>
+              <div className="overflow-x-auto">
+                <Table className="w-full table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
+                      <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/4")}>Nama Profil</TableHead>
+                      {!isMobile && <TableHead className="w-1/6">NIP</TableHead>}
+                      {!isMobile && <TableHead className="w-1/5">Email Profil</TableHead>}
+                      <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/6")}>Mapel</TableHead>
+                      {!isMobile && <TableHead className="w-[80px]">Gender</TableHead>}
+                      {!isMobile && <TableHead className="w-1/6">UID Akun Tertaut</TableHead>}
+                      <TableHead className={cn("text-center", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentTableData.map((teacher, index) => (
+                      <TableRow key={teacher.id}>
+                        <TableCell className={cn(isMobile ? "px-2 text-center" : "")}>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
+                        <TableCell className={cn("font-medium truncate", isMobile ? "px-2" : "")} title={teacher.name}>{teacher.name}</TableCell>
+                        {!isMobile && <TableCell className="truncate" title={teacher.nip}>{teacher.nip || "-"}</TableCell>}
+                        {!isMobile && <TableCell className="truncate" title={teacher.email}>{teacher.email}</TableCell>}
+                        <TableCell className={cn("truncate", isMobile ? "px-2" : "")} title={teacher.subject}>{teacher.subject}</TableCell>
+                        {!isMobile && (
+                          <TableCell>
+                            {teacher.gender === "laki-laki" ? 
+                              <Image src="/avatars/laki-laki.png" alt="Laki-laki" width={24} height={24} className="rounded-full" data-ai-hint="male avatar" /> :
+                            teacher.gender === "perempuan" ? 
+                              <Image src="/avatars/perempuan.png" alt="Perempuan" width={24} height={24} className="rounded-full" data-ai-hint="female avatar" /> : 
+                            "-"}
+                          </TableCell>
+                        )}
+                        {!isMobile && (
+                          <TableCell className="font-mono text-xs truncate" title={teacher.uid}>
+                            {teacher.uid ? (
+                              <div className="flex items-center gap-1">
+                                <UidLinkIcon className="h-3 w-3 text-muted-foreground shrink-0" /> 
+                                <span className="truncate">{teacher.uid}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground italic">Belum tertaut</span>
+                            )}
+                          </TableCell>
+                        )}
+                        <TableCell className={cn("text-center", isMobile ? "px-1" : "")}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${teacher.name}`}>
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openViewDialog(teacher)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Lihat Detail
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(teacher)}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => {
+                                      e.preventDefault(); 
+                                      openDeleteDialog(teacher);
+                                    }}
+                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Hapus
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                {selectedTeacher && selectedTeacher.id === teacher.id && ( 
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tindakan ini akan menghapus profil guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => setSelectedTeacher(null)}>Batal</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteTeacher(selectedTeacher.id, selectedTeacher.name)}>
+                                        Ya, Hapus Profil
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                )}
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                  <Pagination className="mt-6">
+                      <PaginationContent>
+                          <PaginationItem>
+                          <PaginationPrevious 
+                              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                              aria-disabled={currentPage === 1}
+                              className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
+                          />
+                          </PaginationItem>
+                          {renderPageNumbers()}
+                          <PaginationItem>
+                          <PaginationNext 
+                              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                              aria-disabled={currentPage === totalPages}
+                              className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
+                          />
+                          </PaginationItem>
+                      </PaginationContent>
+                  </Pagination>
+              )}
+              </>
+            ) : (
+              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
+                {searchTerm || subjectFilter !== "all" 
+                  ? "Tidak ada profil guru yang cocok dengan filter atau pencarian."
+                  : "Tidak ada data profil guru. Klik \"Tambah Profil Guru\" untuk membuat data baru."
+                }
+              </div>
             )}
-            </>
-          ) : (
-             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-              {searchTerm || subjectFilter !== "all" 
-                ? "Tidak ada profil guru yang cocok dengan filter atau pencarian."
-                : "Tidak ada data profil guru. Klik \"Tambah Profil Guru\" untuk membuat data baru."
-              }
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
+          </CardContent>
+        </Card>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+            <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+            {renderTeacherFormFields(addTeacherForm, 'add')}
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>{addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
+      
       <Dialog open={isViewTeacherDialogOpen} onOpenChange={(isOpen) => {
           setIsViewTeacherDialogOpen(isOpen);
           if (!isOpen) { setSelectedTeacherForView(null); }
@@ -924,8 +906,3 @@ export default function TeachersPage() {
     </div>
   );
 }
-    
-
-    
-
-    
