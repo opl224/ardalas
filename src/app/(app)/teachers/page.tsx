@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, PlusCircle, Edit, Trash2, LinkIcon as UidLinkIcon, MoreVertical, Eye, Search, Filter as FilterIcon } from "lucide-react";
+import { Users, PlusCircle, Edit, Trash2, LinkIcon as UidLinkIcon, MoreVertical, Eye, Search, Filter as FilterIcon, FileDown } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -85,6 +85,9 @@ import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useSidebar } from "@/components/ui/sidebar";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 
 interface AuthUserMin {
@@ -145,6 +148,7 @@ export default function TeachersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
@@ -354,6 +358,52 @@ export default function TeachersPage() {
       });
   }, [teachers, searchTerm, subjectFilter]);
 
+  const handleExport = async (formatType: 'pdf' | 'xlsx') => {
+    if (filteredAndSearchedTeachers.length === 0) {
+      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+      return;
+    }
+    setIsExporting(true);
+
+    const fileName = `Data_Guru_${format(new Date(), "yyyyMMdd")}`;
+    const title = `Data Guru - ${subjectFilter === 'all' ? 'Semua Mata Pelajaran' : subjectFilter}`;
+
+    const dataToExport = filteredAndSearchedTeachers.map((teacher, index) => ({
+      "No.": index + 1,
+      "Nama": teacher.name,
+      "NIP": teacher.nip || '-',
+      "Email": teacher.email,
+      "Mapel Utama": teacher.subject,
+      "UID Akun": teacher.uid || 'Belum tertaut',
+    }));
+
+    try {
+      if (formatType === 'pdf') {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(title, 14, 15);
+        autoTable(doc, {
+          startY: 22,
+          head: [Object.keys(dataToExport[0])],
+          body: dataToExport.map(Object.values),
+          theme: 'grid',
+        });
+        doc.save(`${fileName}.pdf`);
+      } else if (formatType === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Guru");
+        XLSX.writeFile(workbook, `${fileName}.xlsx`);
+      }
+      toast({ title: `Ekspor ${formatType.toUpperCase()} Berhasil`, description: `${fileName}.${formatType} telah diunduh.` });
+    } catch (error) {
+        console.error("Export error:", error);
+        toast({ title: "Gagal Mengekspor Data", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+};
+
   const totalPages = Math.ceil(filteredAndSearchedTeachers.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
     const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -557,38 +607,56 @@ export default function TeachersPage() {
               <Users className="h-6 w-6 text-primary" />
               <span>Daftar Profil Guru</span>
             </CardTitle>
-            <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
-              setIsAddTeacherDialogOpen(isOpen);
-              if (!isOpen) {
-                addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
-                addTeacherForm.clearErrors();
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="w-full md:w-auto">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil Guru
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Tambah Profil Guru Baru</DialogTitle>
-                  <DialogDescription>
-                    Isi detail profil guru. anda dapat menautkannya ke akun pengguna yang sudah ada.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                  {renderTeacherFormFields(addTeacherForm, 'add')}
-                  <DialogFooter>
-                    <DialogClose asChild>
-                       <Button type="button" variant="outline">Batal</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>
-                      {addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <div className="flex items-center gap-2 self-end md:self-auto">
+              <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
+                setIsAddTeacherDialogOpen(isOpen);
+                if (!isOpen) {
+                  addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+                  addTeacherForm.clearErrors();
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="w-full sm:w-auto">
+                    <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Profil"}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Tambah Profil Guru Baru</DialogTitle>
+                    <DialogDescription>
+                      Isi detail profil guru. anda dapat menautkannya ke akun pengguna yang sudah ada.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                    {renderTeacherFormFields(addTeacherForm, 'add')}
+                    <DialogFooter>
+                      <DialogClose asChild>
+                         <Button type="button" variant="outline">Batal</Button>
+                      </DialogClose>
+                      <Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>
+                        {addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+              <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
+                      {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                      <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                      </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
+                      Excel (.xlsx)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
+                      PDF (.pdf)
+                      </DropdownMenuItem>
+                  </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -838,4 +906,3 @@ export default function TeachersPage() {
     
 
     
-

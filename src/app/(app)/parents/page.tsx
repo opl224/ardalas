@@ -817,61 +817,59 @@ export default function ParentsPage() {
                 )}
               </div>
             </CardTitle>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-              {(authRole === 'admin' || authRole === 'guru') && (
-                <div className="flex items-center gap-2">
-                  <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                    setIsAddDialogOpen(isOpen);
-                    if (!isOpen) {
-                      addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
-                      addParentForm.clearErrors();
-                    }
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="w-full sm:w-auto">
-                        <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Tambah Data Orang Tua Baru</DialogTitle>
-                        <DialogDescription>
-                          Isi detail orang tua dan pilih murid yang terkait.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                        {renderParentFormFields(addParentForm, 'add')}
-                        <DialogFooter>
-                          <DialogClose asChild>
-                            <Button type="button" variant="outline">Batal</Button>
-                          </DialogClose>
-                          <Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>
-                            {(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
-                            {(addParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Data"}
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                  <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
-                          {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                          <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
-                          </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
-                          Excel (.xlsx)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
-                          PDF (.pdf)
-                          </DropdownMenuItem>
-                      </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-            </div>
+            { (authRole === 'admin' || authRole === 'guru') && (
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                  setIsAddDialogOpen(isOpen);
+                  if (!isOpen) {
+                    addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
+                    addParentForm.clearErrors();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="w-full sm:w-auto">
+                      <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Tambah Data Orang Tua Baru</DialogTitle>
+                      <DialogDescription>
+                        Isi detail orang tua dan pilih murid yang terkait.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                      {renderParentFormFields(addParentForm, 'add')}
+                      <DialogFooter>
+                        <DialogClose asChild>
+                          <Button type="button" variant="outline">Batal</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>
+                          {(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                          {(addParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Data"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
+                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
+                        Excel (.xlsx)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
+                        PDF (.pdf)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
