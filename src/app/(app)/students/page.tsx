@@ -796,7 +796,7 @@ export default function StudentsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-6 w-6 text-primary" />
             <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
@@ -827,7 +827,7 @@ export default function StudentsPage() {
               }}
             >
               <DialogTrigger asChild>
-                 <Button size="sm" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
+                 <Button size="sm" className="w-full sm:w-auto" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
                   <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
                 </Button>
               </DialogTrigger>

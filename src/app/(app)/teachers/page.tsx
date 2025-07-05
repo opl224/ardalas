@@ -248,6 +248,7 @@ export default function TeachersPage() {
     addTeacherForm.clearErrors();
     try {
       const teachersCollectionRef = collection(db, "teachers");
+      const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.authUserId);
       await addDoc(teachersCollectionRef, {
         name: data.name,
         email: data.email,
@@ -279,6 +280,7 @@ export default function TeachersPage() {
     editTeacherForm.clearErrors();
     try {
       const teacherDocRef = doc(db, "teachers", data.id);
+      const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.authUserId);
       await updateDoc(teacherDocRef, {
         name: data.name,
         email: data.email,
@@ -549,7 +551,7 @@ export default function TeachersPage() {
         <p className="text-muted-foreground">Kelola data profil guru, termasuk penautan ke akun pengguna.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
           <CardTitle className="flex items-center gap-2 text-xl">
             <Users className="h-6 w-6 text-primary" />
             <span>Daftar Profil Guru</span>
@@ -557,14 +559,12 @@ export default function TeachersPage() {
           <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
             setIsAddTeacherDialogOpen(isOpen);
             if (!isOpen) {
-              addTeacherForm.reset({name: "", email: "", subject: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+              addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
               addTeacherForm.clearErrors();
-            } else {
-               if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
             }
           }}>
             <DialogTrigger asChild>
-              <Button size="sm">
+              <Button size="sm" className="w-full sm:w-auto">
                 <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil Guru
               </Button>
             </DialogTrigger>

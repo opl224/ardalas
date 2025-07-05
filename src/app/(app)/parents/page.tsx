@@ -744,7 +744,7 @@ export default function ParentsPage() {
         <p className="text-muted-foreground">Kelola data orang tua dan hubungannya dengan murid.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4">
           <CardTitle className="flex items-center gap-2 text-xl">
             <UserCircle className="h-6 w-6 text-primary" />
              <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
@@ -770,7 +770,7 @@ export default function ParentsPage() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" className="w-full sm:w-auto">
                   <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
                 </Button>
               </DialogTrigger>
