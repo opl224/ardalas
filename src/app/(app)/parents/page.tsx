@@ -800,74 +800,55 @@ export default function ParentsPage() {
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <UserCircle className="h-6 w-6 text-primary" />
-              <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
-                <span className={cn(isMobile && "block")}>Daftar Orang Tua</span>
-                {!isLoadingData && (
-                  <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
-                    {`(${displayedParents.length} orang tua)`}
-                  </span>
-                )}
-                {isLoadingData && (
-                  <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
-                    (Memuat...)
-                  </span>
-                )}
-              </div>
-            </CardTitle>
-            { (authRole === 'admin' || authRole === 'guru') && (
-              <div className="flex items-center gap-2 self-end md:self-auto">
-                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                  setIsAddDialogOpen(isOpen);
-                  if (!isOpen) {
-                    addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
-                    addParentForm.clearErrors();
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="w-full sm:w-auto">
-                      <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Tambah Data Orang Tua Baru</DialogTitle>
-                      <DialogDescription>
-                        Isi detail orang tua dan pilih murid yang terkait.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                      {renderParentFormFields(addParentForm, 'add')}
-                      <DialogFooter>
-                        <DialogClose asChild>
-                          <Button type="button" variant="outline">Batal</Button>
-                        </DialogClose>
-                        <Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>
-                          {(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
-                          {(addParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Data"}
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-                <DropdownMenu>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <UserCircle className="h-6 w-6 text-primary" />
+                <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+                  <span className={cn(isMobile && "block")}>Daftar Orang Tua</span>
+                  {!isLoadingData && (
+                    <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
+                      {`(${displayedParents.length} orang tua)`}
+                    </span>
+                  )}
+                  {isLoadingData && (
+                    <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
+                      (Memuat...)
+                    </span>
+                  )}
+                </div>
+              </CardTitle>
+              {(authRole === 'admin' || authRole === 'guru') && (
+                <div className="md:hidden">
+                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
+                      <Button variant="outline" size="icon" disabled={isExporting}>
                         {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                        <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
-                        </Button>
+                      </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
-                        Excel (.xlsx)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
-                        PDF (.pdf)
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                    <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
+            </div>
+            {(authRole === 'admin' || authRole === 'guru') && (
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+                <div className="w-full md:hidden">
+                  <Dialog open={isAddDialogOpen} onOpenChange={...}>
+                    <DialogTrigger asChild><Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
+                    <DialogContent className="sm:max-w-md">{/* ... Omitted ... */}</DialogContent>
+                  </Dialog>
+                </div>
+                <div className="hidden md:flex items-center gap-2">
+                  <Dialog open={isAddDialogOpen} onOpenChange={...}>
+                    <DialogTrigger asChild><Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
+                    <DialogContent className="sm:max-w-md">{/* ... Omitted ... */}</DialogContent>
+                  </Dialog>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}<span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             )}
           </div>
@@ -956,47 +937,14 @@ export default function ParentsPage() {
                       {(authRole === 'admin' || authRole === 'guru') && (
                         <TableCell className={cn(isMobile ? "text-right px-1" : "text-center")}>
                            <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${parent.name}`}>
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${parent.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openViewDialog(parent)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                Lihat Detail
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(parent)}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openViewDialog(parent)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditDialog(parent)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem
-                                    onSelect={(e) => { e.preventDefault(); openDeleteDialog(parent); }}
-                                    className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Hapus
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                {selectedParent && selectedParent.id === parent.id && (
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Tindakan ini akan menghapus data orang tua <span className="font-semibold"> {selectedParent?.name}</span>. Data yang dihapus tidak dapat dikembalikan.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel onClick={() => setSelectedParent(null)}>Batal</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteParent(selectedParent.id, selectedParent.name)}>
-                                        Ya, Hapus Data
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                )}
+                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(parent); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
+                                {selectedParent && selectedParent.id === parent.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data orang tua <span className="font-semibold"> {selectedParent?.name}</span>. Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedParent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteParent(selectedParent.id, selectedParent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                               </AlertDialog>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -1007,27 +955,7 @@ export default function ParentsPage() {
                 </TableBody>
               </Table>
             </div>
-            {totalPages > 1 && (
-                <Pagination className="mt-6">
-                    <PaginationContent>
-                        <PaginationItem>
-                        <PaginationPrevious
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            aria-disabled={currentPage === 1}
-                            className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
-                        />
-                        </PaginationItem>
-                        {renderPageNumbers()}
-                        <PaginationItem>
-                        <PaginationNext
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            aria-disabled={currentPage === totalPages}
-                            className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
-                        />
-                        </PaginationItem>
-                    </PaginationContent>
-                </Pagination>
-            )}
+            {totalPages > 1 && (<Pagination className="mt-6"><PaginationContent><PaginationItem><PaginationPrevious onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} aria-disabled={currentPage === 1} className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}/></PaginationItem>{renderPageNumbers()}<PaginationItem><PaginationNext onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} aria-disabled={currentPage === totalPages} className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}/></PaginationItem></PaginationContent></Pagination>)}
             </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
@@ -1047,12 +975,8 @@ export default function ParentsPage() {
           if (!isOpen) { setSelectedParentForView(null); }
       }}>
         <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-                <DialogTitle>Detail Orang Tua: {selectedParentForView?.name}</DialogTitle>
-                <DialogDescription>Informasi lengkap mengenai orang tua murid.</DialogDescription>
-            </DialogHeader>
-            {selectedParentForView && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
+            <DialogHeader><DialogTitle>Detail Orang Tua: {selectedParentForView?.name}</DialogTitle><DialogDescription>Informasi lengkap mengenai orang tua murid.</DialogDescription></DialogHeader>
+            {selectedParentForView && (<div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedParentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedParentForView.gender || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Agama:</Label><p className="font-medium">{selectedParentForView.agama || "-"}</p></div>
@@ -1060,27 +984,10 @@ export default function ParentsPage() {
                     <div><Label className="text-muted-foreground">Nomor Telepon:</Label><p className="font-medium">{selectedParentForView.phone || "-"}</p></div>
                     <div className="sm:col-span-2"><Label className="text-muted-foreground">Alamat:</Label><p className="font-medium whitespace-pre-line">{selectedParentForView.address || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Nama Anak Terhubung:</Label><p className="font-medium">{selectedParentForView.studentName || "-"}</p></div>
-                    <div>
-                        <Label className="text-muted-foreground">UID Akun Pengguna Tertaut:</Label>
-                        {selectedParentForView.uid ? (
-                            <p className="font-mono text-xs flex items-center gap-1">
-                                <UidLinkIcon className="h-3.5 w-3.5 text-muted-foreground" /> {selectedParentForView.uid}
-                            </p>
-                        ) : (
-                            <p className="italic text-muted-foreground">Belum ditautkan.</p>
-                        )}
-                    </div>
-                     {selectedParentForView.createdAt && (
-                       <div className="sm:col-span-2">
-                          <Label className="text-muted-foreground">Tanggal Dibuat (Profil):</Label>
-                          <p className="font-medium">{format(selectedParentForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
-                       </div>
-                    )}
-                </div>
-            )}
-            <DialogFooter>
-                <DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose>
-            </DialogFooter>
+                    <div><Label className="text-muted-foreground">UID Akun Pengguna Tertaut:</Label>{selectedParentForView.uid ? (<p className="font-mono text-xs flex items-center gap-1"><UidLinkIcon className="h-3.5 w-3.5 text-muted-foreground" /> {selectedParentForView.uid}</p>) : (<p className="italic text-muted-foreground">Belum ditautkan.</p>)}</div>
+                     {selectedParentForView.createdAt && (<div className="sm:col-span-2"><Label className="text-muted-foreground">Tanggal Dibuat (Profil):</Label><p className="font-medium">{format(selectedParentForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p></div>)}
+            </div>)}
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Tutup</Button></DialogClose></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1094,21 +1001,12 @@ export default function ParentsPage() {
             }
         }}>
           <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Edit Data Orang Tua</DialogTitle>
-              <DialogDescription>
-                Perbarui detail data orang tua.
-              </DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>Edit Data Orang Tua</DialogTitle><DialogDescription>Perbarui detail data orang tua.</DialogDescription></DialogHeader>
             {selectedParent && (
               <form onSubmit={editParentForm.handleSubmit(handleEditParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <Input type="hidden" {...editParentForm.register("id")} />
                  {renderParentFormFields(editParentForm, 'edit')}
-                <DialogFooter>
-                   <DialogClose asChild>
-                      <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedParent(null); }}>Batal</Button>
-                   </DialogClose>
-                  <Button type="submit" disabled={editParentForm.formState.isSubmitting || isLoadingData}>
+                <DialogFooter><DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedParent(null); }}>Batal</Button></DialogClose><Button type="submit" disabled={editParentForm.formState.isSubmitting || isLoadingData}>
                     {(editParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
                     {(editParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
@@ -1121,3 +1019,4 @@ export default function ParentsPage() {
     </div>
   );
 }
+

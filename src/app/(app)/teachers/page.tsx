@@ -602,60 +602,83 @@ export default function TeachersPage() {
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <Users className="h-6 w-6 text-primary" />
-              <span>Daftar Profil Guru</span>
-            </CardTitle>
-            <div className="flex items-center gap-2 self-end md:self-auto">
-              <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
-                setIsAddTeacherDialogOpen(isOpen);
-                if (!isOpen) {
-                  addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
-                  addTeacherForm.clearErrors();
-                }
-              }}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="w-full sm:w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Profil"}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Tambah Profil Guru Baru</DialogTitle>
-                    <DialogDescription>
-                      Isi detail profil guru. anda dapat menautkannya ke akun pengguna yang sudah ada.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                    {renderTeacherFormFields(addTeacherForm, 'add')}
-                    <DialogFooter>
-                      <DialogClose asChild>
-                         <Button type="button" variant="outline">Batal</Button>
-                      </DialogClose>
-                      <Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>
-                        {addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-              <DropdownMenu>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start justify-between">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <Users className="h-6 w-6 text-primary" />
+                <span>Daftar Profil Guru</span>
+              </CardTitle>
+              <div className="md:hidden">
+                <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
+                    <Button variant="outline" size="icon" disabled={isExporting}>
                       {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                      <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
-                      </Button>
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                      <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
-                      Excel (.xlsx)
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
-                      PDF (.pdf)
-                      </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
                   </DropdownMenuContent>
-              </DropdownMenu>
+                </DropdownMenu>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-end">
+              <div className="w-full md:hidden">
+                <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
+                  setIsAddTeacherDialogOpen(isOpen);
+                  if (!isOpen) {
+                    addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+                    addTeacherForm.clearErrors();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="w-full">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+                    <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                      {renderTeacherFormFields(addTeacherForm, 'add')}
+                      <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>{addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="hidden md:flex items-center gap-2">
+                <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
+                  setIsAddTeacherDialogOpen(isOpen);
+                  if (!isOpen) {
+                    addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+                    addTeacherForm.clearErrors();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+                    <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                      {renderTeacherFormFields(addTeacherForm, 'add')}
+                      <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>{addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isExporting}>
+                      {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                      <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
         </CardHeader>
