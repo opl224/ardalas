@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon } from "lucide-react";
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon, FileDown } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode, useCallback } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -68,7 +68,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import { format, startOfDay } from "date-fns";
-import { id as indonesiaLocale } from "date-fns/locale";
+import { id as indonesiaLocale } from 'date-fns/locale';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -89,6 +89,9 @@ import { cn } from "@/lib/utils";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { CalendarDatePicker } from "@/components/calendar-date-picker";
 import { useSidebar } from "@/components/ui/sidebar";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 
 interface ClassMin {
@@ -161,6 +164,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
@@ -547,6 +551,53 @@ export default function StudentsPage() {
     }
   };
 
+  const handleExport = async (formatType: 'pdf' | 'xlsx') => {
+    if (displayedStudents.length === 0) {
+      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+      return;
+    }
+    setIsExporting(true);
+
+    const fileName = `Data_Siswa_${selectedClassFilter !== 'all' ? allClassesForFilter.find(c => c.id === selectedClassFilter)?.name?.replace(/\s+/g, '_') : 'Semua_Kelas'}_${format(new Date(), "yyyyMMdd")}`;
+    const title = `Data Siswa - ${selectedClassFilter !== 'all' ? `Kelas ${allClassesForFilter.find(c => c.id === selectedClassFilter)?.name}` : 'Semua Kelas'}`;
+
+    const dataToExport = displayedStudents.map((student, index) => ({
+      "No.": index + 1,
+      "Nama Siswa": student.name,
+      "NIS": student.nis || '-',
+      "Email": student.email || '-',
+      "Kelas": student.className || '-',
+      "Orang Tua": student.parentName || '-',
+      "No. Absen": student.attendanceNumber ?? '-',
+    }));
+
+    try {
+      if (formatType === 'pdf') {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(title, 14, 15);
+        autoTable(doc, {
+          startY: 22,
+          head: [Object.keys(dataToExport[0])],
+          body: dataToExport.map(Object.values),
+          theme: 'grid',
+        });
+        doc.save(`${fileName}.pdf`);
+      } else if (formatType === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Siswa");
+        XLSX.writeFile(workbook, `${fileName}.xlsx`);
+      }
+      toast({ title: `Ekspor ${formatType.toUpperCase()} Berhasil`, description: `${fileName}.${formatType} telah diunduh.` });
+    } catch (error) {
+        console.error("Export error:", error);
+        toast({ title: "Gagal Mengekspor Data", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+};
+
   const openViewStudentDialog = (student: Student) => {
     setSelectedStudentForView(student);
     setIsViewStudentDialogOpen(true);
@@ -815,50 +866,68 @@ export default function StudentsPage() {
               </div>
             </CardTitle>
             { (authRole === 'admin' || authRole === 'guru') && (
-              <Dialog
-                open={isAddStudentDialogOpen}
-                onOpenChange={(isOpen) => {
-                  setIsAddStudentDialogOpen(isOpen);
-                  if (!isOpen) {
-                    addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
-                    addStudentForm.clearErrors();
-                  } else {
-                     if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) fetchInitialDropdownAndTeacherData();
-                  }
-                }}
-              >
-                <DialogTrigger asChild>
-                   <Button size="sm" className="w-full md:w-auto" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Tambah Murid Baru</DialogTitle>
-                    <DialogDescription>
-                      Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form
-                    id="addStudentDialogForm"
-                    onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)}
-                    className="flex flex-col overflow-hidden flex-1"
-                  >
-                    <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
-                      {renderStudentFormFields(addStudentForm, 'add')}
-                    </div>
-                    <DialogFooter className="pt-4 border-t mt-auto">
-                      <DialogClose asChild>
-                         <Button type="button" variant="outline">Batal</Button>
-                      </DialogClose>
-                      <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingInitialData}>
-                        {(addStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
-                        {(addStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Murid"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <Dialog
+                  open={isAddStudentDialogOpen}
+                  onOpenChange={(isOpen) => {
+                    setIsAddStudentDialogOpen(isOpen);
+                    if (!isOpen) {
+                      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
+                      addStudentForm.clearErrors();
+                    } else {
+                       if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) fetchInitialDropdownAndTeacherData();
+                    }
+                  }}
+                >
+                  <DialogTrigger asChild>
+                     <Button size="sm" className="w-full sm:w-auto" disabled={isLoadingInitialData && (allClassesForFilter.length === 0 || allParents.length === 0)}>
+                      <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Murid'}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Tambah Murid Baru</DialogTitle>
+                      <DialogDescription>
+                        Isi detail murid untuk menambahkan data baru. Ini akan membuat profil di daftar murid.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form
+                      id="addStudentDialogForm"
+                      onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)}
+                      className="flex flex-col overflow-hidden flex-1"
+                    >
+                      <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">
+                        {renderStudentFormFields(addStudentForm, 'add')}
+                      </div>
+                      <DialogFooter className="pt-4 border-t mt-auto">
+                        <DialogClose asChild>
+                           <Button type="button" variant="outline">Batal</Button>
+                        </DialogClose>
+                        <Button form="addStudentDialogForm" type="submit" disabled={addStudentForm.formState.isSubmitting || isLoadingInitialData}>
+                          {(addStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                          {(addStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Murid"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
+                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
+                        Excel (.xlsx)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
+                        PDF (.pdf)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </CardHeader>

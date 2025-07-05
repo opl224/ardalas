@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon, MoreVertical, Eye } from "lucide-react";
+import { UserCircle, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, LinkIcon as UidLinkIcon, MoreVertical, Eye, FileDown } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode, useCallback } from "react";
@@ -91,6 +91,9 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 
 interface StudentForDialog {
@@ -165,6 +168,8 @@ export default function ParentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
+
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
@@ -522,6 +527,56 @@ export default function ParentsPage() {
     }
     return filtered;
   }, [parents, studentsForDialog, searchTerm, selectedClassFilter, authRole]);
+  
+  const handleExport = async (formatType: 'pdf' | 'xlsx') => {
+    if (displayedParents.length === 0) {
+      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+      return;
+    }
+    setIsExporting(true);
+
+    const fileName = `Data_Orang_Tua_${selectedClassFilter !== 'all' ? allClassesForFilter.find(c => c.id === selectedClassFilter)?.name?.replace(/\s+/g, '_') : 'Semua_Kelas'}_${format(new Date(), "yyyyMMdd")}`;
+    const title = `Data Orang Tua - ${selectedClassFilter !== 'all' ? `Kelas Anak ${allClassesForFilter.find(c => c.id === selectedClassFilter)?.name}` : 'Semua Kelas'}`;
+
+    const dataToExport = displayedParents.map((parent, index) => {
+        const student = studentsForDialog.find(s => s.id === parent.studentId);
+        const className = allClassesForFilter.find(c => c.id === student?.classId)?.name || '-';
+        return {
+            "No.": index + 1,
+            "Nama Orang Tua": parent.name,
+            "Email": parent.email || '-',
+            "Telepon": parent.phone || '-',
+            "Nama Anak": parent.studentName,
+            "Kelas Anak": className
+        };
+    });
+
+    try {
+      if (formatType === 'pdf') {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(title, 14, 15);
+        autoTable(doc, {
+          startY: 22,
+          head: [Object.keys(dataToExport[0])],
+          body: dataToExport.map(Object.values),
+          theme: 'grid',
+        });
+        doc.save(`${fileName}.pdf`);
+      } else if (formatType === 'xlsx') {
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data Orang Tua");
+        XLSX.writeFile(workbook, `${fileName}.xlsx`);
+      }
+      toast({ title: `Ekspor ${formatType.toUpperCase()} Berhasil`, description: `${fileName}.${formatType} telah diunduh.` });
+    } catch (error) {
+        console.error("Export error:", error);
+        toast({ title: "Gagal Mengekspor Data", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+};
 
   const totalPages = Math.ceil(displayedParents.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -763,39 +818,57 @@ export default function ParentsPage() {
               </div>
             </CardTitle>
             {(authRole === 'admin' || authRole === 'guru') && (
-              <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                setIsAddDialogOpen(isOpen);
-                if (!isOpen) {
-                  addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
-                  addParentForm.clearErrors();
-                }
-              }}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="w-full md:w-auto">
-                    <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Tambah Data Orang Tua Baru</DialogTitle>
-                    <DialogDescription>
-                      Isi detail orang tua dan pilih murid yang terkait.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                    {renderParentFormFields(addParentForm, 'add')}
-                    <DialogFooter>
-                      <DialogClose asChild>
-                         <Button type="button" variant="outline">Batal</Button>
-                      </DialogClose>
-                      <Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>
-                        {(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
-                        {(addParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Data"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                  setIsAddDialogOpen(isOpen);
+                  if (!isOpen) {
+                    addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined });
+                    addParentForm.clearErrors();
+                  }
+                }}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="w-full sm:w-auto">
+                      <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? "Tambah" : "Tambah Orang Tua"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Tambah Data Orang Tua Baru</DialogTitle>
+                      <DialogDescription>
+                        Isi detail orang tua dan pilih murid yang terkait.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                      {renderParentFormFields(addParentForm, 'add')}
+                      <DialogFooter>
+                        <DialogClose asChild>
+                           <Button type="button" variant="outline">Batal</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>
+                          {(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                          {(addParentForm.formState.isSubmitting || isLoadingData) ? "Menyimpan..." : "Simpan Data"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="w-full sm:w-auto" disabled={isExporting}>
+                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>
+                        Excel (.xlsx)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>
+                        PDF (.pdf)
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
         </CardHeader>
