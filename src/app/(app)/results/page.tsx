@@ -1448,7 +1448,6 @@ export default function ResultsPage() {
                                 {result.meetingNumber && <span className="text-xs text-muted-foreground ml-1">(P{result.meetingNumber})</span>}
                               </TableCell>
                               <TableCell>{result.score}</TableCell>
-                              <TableCell className="truncate" title={result.feedback || undefined}>{result.feedback || "-"}</TableCell>
                               <TableCell>
                                 {format(result.dateOfAssessment.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}
                               </TableCell>
@@ -1709,5 +1708,3 @@ export default function ResultsPage() {
     </div>
   );
 }
-
-    
