@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { BookOpen, PlusCircle, Edit, Trash2, Search, MoreVertical } from "lucide-react";
+import { BookOpen, PlusCircle, Edit, Trash2, Search, MoreVertical, FileDown } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,6 +82,11 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import LottieLoader from "@/components/ui/LottieLoader";
+import { format } from "date-fns";
 
 interface AuthUserMin {
   id: string; // Firebase Auth UID
@@ -125,6 +130,7 @@ export default function SubjectsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const { isMobile } = useSidebar();
+  const [isExporting, setIsExporting] = useState(false);
 
   const { toast } = useToast();
 
@@ -386,6 +392,52 @@ export default function SubjectsPage() {
     });
   }, [subjects, searchTerm, role]);
 
+  const handleExport = async (formatType: 'pdf' | 'xlsx') => {
+    if (displayedSubjects.length === 0) {
+        toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+        return;
+    }
+    setIsExporting(true);
+
+    const fileName = `Data_Mata_Pelajaran_${format(new Date(), "yyyyMMdd")}`;
+    const title = `Data Mata Pelajaran - Ardalas`;
+
+    const dataToExport = displayedSubjects.map((subject, index) => ({
+        "No.": index + 1,
+        "Nama Mata Pelajaran": subject.name,
+        "Deskripsi": subject.description || '-',
+        "Guru Penanggung Jawab": subject.teacherName || '-',
+        "UID Guru": subject.teacherUid || 'N/A',
+    }));
+
+    try {
+        if (formatType === 'pdf') {
+            const doc = new jsPDF({ orientation: 'landscape' });
+            doc.setFontSize(16);
+            doc.text(title, 14, 15);
+            autoTable(doc, {
+                startY: 22,
+                head: [Object.keys(dataToExport[0])],
+                body: dataToExport.map(Object.values),
+                theme: 'grid',
+            });
+            doc.save(`${fileName}.pdf`);
+        } else if (formatType === 'xlsx') {
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Mata Pelajaran");
+            XLSX.writeFile(workbook, `${fileName}.xlsx`);
+        }
+        toast({ title: `Ekspor ${formatType.toUpperCase()} Berhasil`, description: `${fileName}.${formatType} telah diunduh.` });
+    } catch (error) {
+        console.error("Export error:", error);
+        toast({ title: "Gagal Mengekspor Data", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+
   const totalPages = Math.ceil(displayedSubjects.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
     const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -451,51 +503,68 @@ export default function SubjectsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <BookOpen className="h-6 w-6 text-primary" />
-            <span>Daftar Mata Pelajaran</span>
-          </CardTitle>
+        <CardHeader className="pb-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                    <BookOpen className="h-6 w-6 text-primary" />
+                    <span>Daftar Mata Pelajaran</span>
+                </CardTitle>
+                 {role === "admin" && (
+                    <div className="flex items-center gap-2">
+                        <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                          setIsAddDialogOpen(isOpen);
+                          if (!isOpen) {
+                            addSubjectForm.reset();
+                            addSubjectForm.clearErrors();
+                          } else {
+                            if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
+                          }
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" className="w-full sm:w-auto">
+                              <PlusCircle className="mr-2 h-4 w-4" /> Tambah Mata Pelajaran
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Tambah Mata Pelajaran Baru</DialogTitle>
+                              <DialogDescription>
+                                Isi detail mata pelajaran baru.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                              {renderSubjectFormFields(addSubjectForm, 'add')}
+                              <DialogFooter>
+                                <DialogClose asChild>
+                                   <Button type="button" variant="outline">Batal</Button>
+                                </DialogClose>
+                                <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
+                                  {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? <LottieLoader width={16} height={16} className="mr-2" /> : null}
+                                  {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Mata Pelajaran"}
+                                </Button>
+                              </DialogFooter>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={isExporting}>
+                                {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                                <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )}
+            </div>
         </CardHeader>
         <CardContent>
           {role === "admin" && (
-            <div className="my-4 flex flex-col gap-4">
-              <div className="flex sm:justify-end">
-                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                  setIsAddDialogOpen(isOpen);
-                  if (!isOpen) {
-                    addSubjectForm.reset();
-                    addSubjectForm.clearErrors();
-                  } else {
-                    if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="w-full sm:w-auto">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Tambah Mata Pelajaran
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Tambah Mata Pelajaran Baru</DialogTitle>
-                      <DialogDescription>
-                        Isi detail mata pelajaran baru.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={addSubjectForm.handleSubmit(handleAddSubjectSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                      {renderSubjectFormFields(addSubjectForm, 'add')}
-                      <DialogFooter>
-                        <DialogClose asChild>
-                           <Button type="button" variant="outline">Batal</Button>
-                        </DialogClose>
-                        <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
-                          {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Mata Pelajaran"}
-                        </Button>
-                      </DialogFooter>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-              </div>
+            <div className="my-4">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -634,6 +703,7 @@ export default function SubjectsPage() {
                       <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedSubject(null); }}>Batal</Button>
                    </DialogClose>
                   <Button type="submit" disabled={editSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
+                    {editSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? <LottieLoader width={16} height={16} className="mr-2" /> : null}
                     {editSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>
