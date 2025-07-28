@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical, Search, Filter as FilterIcon } from "lucide-react"; 
+import { School, PlusCircle, Edit, Trash2, Eye, AlertCircle, MoreVertical, Search, Filter as FilterIcon, FileDown } from "lucide-react"; 
 import { useState, useEffect, useMemo } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -83,6 +83,11 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "@/components/ui/sidebar";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import LottieLoader from "@/components/ui/LottieLoader";
+import { format } from "date-fns";
 
 
 interface TeacherMin { 
@@ -130,6 +135,7 @@ export default function ClassesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClassNameFilter, setSelectedClassNameFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [isViewStudentsDialogOpen, setIsViewStudentsDialogOpen] = useState(false);
   const [selectedClassForViewingStudents, setSelectedClassForViewingStudents] = useState<ClassData | null>(null);
@@ -383,6 +389,50 @@ export default function ClassesPage() {
     return tempClasses;
   }, [allRawClasses, searchTerm, selectedClassNameFilter]);
 
+  const handleExport = async (formatType: 'pdf' | 'xlsx') => {
+    if (filteredClasses.length === 0) {
+        toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+        return;
+    }
+    setIsExporting(true);
+
+    const fileName = `Data_Kelas_${format(new Date(), "yyyyMMdd")}`;
+    const title = `Data Kelas Sekolah`;
+
+    const dataToExport = filteredClasses.map((item, index) => ({
+        "No.": index + 1,
+        "Nama Kelas": item.name,
+        "Wali Kelas": item.teacherName || '-',
+    }));
+
+    try {
+        if (formatType === 'pdf') {
+            const doc = new jsPDF();
+            doc.setFontSize(16);
+            doc.text(title, 14, 15);
+            autoTable(doc, {
+                startY: 22,
+                head: [Object.keys(dataToExport[0])],
+                body: dataToExport.map(Object.values),
+                theme: 'grid',
+            });
+            doc.save(`${fileName}.pdf`);
+        } else if (formatType === 'xlsx') {
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Data Kelas");
+            XLSX.writeFile(workbook, `${fileName}.xlsx`);
+        }
+        toast({ title: `Ekspor ${formatType.toUpperCase()} Berhasil`, description: `${fileName}.${formatType} telah diunduh.` });
+    } catch (error) {
+        console.error("Export error:", error);
+        toast({ title: "Gagal Mengekspor Data", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+
   const totalPages = Math.ceil(filteredClasses.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
     const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -455,67 +505,81 @@ export default function ClassesPage() {
             <span>{authRole === "orangtua" ? "Detail Kelas Anak" : "Daftar Kelas"}</span>
           </CardTitle>
           {authRole === "admin" && (
-            <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-              setIsAddDialogOpen(isOpen);
-              if (!isOpen) {
-                addClassForm.reset();
-                addClassForm.clearErrors();
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button size="sm" onClick={() => { if (teachers.length === 0) fetchTeachersForDropdown(); }}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Tambah Kelas
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Tambah Kelas Baru</DialogTitle>
-                  <DialogDescription>
-                    Isi detail kelas dan pilih wali kelas jika ada.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={addClassForm.handleSubmit(handleAddClassSubmit)} className="space-y-4 py-4">
-                  <div>
-                    <Label htmlFor="add-class-name">Nama Kelas</Label>
-                    <Input id="add-class-name" {...addClassForm.register("name")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1" />
-                    {addClassForm.formState.errors.name && (
-                      <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
-                    )}
-                  </div>
-                  <div>
-                    <Label htmlFor="add-class-teacherId">Wali Kelas (Opsional)</Label>
-                    <Select
-                      onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
-                      defaultValue={addClassForm.getValues("teacherId")}
-                    >
-                      <SelectTrigger id="add-class-teacherId" className="mt-1">
-                        <SelectValue placeholder="Pilih wali kelas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {teachers.length === 0 && <SelectItem value="loading" disabled>Memuat guru...</SelectItem>}
-                        <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
-                        {teachers.map((teacher) => (
-                          <SelectItem key={teacher.id} value={teacher.id}>
-                            {teacher.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {addClassForm.formState.errors.teacherId && (
-                      <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.teacherId.message}</p>
-                    )}
-                  </div>
-                  <DialogFooter>
-                    <DialogClose asChild>
-                       <Button type="button" variant="outline">Batal</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={addClassForm.formState.isSubmitting}>
-                      {addClassForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Kelas"}
+            <div className="flex items-center gap-2">
+                <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                setIsAddDialogOpen(isOpen);
+                if (!isOpen) {
+                    addClassForm.reset();
+                    addClassForm.clearErrors();
+                }
+                }}>
+                <DialogTrigger asChild>
+                    <Button size="sm" onClick={() => { if (teachers.length === 0) fetchTeachersForDropdown(); }}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Tambah Kelas
                     </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                    <DialogTitle>Tambah Kelas Baru</DialogTitle>
+                    <DialogDescription>
+                        Isi detail kelas dan pilih wali kelas jika ada.
+                    </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={addClassForm.handleSubmit(handleAddClassSubmit)} className="space-y-4 py-4">
+                    <div>
+                        <Label htmlFor="add-class-name">Nama Kelas</Label>
+                        <Input id="add-class-name" {...addClassForm.register("name")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1" />
+                        {addClassForm.formState.errors.name && (
+                        <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
+                        )}
+                    </div>
+                    <div>
+                        <Label htmlFor="add-class-teacherId">Wali Kelas (Opsional)</Label>
+                        <Select
+                        onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
+                        defaultValue={addClassForm.getValues("teacherId")}
+                        >
+                        <SelectTrigger id="add-class-teacherId" className="mt-1">
+                            <SelectValue placeholder="Pilih wali kelas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {teachers.length === 0 && <SelectItem value="loading" disabled>Memuat guru...</SelectItem>}
+                            <SelectItem value={NO_TEACHER_VALUE}>Tidak Ada Wali Kelas</SelectItem>
+                            {teachers.map((teacher) => (
+                            <SelectItem key={teacher.id} value={teacher.id}>
+                                {teacher.name}
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                        </Select>
+                        {addClassForm.formState.errors.teacherId && (
+                        <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.teacherId.message}</p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild>
+                        <Button type="button" variant="outline">Batal</Button>
+                        </DialogClose>
+                        <Button type="submit" disabled={addClassForm.formState.isSubmitting}>
+                        {addClassForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Kelas"}
+                        </Button>
+                    </DialogFooter>
+                    </form>
+                </DialogContent>
+                </Dialog>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" disabled={isExporting}>
+                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                    </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                    <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
           )}
         </CardHeader>
         <CardContent>
@@ -663,7 +727,7 @@ export default function ClassesPage() {
             </>
           ) : (
              <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
-                {searchTerm || selectedClassNameFilter !== "all" ? 'Tidak ada kelas yang cocok dengan filter atau pencarian.' :
+                {searchTerm || selectedClassNameFilter !== "all" ? 'Tidak ada kelas yang cocok dengan filter atau pencarian.' : 
                  authRole === 'admin' ? 'Tidak ada data kelas untuk ditampilkan. Klik "Tambah Kelas" untuk membuat data baru.' : 
                  authRole === 'guru' ? 'Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun saat ini.' :
                  authRole === 'orangtua' && !user?.linkedStudentClassId ? (
