@@ -442,7 +442,7 @@ export default function UserAdministrationPage() {
       const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
       return (
         <div>
-          <Label>Kelas yang Ditugaskan</Label>
+          <Label>Kelas yang Ditugaskan <span className="text-destructive">*</span></Label>
           {isLoadingClasses ? (
             <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
           ) : noClassesAvailable ? (
@@ -519,7 +519,7 @@ export default function UserAdministrationPage() {
     } else if (currentRole === 'siswa') {
       return (
          <div>
-            <Label htmlFor="classId">Kelas Siswa</Label>
+            <Label htmlFor="classId">Kelas Siswa <span className="text-destructive">*</span></Label>
             {noClassesAvailable && (
                  <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
@@ -654,17 +654,17 @@ export default function UserAdministrationPage() {
               <Form {...addUserForm}>
               <form onSubmit={addUserForm.handleSubmit(handleAddUserSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <div>
-                  <Label htmlFor="name">Nama Lengkap</Label>
+                  <Label htmlFor="name">Nama Lengkap <span className="text-destructive">*</span></Label>
                   <Input id="name" {...addUserForm.register("name")} className="mt-1" />
                   {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
                   <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
                   {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
                   <div className="relative mt-1">
                     <Input id="password" type={showPassword ? "text" : "password"} {...addUserForm.register("password")} className="hide-password-reveal-icon" />
                     <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}>
@@ -674,7 +674,7 @@ export default function UserAdministrationPage() {
                   {addUserForm.formState.errors.password && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.password.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="role">Peran</Label>
+                  <Label htmlFor="role">Peran <span className="text-destructive">*</span></Label>
                   <Controller
                     name="role"
                     control={addUserForm.control}
@@ -931,17 +931,17 @@ export default function UserAdministrationPage() {
             <form onSubmit={editUserForm.handleSubmit(handleEditUserSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Input type="hidden" {...editUserForm.register("id")} />
               <div>
-                <Label htmlFor="edit-name">Nama Lengkap</Label>
+                <Label htmlFor="edit-name">Nama Lengkap <span className="text-destructive">*</span></Label>
                 <Input id="edit-name" {...editUserForm.register("name")} className="mt-1" />
                 {editUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.name.message}</p>}
               </div>
               <div>
-                <Label htmlFor="edit-email">Email</Label>
+                <Label htmlFor="edit-email">Email <span className="text-destructive">*</span></Label>
                 <Input id="edit-email" type="email" {...editUserForm.register("email")} className="mt-1" />
                 {editUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.email.message}</p>}
               </div>
               <div>
-                <Label htmlFor="edit-role">Peran</Label>
+                <Label htmlFor="edit-role">Peran <span className="text-destructive">*</span></Label>
                  <Controller
                     name="role"
                     control={editUserForm.control}
@@ -974,4 +974,3 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
-
