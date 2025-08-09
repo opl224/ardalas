@@ -639,35 +639,35 @@ export default function ParentsPage() {
   const renderParentFormFields = (formInstance: typeof addParentForm | typeof editParentForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-parent-name`}>Nama Lengkap Orang Tua</Label>
+        <Label htmlFor={`${formType}-parent-name`}>Nama Lengkap Orang Tua <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-parent-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-email`}>Email (Opsional)</Label>
+        <Label htmlFor={`${formType}-parent-email`}>Email</Label>
         <Input id={`${formType}-parent-email`} type="email" {...formInstance.register("email")} className="mt-1" />
         {formInstance.formState.errors.email && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-phone`}>Nomor Telepon (Opsional)</Label>
+        <Label htmlFor={`${formType}-parent-phone`}>Nomor Telepon</Label>
         <Input id={`${formType}-parent-phone`} type="tel" {...formInstance.register("phone")} className="mt-1" />
         {formInstance.formState.errors.phone && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.phone.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-address`}>Alamat (Opsional)</Label>
+        <Label htmlFor={`${formType}-parent-address`}>Alamat</Label>
         <Textarea id={`${formType}-parent-address`} {...formInstance.register("address")} className="mt-1" />
         {formInstance.formState.errors.address && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-gender`}>Jenis Kelamin</Label>
+        <Label htmlFor={`${formType}-parent-gender`}>Jenis Kelamin <span className="text-destructive">*</span></Label>
         <Controller
             name="gender"
             control={formInstance.control}
@@ -691,7 +691,7 @@ export default function ParentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+        <Label htmlFor={`${formType}-agama`}>Agama</Label>
         <Controller
           name="agama"
           control={formInstance.control}
@@ -716,7 +716,7 @@ export default function ParentsPage() {
         />
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid)</Label>
+        <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid) <span className="text-destructive">*</span></Label>
         <Controller
           name="studentId"
           control={formInstance.control}
@@ -750,7 +750,7 @@ export default function ParentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-authUserId`}>Akun Pengguna Orang Tua Tertaut (Opsional)</Label>
+        <Label htmlFor={`${formType}-parent-authUserId`}>Akun Pengguna Orang Tua Tertaut</Label>
         <Controller
           name="authUserId"
           control={formInstance.control}

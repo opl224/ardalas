@@ -625,28 +625,28 @@ export default function StudentsPage() {
   const renderStudentFormFields = (formInstance: typeof addStudentForm | typeof editStudentForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-student-name`}>Nama Lengkap</Label>
+        <Label htmlFor={`${formType}-student-name`}>Nama Lengkap <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-student-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-nis`}>NIS</Label>
+        <Label htmlFor={`${formType}-student-nis`}>NIS <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-student-nis`} {...formInstance.register("nis")} className="mt-1" />
         {formInstance.formState.errors.nis && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nis.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-email`}>Email (Opsional)</Label>
+        <Label htmlFor={`${formType}-student-email`}>Email</Label>
         <Input id={`${formType}-student-email`} type="email" {...formInstance.register("email")} className="mt-1" />
         {formInstance.formState.errors.email && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-classId`}>Kelas</Label>
+        <Label htmlFor={`${formType}-student-classId`}>Kelas <span className="text-destructive">*</span></Label>
         <Controller
           name="classId"
           control={formInstance.control}
@@ -680,7 +680,7 @@ export default function StudentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
+        <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir</Label>
         <Controller
           control={formInstance.control}
           name="dateOfBirth"
@@ -702,7 +702,7 @@ export default function StudentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-gender`}>Jenis Kelamin (Opsional)</Label>
+        <Label htmlFor={`${formType}-student-gender`}>Jenis Kelamin</Label>
         <Controller
           name="gender"
           control={formInstance.control}
@@ -729,7 +729,7 @@ export default function StudentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+        <Label htmlFor={`${formType}-agama`}>Agama</Label>
         <Controller
           name="agama"
           control={formInstance.control}
@@ -754,7 +754,7 @@ export default function StudentsPage() {
         />
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-address`}>Alamat (Opsional)</Label>
+        <Label htmlFor={`${formType}-student-address`}>Alamat</Label>
         <Textarea
           id={`${formType}-student-address`}
           {...formInstance.register("address")}
@@ -766,7 +766,7 @@ export default function StudentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-linkedParentId`}>Orang Tua Terhubung (Opsional)</Label>
+        <Label htmlFor={`${formType}-student-linkedParentId`}>Orang Tua Terhubung</Label>
         <Controller
           name="linkedParentId"
           control={formInstance.control}
@@ -799,7 +799,7 @@ export default function StudentsPage() {
         />
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-attendanceNumber`}>Nomor Absen (Opsional)</Label>
+        <Label htmlFor={`${formType}-student-attendanceNumber`}>Nomor Absen</Label>
         <Input
           id={`${formType}-student-attendanceNumber`}
           type="number"

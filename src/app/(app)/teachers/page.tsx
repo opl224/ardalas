@@ -360,8 +360,8 @@ export default function TeachersPage() {
 
   const handleExport = async (formatType: 'pdf' | 'xlsx') => {
     if (filteredAndSearchedTeachers.length === 0) {
-      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
-      return;
+        toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+        return;
     }
     setIsExporting(true);
 
@@ -466,7 +466,7 @@ export default function TeachersPage() {
   const renderTeacherFormFields = (formInstance: typeof addTeacherForm | typeof editTeacherForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-name`}>Nama Lengkap Profil</Label>
+        <Label htmlFor={`${formType}-name`}>Nama Lengkap Profil <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
@@ -480,7 +480,7 @@ export default function TeachersPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-email`}>Email Profil</Label>
+        <Label htmlFor={`${formType}-email`}>Email Profil <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-email`} type="email" {...formInstance.register("email")} className="mt-1" />
         {formInstance.formState.errors.email && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
@@ -525,25 +525,25 @@ export default function TeachersPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-subject`}>Mata Pelajaran Utama</Label>
+        <Label htmlFor={`${formType}-subject`}>Mata Pelajaran Utama <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-subject`} {...formInstance.register("subject")} className="mt-1" />
         {formInstance.formState.errors.subject && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.subject.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-address`}>Alamat (Opsional)</Label>
+        <Label htmlFor={`${formType}-address`}>Alamat</Label>
         <Textarea id={`${formType}-address`} {...formInstance.register("address")} className="mt-1" />
       </div>
       <div>
-        <Label htmlFor={`${formType}-phone`}>Nomor Telepon (Opsional)</Label>
+        <Label htmlFor={`${formType}-phone`}>Nomor Telepon</Label>
         <Input id={`${formType}-phone`} type="tel" {...formInstance.register("phone")} className="mt-1" />
         {formInstance.formState.errors.phone && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.phone.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-gender`}>Jenis Kelamin</Label>
+        <Label htmlFor={`${formType}-gender`}>Jenis Kelamin <span className="text-destructive">*</span></Label>
         <Controller
             name="gender"
             control={formInstance.control}
@@ -567,7 +567,7 @@ export default function TeachersPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+        <Label htmlFor={`${formType}-agama`}>Agama</Label>
         <Controller
           name="agama"
           control={formInstance.control}
@@ -617,7 +617,7 @@ export default function TeachersPage() {
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <DialogTrigger asChild>
-                    <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Tambah Profil</Button>
+                    <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Profil</Button>
                   </DialogTrigger>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

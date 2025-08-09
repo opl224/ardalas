@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -328,19 +329,19 @@ export default function SubjectsPage() {
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-subject-name`}>Nama Mata Pelajaran</Label>
+        <Label htmlFor={`${formType}-subject-name`}>Nama Mata Pelajaran <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-subject-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-subject-description`}>Deskripsi (Opsional)</Label>
+        <Label htmlFor={`${formType}-subject-description`}>Deskripsi</Label>
         <Textarea id={`${formType}-subject-description`} {...formInstance.register("description")} className="mt-1" />
       </div>
       {role === "admin" && (
         <div>
-          <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab (Opsional)</Label>
+          <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab</Label>
           <Controller
             name="teacherUid"
             control={formInstance.control}
