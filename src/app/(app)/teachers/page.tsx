@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -112,12 +113,13 @@ interface Teacher {
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
 const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
+const MAIN_SUBJECT_OPTIONS = ["Guru Kelas", "PAI", "Penjas"] as const;
 
 const teacherFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }), 
   nip: z.string().min(5, { message: "NIP minimal 5 karakter." }).optional().or(z.literal('')),
-  subject: z.string().min(2, { message: "Mata pelajaran minimal 2 karakter." }),
+  subject: z.string().min(2, { message: "Mata pelajaran harus dipilih." }),
   address: z.string().trim().optional(),
   phone: z.string().trim().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal('')),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
@@ -159,7 +161,7 @@ export default function TeachersPage() {
       name: "",
       email: "",
       nip: "",
-      subject: "",
+      subject: undefined,
       address: "",
       phone: "",
       gender: undefined,
@@ -268,7 +270,7 @@ export default function TeachersPage() {
       
       toast({ title: "Profil Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddTeacherDialogOpen(false);
-      addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+      addTeacherForm.reset({name: "", email: "", subject: undefined, nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
       fetchTeachers(); 
     } catch (error: any) {
       console.error("Error adding teacher profile:", error);
@@ -526,7 +528,24 @@ export default function TeachersPage() {
       </div>
       <div>
         <Label htmlFor={`${formType}-subject`}>Mata Pelajaran Utama <span className="text-destructive">*</span></Label>
-        <Input id={`${formType}-subject`} {...formInstance.register("subject")} className="mt-1" />
+        <Controller
+            name="subject"
+            control={formInstance.control}
+            render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger id={`${formType}-subject`} className="mt-1">
+                        <SelectValue placeholder="Pilih mata pelajaran utama" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {MAIN_SUBJECT_OPTIONS.map((subject) => (
+                            <SelectItem key={subject} value={subject}>
+                                {subject}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+        />
         {formInstance.formState.errors.subject && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.subject.message}</p>
         )}
@@ -603,7 +622,7 @@ export default function TeachersPage() {
       <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
         setIsAddTeacherDialogOpen(isOpen);
         if (!isOpen) {
-          addTeacherForm.reset({name: "", email: "", subject: "", nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
+          addTeacherForm.reset({name: "", email: "", subject: undefined, nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
           addTeacherForm.clearErrors();
         }
       }}>
