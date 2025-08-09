@@ -527,14 +527,14 @@ export default function ClassesPage() {
                     </DialogHeader>
                     <form onSubmit={addClassForm.handleSubmit(handleAddClassSubmit)} className="space-y-4 py-4">
                     <div>
-                        <Label htmlFor="add-class-name">Nama Kelas</Label>
+                        <Label htmlFor="add-class-name">Nama Kelas <span className="text-destructive">*</span></Label>
                         <Input id="add-class-name" {...addClassForm.register("name")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1" />
                         {addClassForm.formState.errors.name && (
                         <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
                         )}
                     </div>
                     <div>
-                        <Label htmlFor="add-class-teacherId">Wali Kelas (Opsional)</Label>
+                        <Label htmlFor="add-class-teacherId">Wali Kelas</Label>
                         <Select
                         onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
                         defaultValue={addClassForm.getValues("teacherId")}
@@ -764,14 +764,14 @@ export default function ClassesPage() {
               <form onSubmit={editClassForm.handleSubmit(handleEditClassSubmit)} className="space-y-4 py-4">
                 <Input type="hidden" {...editClassForm.register("id")} />
                 <div>
-                  <Label htmlFor="edit-class-name">Nama Kelas</Label>
+                  <Label htmlFor="edit-class-name">Nama Kelas <span className="text-destructive">*</span></Label>
                   <Input id="edit-class-name" {...editClassForm.register("name")} className="mt-1" />
                   {editClassForm.formState.errors.name && (
                     <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.name.message}</p>
                   )}
                 </div>
                 <div>
-                    <Label htmlFor="edit-class-teacherId">Wali Kelas (Opsional)</Label>
+                    <Label htmlFor="edit-class-teacherId">Wali Kelas</Label>
                     <Select
                       onValueChange={(value) => editClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
                       defaultValue={editClassForm.getValues("teacherId") || undefined}

@@ -429,12 +429,12 @@ export default function AnnouncementsPage() {
   const renderFormFields = (formInstance: typeof addAnnouncementForm | typeof editAnnouncementForm, dialogType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${dialogType}-announcement-title`}>Judul Pengumuman</Label>
+        <Label htmlFor={`${dialogType}-announcement-title`}>Judul Pengumuman <span className="text-destructive">*</span></Label>
         <Input id={`${dialogType}-announcement-title`} {...formInstance.register("title")} className="mt-1" />
         {(formInstance.formState.errors as any).title && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).title.message}</p>}
       </div>
       <div>
-        <Label htmlFor={`${dialogType}-announcement-content`}>Isi Pengumuman</Label>
+        <Label htmlFor={`${dialogType}-announcement-content`}>Isi Pengumuman <span className="text-destructive">*</span></Label>
         <Textarea id={`${dialogType}-announcement-content`} {...formInstance.register("content")} className="mt-1 min-h-[150px]" />
         {(formInstance.formState.errors as any).content && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).content.message}</p>}
       </div>
@@ -442,7 +442,7 @@ export default function AnnouncementsPage() {
       {role === 'guru' ? (
         <>
           <div>
-            <Label>Target Kelas</Label>
+            <Label>Target Kelas <span className="text-destructive">*</span></Label>
             {isLoadingTeacherClasses ? (
               <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
             ) : teacherClasses.length === 0 ? (
@@ -482,7 +482,7 @@ export default function AnnouncementsPage() {
             {(formInstance.formState.errors as any).targetClassIds && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).targetClassIds.message}</p>}
           </div>
           <div>
-            <Label>Target Peran di Kelas Tersebut</Label>
+            <Label>Target Peran di Kelas Tersebut <span className="text-destructive">*</span></Label>
             <div className="mt-2 grid grid-cols-2 gap-2">
               {ROLES_FOR_TEACHER_TARGETING.map((roleKey) => (
                 <FormField
@@ -518,7 +518,7 @@ export default function AnnouncementsPage() {
         </>
       ) : (
         <div>
-          <Label>Target Audiens (Untuk Admin)</Label>
+          <Label>Target Audiens <span className="text-destructive">*</span></Label>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {ROLES.map((roleKey) => (
               <FormField
