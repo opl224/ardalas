@@ -35,7 +35,7 @@ export const navItems: NavItem[] = [
   { title: "Beranda", href: "/dashboard", icon: LayoutDashboard },
   { 
     title: "Administrasi Pengguna",
-    href: "/admin/user-administration", 
+    href: "/user-administration", 
     icon: UserCog,
     roles: ["admin"], 
   },
@@ -101,3 +101,5 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
+
+    
