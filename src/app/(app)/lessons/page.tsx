@@ -497,6 +497,7 @@ export default function LessonsPage() {
   };
 
   const handleDeleteLesson = async (lessonId: string) => {
+    if (role !== "admin") return;
     try {
       await deleteDoc(doc(db, "lessons", lessonId));
       toast({ title: "Pelajaran Dihapus", description: "Jadwal pelajaran berhasil dihapus." });
@@ -534,6 +535,7 @@ export default function LessonsPage() {
 
 
   const openEditDialog = (lesson: LessonData) => {
+    if(role !== 'admin') return;
     setSelectedLesson(lesson);
     if (role === 'admin' && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) {
         fetchAdminDropdownData(); 
@@ -542,6 +544,7 @@ export default function LessonsPage() {
   };
 
   const openDeleteDialog = (lesson: LessonData) => {
+    if(role !== 'admin') return;
     setSelectedLesson(lesson);
   };
 
@@ -669,7 +672,7 @@ export default function LessonsPage() {
     }
     return "Belum ada jadwal pelajaran yang ditambahkan.";
   };
-
+  
   return (
     <div className="space-y-6">
       <div>
@@ -869,8 +872,8 @@ export default function LessonsPage() {
                                     </Link>
                                   </Button>
                                 ) : (
-                                  <Button size={isMobile ? "sm" : "sm"} variant={"outline"} disabled>
-                                    {isMobile ? <span className="text-xs">Belum Mulai</span> : "Belum Mulai"}
+                                  <Button size={isMobile ? "icon" : "sm"} variant={"outline"} disabled>
+                                    {isMobile ? <span className="text-xs">Tutup</span> : "Belum Mulai"}
                                   </Button>
                                 )
                             )
