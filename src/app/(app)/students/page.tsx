@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -534,7 +535,7 @@ export default function StudentsPage() {
 
   const handleDeleteStudent = async (studentId: string, studentName?: string) => {
     if (authRole !== 'admin') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menghapus murid.", variant: "destructive"});
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa menghapus murid.", variant: "destructive"});
         return;
     }
     try {
@@ -605,7 +606,6 @@ export default function StudentsPage() {
 
   const openEditDialog = (student: Student) => {
     if (authRole !== 'admin') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa mengedit murid.", variant: "destructive"});
         return;
     }
     if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) {
@@ -617,7 +617,6 @@ export default function StudentsPage() {
 
   const openDeleteDialog = (student: Student) => {
      if (authRole !== 'admin') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa menghapus murid.", variant: "destructive"});
         return;
     }
     setSelectedStudent(student);

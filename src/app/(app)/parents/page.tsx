@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -490,7 +491,6 @@ export default function ParentsPage() {
 
   const openEditDialog = (parent: Parent) => {
     if (authRole !== 'admin') {
-      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
       return;
     }
     setSelectedParent(parent);
@@ -499,7 +499,6 @@ export default function ParentsPage() {
 
   const openDeleteDialog = (parent: Parent) => {
     if (authRole !== 'admin') {
-      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
       return;
     }
     setSelectedParent(parent);
@@ -839,10 +838,12 @@ export default function ParentsPage() {
                         <UserCircle className="h-6 w-6 text-primary" />
                         <span>Daftar Orang Tua ({displayedParents.length})</span>
                     </CardTitle>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="outline" size="icon" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}</Button></DropdownMenuTrigger>
-                        <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
-                    </DropdownMenu>
+                    {authRole === 'admin' && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="outline" size="icon" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}</Button></DropdownMenuTrigger>
+                            <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
                 </div>
                  {authRole === 'admin' && (
                     <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
