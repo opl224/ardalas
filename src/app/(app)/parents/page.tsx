@@ -138,7 +138,7 @@ const parentFormSchema = z.object({
   address: z.string().trim().optional(),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
   agama: z.string().optional(),
-  studentId: z.string({ required_error: "Pilih murid terkait (UID)." }), // Student's Auth UID
+  studentId: z.string({ required_error: "Pilih siswa terkait (UID)." }), // Student's Auth UID
   authUserId: z.string().optional(), // Parent's Auth UID
 });
 type ParentFormValues = z.infer<typeof parentFormSchema>;
@@ -347,7 +347,7 @@ export default function ParentsPage() {
     addParentForm.clearErrors();
     const selectedStudent = studentsForDialog.find(s => s.id === data.studentId); // s.id is student's UID
     if (!selectedStudent) {
-      toast({ title: "Error", description: "Murid tidak ditemukan.", variant: "destructive" });
+      toast({ title: "Error", description: "Siswa tidak ditemukan.", variant: "destructive" });
       return;
     }
 
@@ -395,7 +395,7 @@ export default function ParentsPage() {
     editParentForm.clearErrors();
     const selectedStudent = studentsForDialog.find(s => s.id === data.studentId); // s.id is student's UID
     if (!selectedStudent) {
-      toast({ title: "Error", description: "Murid tidak ditemukan.", variant: "destructive" });
+      toast({ title: "Error", description: "Siswa tidak ditemukan.", variant: "destructive" });
       return;
     }
 
@@ -716,7 +716,7 @@ export default function ParentsPage() {
         />
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-studentId`}>Anak (Murid) <span className="text-destructive">*</span></Label>
+        <Label htmlFor={`${formType}-parent-studentId`}>Anak (Siswa) <span className="text-destructive">*</span></Label>
         <Controller
           name="studentId"
           control={formInstance.control}
@@ -727,13 +727,13 @@ export default function ParentsPage() {
                   disabled={isLoadingData}
               >
               <SelectTrigger id={`${formType}-parent-studentId`} className="mt-1">
-                <SelectValue placeholder={isLoadingData ? "Memuat murid..." : "Pilih murid"} />
+                <SelectValue placeholder={isLoadingData ? "Memuat siswa..." : "Pilih siswa"} />
               </SelectTrigger>
               <SelectContent>
                 {isLoadingData ? (
-                    <SelectItem key={`loading-students-item-${formType}`} value="loading-students" disabled>Memuat murid...</SelectItem>
+                    <SelectItem key={`loading-students-item-${formType}`} value="loading-students" disabled>Memuat siswa...</SelectItem>
                 ) : studentsForDialog.length === 0 ? (
-                    <SelectItem key={`no-students-item-${formType}`} value="no-students" disabled>Tidak ada murid terdaftar</SelectItem>
+                    <SelectItem key={`no-students-item-${formType}`} value="no-students" disabled>Tidak ada siswa terdaftar</SelectItem>
                 ) : (
                   studentsForDialog.map((student) => (
                     <SelectItem key={student.id} value={student.id}>
@@ -781,7 +781,7 @@ export default function ParentsPage() {
           )}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Tautkan profil ini ke akun pengguna orang tua yang sudah terdaftar di Administrasi Pengguna (jika ada).
+          Tautkan profil ini ke akun pengguna orang tua yang sudah terdaftar di Administrasi Pengguna.
         </p>
         {formInstance.formState.errors.authUserId && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.authUserId.message}</p>
@@ -795,7 +795,7 @@ export default function ParentsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Orang Tua</h1>
-        <p className="text-muted-foreground">Kelola data orang tua dan hubungannya dengan murid.</p>
+        <p className="text-muted-foreground">Kelola data orang tua dan hubungannya dengan siswa.</p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="pb-4">
@@ -868,7 +868,7 @@ export default function ParentsPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Cari nama orang tua/murid, email, telepon..."
+                  placeholder="Cari nama orang tua/siswa, email, telepon..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8 w-full"
@@ -973,7 +973,7 @@ export default function ParentsPage() {
               {searchTerm || selectedClassFilter !== "all"
                 ? "Tidak ada data orang tua yang cocok dengan filter atau pencarian."
                 : (teacherResponsibleClassIds && teacherResponsibleClassIds.length === 0 && authRole === 'guru' )
-                ? "Anda tidak menjadi wali kelas untuk kelas manapun, atau kelas yang anda asuh belum memiliki murid yang terdata orang tuanya."
+                ? "Anda tidak menjadi wali kelas untuk kelas manapun, atau kelas yang anda asuh belum memiliki siswa yang terdata orang tuanya."
                 : "Tidak ada data orang tua untuk ditampilkan. Klik \"Tambah Orang Tua\" untuk membuat data baru."
               }
             </div>
@@ -986,7 +986,7 @@ export default function ParentsPage() {
           if (!isOpen) { setSelectedParentForView(null); }
       }}>
         <DialogContent className="sm:max-w-xl">
-            <DialogHeader><DialogTitle>Detail Orang Tua: {selectedParentForView?.name}</DialogTitle><DialogDescription>Informasi lengkap mengenai orang tua murid.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Detail Orang Tua: {selectedParentForView?.name}</DialogTitle><DialogDescription>Informasi lengkap mengenai orang tua siswa.</DialogDescription></DialogHeader>
             {selectedParentForView && (<div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedParentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedParentForView.gender || "-"}</p></div>

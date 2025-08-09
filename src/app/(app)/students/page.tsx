@@ -320,7 +320,7 @@ export default function StudentsPage() {
       if (error.code === 'failed-precondition' && error.message.includes('query requires an index')) {
          toast({ title: "Indeks Firestore Diperlukan", description: "Operasi ini memerlukan indeks kustom di Firestore. Hubungi administrator.", variant: "destructive", duration: 10000 });
       } else {
-        toast({ title: "Gagal Memuat Data Murid", variant: "destructive" });
+        toast({ title: "Gagal Memuat Data Siswa", variant: "destructive" });
       }
       setStudents([]);
     } finally {
@@ -439,14 +439,14 @@ export default function StudentsPage() {
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
     if (authRole !== 'admin') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan murid.", variant: "destructive"});
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan siswa.", variant: "destructive"});
         return;
     }
     addStudentForm.clearErrors();
 
     const selectedClassObj = allClassesForFilter.find(c => c.id === data.classId);
     if (!selectedClassObj) {
-        toast({ title: "Kelas tidak valid", description: "Silakan pilih kelas yang valid untuk murid.", variant: "destructive" });
+        toast({ title: "Kelas tidak valid", description: "Silakan pilih kelas yang valid untuk siswa.", variant: "destructive" });
         return;
     }
     const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
@@ -470,18 +470,18 @@ export default function StudentsPage() {
       };
 
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
-      toast({ title: "Murid Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
+      toast({ title: "Siswa Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
       addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents();
     } catch (error: any) {
       console.error("Error adding student:", error);
-      let errorMessage = "Gagal menambahkan murid.";
+      let errorMessage = "Gagal menambahkan siswa.";
        if (error.message && error.message.includes("Missing or insufficient permissions")) {
-        errorMessage = "Anda tidak memiliki izin untuk menambahkan murid.";
+        errorMessage = "Anda tidak memiliki izin untuk menambahkan siswa.";
       }
       toast({
-        title: "Gagal Menambahkan Murid",
+        title: "Gagal Menambahkan Siswa",
         description: errorMessage,
         variant: "destructive",
       });
@@ -491,7 +491,7 @@ export default function StudentsPage() {
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
      if (authRole !== 'admin') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit murid.", variant: "destructive"});
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit siswa.", variant: "destructive"});
         return;
     }
     editStudentForm.clearErrors();
@@ -520,14 +520,14 @@ export default function StudentsPage() {
 
       await updateDoc(studentDocRef, updateData);
 
-      toast({ title: "Data Murid Diperbarui", description: `${data.name} berhasil diperbarui.` });
+      toast({ title: "Data Siswa Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditStudentDialogOpen(false);
       setSelectedStudent(null);
       fetchStudents();
     } catch (error) {
       console.error("Error editing student:", error);
       toast({
-        title: "Gagal Memperbarui Data Murid",
+        title: "Gagal Memperbarui Data Siswa",
         variant: "destructive",
       });
     }
@@ -535,18 +535,18 @@ export default function StudentsPage() {
 
   const handleDeleteStudent = async (studentId: string, studentName?: string) => {
     if (authRole !== 'admin') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa menghapus murid.", variant: "destructive"});
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa menghapus siswa.", variant: "destructive"});
         return;
     }
     try {
       await deleteDoc(doc(db, "users", studentId));
-      toast({ title: "Data Murid Dihapus dari Profil", description: `${studentName || 'Murid'} berhasil dihapus dari daftar profil.` });
+      toast({ title: "Data Siswa Dihapus dari Profil", description: `${studentName || 'Siswa'} berhasil dihapus dari daftar profil.` });
       setSelectedStudent(null);
       fetchStudents();
     } catch (error) {
       console.error("Error deleting student:", error);
       toast({
-        title: "Gagal Menghapus Murid",
+        title: "Gagal Menghapus Siswa",
         variant: "destructive",
       });
     }
@@ -759,7 +759,7 @@ export default function StudentsPage() {
           id={`${formType}-student-address`}
           {...formInstance.register("address")}
           className="mt-1"
-          placeholder="Masukkan alamat lengkap murid"
+          placeholder="Masukkan alamat lengkap siswa"
         />
         {formInstance.formState.errors.address && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
@@ -815,24 +815,24 @@ export default function StudentsPage() {
   );
 
   const pageTitle = (authRole === 'admin' || authRole === 'guru')
-    ? "Manajemen Murid"
+    ? "Manajemen Siswa"
     : (authRole === 'siswa' && authUser?.className
       ? `Daftar Siswa Kelas ${authUser.className}`
-      : "Daftar Murid");
+      : "Daftar Siswa");
 
   const pageDescription = (authRole === 'admin' || authRole === 'guru')
-    ? "Kelola data murid, absensi, nilai, dan informasi terkait."
+    ? "Kelola data siswa, absensi, nilai, dan informasi terkait."
     : (authRole === 'siswa' && authUser?.className
       ? `Daftar teman sekelas.`
-      : "Informasi murid.");
+      : "Informasi siswa.");
 
   const showClassFilter = ((authRole === 'admin' || authRole === 'guru') && allClassesForFilter.length > 0);
   const isLoadingCombined = isLoadingStudents || authLoading || isLoadingInitialData;
 
   const getNoStudentsMessage = () => {
     if (authRole === 'siswa') return "Tidak ada siswa lain di kelas anda.";
-    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun, atau kelas yang anda asuh belum memiliki murid.";
-    return "Tidak ada data murid untuk ditampilkan. Klik \"Tambah Murid\" untuk membuat data baru.";
+    if (authRole === 'guru' && teacherResponsibleClassIds?.length === 0) return "Anda tidak ditugaskan sebagai wali kelas untuk kelas manapun, atau kelas yang anda asuh belum memiliki siswa.";
+    return "Tidak ada data siswa untuk ditampilkan. Klik \"Tambah Siswa\" untuk membuat data baru.";
   };
 
   return (
@@ -850,13 +850,13 @@ export default function StudentsPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Users className="h-6 w-6 text-primary" />
-                  <span>Daftar Murid ({displayedStudents.length})</span>
+                  <span>Daftar Siswa ({displayedStudents.length})</span>
                 </CardTitle>
                 <div className="flex items-center gap-2">
                     {authRole === 'admin' && (
                         <div className="hidden md:flex">
                              <DialogTrigger asChild>
-                                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
+                                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button>
                             </DialogTrigger>
                         </div>
                     )}
@@ -877,7 +877,7 @@ export default function StudentsPage() {
               {authRole === 'admin' && (
                 <div className="md:hidden mt-4">
                      <DialogTrigger asChild>
-                      <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
+                      <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button>
                     </DialogTrigger>
                 </div>
               )}
@@ -971,7 +971,7 @@ export default function StudentsPage() {
                                         <DropdownMenuSeparator />
                                         <AlertDialog>
                                           <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                          {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                          {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data siswa <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                                         </AlertDialog>
                                     </>
                                     )}
@@ -1013,7 +1013,7 @@ export default function StudentsPage() {
                                             <DropdownMenuSeparator />
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                                {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                                {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data siswa <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                                             </AlertDialog>
                                         </>
                                       )}
@@ -1035,7 +1035,7 @@ export default function StudentsPage() {
             ) : (
               <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {searchTerm || selectedClassFilter !== "all"
-                  ? "Tidak ada murid yang cocok dengan filter atau pencarian."
+                  ? "Tidak ada siswa yang cocok dengan filter atau pencarian."
                   : getNoStudentsMessage()
                 }
               </div>
@@ -1044,8 +1044,8 @@ export default function StudentsPage() {
         </Card>
         <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Tambah Murid Baru</DialogTitle>
-            <DialogDescription>Buat profil murid baru. Ini belum membuat akun login.</DialogDescription>
+            <DialogTitle>Tambah Siswa Baru</DialogTitle>
+            <DialogDescription>Buat profil siswa baru. Ini belum membuat akun login.</DialogDescription>
           </DialogHeader>
           <form id="addStudentDialogForm" onSubmit={addStudentForm.handleSubmit(handleAddStudentSubmit)} className="flex flex-col overflow-hidden flex-1">
             <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">{renderStudentFormFields(addStudentForm, 'add')}</div>
@@ -1065,7 +1065,7 @@ export default function StudentsPage() {
           if (!isOpen) { setSelectedStudentForView(null); }
       }}>
         <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl">
-            <DialogHeader><DialogTitle>Detail Murid: {selectedStudentForView?.name}</DialogTitle><DialogDescription>Informasi lengkap mengenai murid.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Detail Siswa: {selectedStudentForView?.name}</DialogTitle><DialogDescription>Informasi lengkap mengenai siswa.</DialogDescription></DialogHeader>
             {selectedStudentForView && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm overflow-y-auto flex-1 pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
@@ -1095,7 +1095,7 @@ export default function StudentsPage() {
             }
         }}>
           <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-md">
-            <DialogHeader><DialogTitle>Edit Data Murid</DialogTitle><DialogDescription>Perbarui detail data murid.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Edit Data Siswa</DialogTitle><DialogDescription>Perbarui detail data siswa.</DialogDescription></DialogHeader>
             {selectedStudent && (
               <form id="editStudentDialogForm" onSubmit={editStudentForm.handleSubmit(handleEditStudentSubmit)} className="flex flex-col overflow-hidden flex-1">
                 <Input type="hidden" {...editStudentForm.register("id")} />

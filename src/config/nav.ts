@@ -56,7 +56,7 @@ export const navItems: NavItem[] = [
     roles: ["admin", "guru"], 
     children: [
       { title: "Guru", href: "/teachers", icon: Users, roles: ["admin"] },
-      { title: "Murid", href: "/students", icon: Users, roles: ["admin", "guru"] }, 
+      { title: "Siswa", href: "/students", icon: Users, roles: ["admin", "guru"] }, 
       { title: "Orang Tua", href: "/parents", icon: UserCircle, roles: ["admin", "guru"] },
     ],
   },
