@@ -339,7 +339,7 @@ export default function ParentsPage() {
   }, [selectedParent, isEditDialogOpen, editParentForm]);
 
   const handleAddParentSubmit: SubmitHandler<ParentFormValues> = async (data) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
+    if (authRole !== 'admin') {
       toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menambahkan data.", variant: "destructive" });
       return;
     }
@@ -386,7 +386,7 @@ export default function ParentsPage() {
   };
 
   const handleEditParentSubmit: SubmitHandler<EditParentFormValues> = async (data) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
+    if (authRole !== 'admin') {
       toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
       return;
     }
@@ -448,7 +448,7 @@ export default function ParentsPage() {
   };
 
   const handleDeleteParent = async (parentId: string, parentName?: string) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
+    if (authRole !== 'admin') {
       toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
       return;
     }
@@ -489,7 +489,7 @@ export default function ParentsPage() {
   };
 
   const openEditDialog = (parent: Parent) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
+    if (authRole !== 'admin') {
       toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
       return;
     }
@@ -498,7 +498,7 @@ export default function ParentsPage() {
   };
 
   const openDeleteDialog = (parent: Parent) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
+    if (authRole !== 'admin') {
       toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
       return;
     }
@@ -530,8 +530,8 @@ export default function ParentsPage() {
   
   const handleExport = async (formatType: 'pdf' | 'xlsx') => {
     if (displayedParents.length === 0) {
-      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
-      return;
+        toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+        return;
     }
     setIsExporting(true);
 
@@ -800,76 +800,66 @@ export default function ParentsPage() {
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader className="pb-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between">
-              <CardTitle className="flex items-center gap-2 text-xl">
-                <UserCircle className="h-6 w-6 text-primary" />
-                <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
-                  <span className={cn(isMobile && "block")}>Daftar Orang Tua</span>
-                  {!isLoadingData && (
-                    <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "sm:text-xl sm:font-semibold sm:text-foreground")}>
-                      {`(${displayedParents.length} orang tua)`}
-                    </span>
-                  )}
-                  {isLoadingData && (
-                    <span className={cn("text-base font-normal text-muted-foreground", isMobile ? "text-xs" : "")}>
-                      (Memuat...)
-                    </span>
-                  )}
-                </div>
-              </CardTitle>
-              {(authRole === 'admin' || authRole === 'guru') && (
-                <div className="md:hidden">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" disabled={isExporting}>
-                        {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
+            {/* Desktop Header */}
+            <div className="hidden md:flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-xl">
+                    <UserCircle className="h-6 w-6 text-primary" />
+                    <div className="flex flex-col items-start sm:flex-row sm:items-baseline sm:gap-x-1.5">
+                        <span className="block">Daftar Orang Tua</span>
+                        {!isLoadingData && <span className="text-base font-normal text-muted-foreground sm:text-xl sm:font-semibold sm:text-foreground">({displayedParents.length} orang tua)</span>}
+                        {isLoadingData && <span className="text-base font-normal text-muted-foreground">(Memuat...)</span>}
+                    </div>
+                </CardTitle>
+                 {authRole === 'admin' && (
+                    <div className="flex items-center gap-2">
+                         <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                            setIsAddDialogOpen(isOpen);
+                            if (!isOpen) { addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined }); addParentForm.clearErrors(); }
+                        }}>
+                        <DialogTrigger asChild><Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                        <DialogHeader><DialogTitle>Tambah Profil Orang Tua Baru</DialogTitle><DialogDescription>Isi detail profil orang tua. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+                        <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                            {renderParentFormFields(addParentForm, 'add')}
+                            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>{(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}{(addParentForm.formState.isSubmitting || isLoadingData) ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+                        </form>
+                        </DialogContent>
+                    </Dialog>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}<span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
+                    </DropdownMenu>
+                    </div>
+                 )}
             </div>
-            {(authRole === 'admin' || authRole === 'guru') && (
-              <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                <div className="w-full md:hidden">
-                   <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                      setIsAddDialogOpen(isOpen);
-                      if (!isOpen) { addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined }); addParentForm.clearErrors(); }
+            {/* Mobile Header */}
+            <div className="md:hidden flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                        <UserCircle className="h-6 w-6 text-primary" />
+                        <span>Daftar Orang Tua ({displayedParents.length})</span>
+                    </CardTitle>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="outline" size="icon" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}</Button></DropdownMenuTrigger>
+                        <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+                 {authRole === 'admin' && (
+                    <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
+                        setIsAddDialogOpen(isOpen);
+                        if (!isOpen) { addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined }); addParentForm.clearErrors(); }
                     }}>
-                    <DialogTrigger asChild><Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader><DialogTitle>Tambah Profil Orang Tua Baru</DialogTitle><DialogDescription>Isi detail profil orang tua. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
-                      <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                        {renderParentFormFields(addParentForm, 'add')}
-                        <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>{(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}{(addParentForm.formState.isSubmitting || isLoadingData) ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-                <div className="hidden md:flex items-center gap-2 ml-auto">
-                  <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
-                      setIsAddDialogOpen(isOpen);
-                      if (!isOpen) { addParentForm.reset({ name: "", email: "", phone: "", address: "", gender: undefined, agama: undefined, studentId: undefined, authUserId: undefined }); addParentForm.clearErrors(); }
-                  }}>
-                    <DialogTrigger asChild><Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
-                    <DialogContent className="sm:max-w-md">
-                      <DialogHeader><DialogTitle>Tambah Profil Orang Tua Baru</DialogTitle><DialogDescription>Isi detail profil orang tua. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
-                      <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-                          {renderParentFormFields(addParentForm, 'add')}
-                          <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>{(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}{(addParentForm.formState.isSubmitting || isLoadingData) ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
-                      </form>
-                    </DialogContent>
-                  </Dialog>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="outline" size="sm" disabled={isExporting}>{isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}<span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent><DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem><DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem></DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            )}
-          </div>
+                        <DialogTrigger asChild><Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Orang Tua</Button></DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                        <DialogHeader><DialogTitle>Tambah Profil Orang Tua Baru</DialogTitle><DialogDescription>Isi detail profil orang tua. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+                        <form onSubmit={addParentForm.handleSubmit(handleAddParentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                            {renderParentFormFields(addParentForm, 'add')}
+                            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addParentForm.formState.isSubmitting || isLoadingData}>{(addParentForm.formState.isSubmitting || isLoadingData) && <LottieLoader width={16} height={16} className="mr-2" />}{(addParentForm.formState.isSubmitting || isLoadingData) ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+                        </form>
+                        </DialogContent>
+                    </Dialog>
+                 )}
+            </div>
         </CardHeader>
         <CardContent>
           {(authRole === 'admin' || authRole === 'guru') && (
@@ -919,7 +909,7 @@ export default function ParentsPage() {
                     {!isMobile && <TableHead className="w-1/4">Email</TableHead>}
                     <TableHead className={cn(isMobile ? "w-1/2" : "w-1/5")}>Nama Anak</TableHead>
                     {!isMobile && <TableHead className="w-1/5">UID Akun Tertaut</TableHead>}
-                    {(authRole === 'admin' || authRole === 'guru') && <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-center w-16")}>Aksi</TableHead>}
+                    <TableHead className={cn(isMobile ? "text-right px-1 w-12" : "text-center w-16")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -952,22 +942,24 @@ export default function ParentsPage() {
                           )}
                         </TableCell>
                       )}
-                      {(authRole === 'admin' || authRole === 'guru') && (
-                        <TableCell className={cn(isMobile ? "text-right px-1" : "text-center")}>
-                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${parent.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openViewDialog(parent)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openEditDialog(parent)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(parent); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                {selectedParent && selectedParent.id === parent.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data orang tua <span className="font-semibold"> {selectedParent?.name}</span>. Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedParent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteParent(selectedParent.id, selectedParent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      )}
+                      <TableCell className={cn(isMobile ? "text-right px-1" : "text-center")}>
+                         <DropdownMenu>
+                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${parent.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openViewDialog(parent)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
+                            {authRole === 'admin' && (
+                            <>
+                                <DropdownMenuItem onClick={() => openEditDialog(parent)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(parent); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
+                                    {selectedParent && selectedParent.id === parent.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data orang tua <span className="font-semibold"> {selectedParent?.name}</span>. Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedParent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteParent(selectedParent.id, selectedParent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                </AlertDialog>
+                            </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1010,7 +1002,7 @@ export default function ParentsPage() {
       </Dialog>
 
 
-      {(authRole === 'admin' || authRole === 'guru') && (
+      {authRole === 'admin' && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
             setIsEditDialogOpen(isOpen);
             if (!isOpen) {

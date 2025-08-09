@@ -437,8 +437,8 @@ export default function StudentsPage() {
 
 
   const handleAddStudentSubmit: SubmitHandler<StudentFormValues> = async (data) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menambahkan murid.", variant: "destructive"});
+    if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan murid.", variant: "destructive"});
         return;
     }
     addStudentForm.clearErrors();
@@ -489,8 +489,8 @@ export default function StudentsPage() {
 
   const handleEditStudentSubmit: SubmitHandler<EditStudentFormValues> = async (data) => {
     if (!selectedStudent) return;
-     if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat mengedit murid.", variant: "destructive"});
+     if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit murid.", variant: "destructive"});
         return;
     }
     editStudentForm.clearErrors();
@@ -533,8 +533,8 @@ export default function StudentsPage() {
   };
 
   const handleDeleteStudent = async (studentId: string, studentName?: string) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Hanya admin atau guru yang dapat menghapus murid.", variant: "destructive"});
+    if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang dapat menghapus murid.", variant: "destructive"});
         return;
     }
     try {
@@ -604,8 +604,8 @@ export default function StudentsPage() {
   };
 
   const openEditDialog = (student: Student) => {
-    if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit murid.", variant: "destructive"});
+    if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa mengedit murid.", variant: "destructive"});
         return;
     }
     if ((allClassesForFilter.length === 0 && !isLoadingInitialData) || (allParents.length === 0 && !isLoadingInitialData)) {
@@ -616,8 +616,8 @@ export default function StudentsPage() {
   };
 
   const openDeleteDialog = (student: Student) => {
-     if (authRole !== 'admin' && authRole !== 'guru') {
-        toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus murid.", variant: "destructive"});
+     if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Hanya admin yang bisa menghapus murid.", variant: "destructive"});
         return;
     }
     setSelectedStudent(student);
@@ -680,142 +680,138 @@ export default function StudentsPage() {
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.classId.message}</p>
         )}
       </div>
-      {(authRole === 'admin' || authRole === 'guru') && (
-        <>
-          <div>
-            <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
-            <Controller
-              control={formInstance.control}
-              name="dateOfBirth"
-              render={({ field }) => (
-                <CalendarDatePicker
-                  id={`${formType}-student-dateOfBirth-picker`}
-                  date={field.value ? { from: field.value, to: field.value } : undefined}
-                  onDateSelect={(range) => field.onChange(range?.from)}
-                  numberOfMonths={1}
-                  closeOnSelect={true}
-                  yearsRange={50}
-                  className="mt-1 w-full"
-                  variant="outline"
-                />
-              )}
+      <div>
+        <Label htmlFor={`${formType}-student-dateOfBirth`}>Tanggal Lahir (Opsional)</Label>
+        <Controller
+          control={formInstance.control}
+          name="dateOfBirth"
+          render={({ field }) => (
+            <CalendarDatePicker
+              id={`${formType}-student-dateOfBirth-picker`}
+              date={field.value ? { from: field.value, to: field.value } : undefined}
+              onDateSelect={(range) => field.onChange(range?.from)}
+              numberOfMonths={1}
+              closeOnSelect={true}
+              yearsRange={50}
+              className="mt-1 w-full"
+              variant="outline"
             />
-            {formInstance.formState.errors.dateOfBirth && (
-              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfBirth.message}</p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor={`${formType}-student-gender`}>Jenis Kelamin (Opsional)</Label>
-            <Controller
-              name="gender"
-              control={formInstance.control}
-              render={({ field }) => (
-                <Select
-                  onValueChange={(value) => field.onChange(value as typeof GENDERS[number] | undefined)}
-                  value={field.value || undefined}
-                >
-                  <SelectTrigger id={`${formType}-student-gender`} className="mt-1">
-                    <SelectValue placeholder="Pilih jenis kelamin" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GENDERS.map(genderValue => (
-                        <SelectItem key={genderValue} value={genderValue}>
-                            {genderValue.charAt(0).toUpperCase() + genderValue.slice(1)}
-                        </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {formInstance.formState.errors.gender && (
-              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.gender.message}</p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
-            <Controller
-              name="agama"
-              control={formInstance.control}
-              render={({ field }) => (
-                <Select
-                  onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
-                  value={field.value || "_NONE_"}
-                >
-                  <SelectTrigger id={`${formType}-agama`} className="mt-1">
-                    <SelectValue placeholder="Pilih agama" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_NONE_">Tidak ditentukan</SelectItem>
-                    {AGAMA_OPTIONS.map((agama) => (
-                      <SelectItem key={agama} value={agama}>
-                        {agama}
+          )}
+        />
+        {formInstance.formState.errors.dateOfBirth && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfBirth.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-gender`}>Jenis Kelamin (Opsional)</Label>
+        <Controller
+          name="gender"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(value) => field.onChange(value as typeof GENDERS[number] | undefined)}
+              value={field.value || undefined}
+            >
+              <SelectTrigger id={`${formType}-student-gender`} className="mt-1">
+                <SelectValue placeholder="Pilih jenis kelamin" />
+              </SelectTrigger>
+              <SelectContent>
+                {GENDERS.map(genderValue => (
+                    <SelectItem key={genderValue} value={genderValue}>
+                        {genderValue.charAt(0).toUpperCase() + genderValue.slice(1)}
+                    </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {formInstance.formState.errors.gender && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.gender.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-agama`}>Agama (Opsional)</Label>
+        <Controller
+          name="agama"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
+              value={field.value || "_NONE_"}
+            >
+              <SelectTrigger id={`${formType}-agama`} className="mt-1">
+                <SelectValue placeholder="Pilih agama" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_NONE_">Tidak ditentukan</SelectItem>
+                {AGAMA_OPTIONS.map((agama) => (
+                  <SelectItem key={agama} value={agama}>
+                    {agama}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-address`}>Alamat (Opsional)</Label>
+        <Textarea
+          id={`${formType}-student-address`}
+          {...formInstance.register("address")}
+          className="mt-1"
+          placeholder="Masukkan alamat lengkap murid"
+        />
+        {formInstance.formState.errors.address && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-linkedParentId`}>Orang Tua Terhubung (Opsional)</Label>
+        <Controller
+          name="linkedParentId"
+          control={formInstance.control}
+          render={({ field }) => (
+            <Select
+              onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
+              value={field.value || "_NONE_"}
+              disabled={isLoadingInitialData}
+            >
+              <SelectTrigger id={`${formType}-student-linkedParentId`} className="mt-1">
+                <SelectValue placeholder={isLoadingInitialData ? "Memuat orang tua..." : "Pilih orang tua"} />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingInitialData ? (
+                  <SelectItem value="loading_parents" disabled>Memuat orang tua...</SelectItem>
+                ) : (
+                  <>
+                    <SelectItem value="_NONE_">Tidak Ada / Kosongkan</SelectItem>
+                    {allParents.map((parent) => (
+                      <SelectItem key={parent.id} value={parent.id}>
+                        {parent.name}
                       </SelectItem>
                     ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-          <div>
-            <Label htmlFor={`${formType}-student-address`}>Alamat (Opsional)</Label>
-            <Textarea
-              id={`${formType}-student-address`}
-              {...formInstance.register("address")}
-              className="mt-1"
-              placeholder="Masukkan alamat lengkap murid"
-            />
-            {formInstance.formState.errors.address && (
-              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.address.message}</p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor={`${formType}-student-linkedParentId`}>Orang Tua Terhubung (Opsional)</Label>
-            <Controller
-              name="linkedParentId"
-              control={formInstance.control}
-              render={({ field }) => (
-                <Select
-                  onValueChange={(value) => field.onChange(value === "_NONE_" ? undefined : value)}
-                  value={field.value || "_NONE_"}
-                  disabled={isLoadingInitialData}
-                >
-                  <SelectTrigger id={`${formType}-student-linkedParentId`} className="mt-1">
-                    <SelectValue placeholder={isLoadingInitialData ? "Memuat orang tua..." : "Pilih orang tua"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingInitialData ? (
-                      <SelectItem value="loading_parents" disabled>Memuat orang tua...</SelectItem>
-                    ) : (
-                      <>
-                        <SelectItem value="_NONE_">Tidak Ada / Kosongkan</SelectItem>
-                        {allParents.map((parent) => (
-                          <SelectItem key={parent.id} value={parent.id}>
-                            {parent.name}
-                          </SelectItem>
-                        ))}
-                        {allParents.length === 0 && <SelectItem value="no_parents" disabled>Belum ada data orang tua.</SelectItem>}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-          <div>
-            <Label htmlFor={`${formType}-student-attendanceNumber`}>Nomor Absen (Opsional)</Label>
-            <Input
-              id={`${formType}-student-attendanceNumber`}
-              type="number"
-              {...formInstance.register("attendanceNumber", { setValueAs: (v) => (v === "" ? null : Number(v)) })}
-              className="mt-1"
-              placeholder="Contoh: 15"
-            />
-            {formInstance.formState.errors.attendanceNumber && (
-              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.attendanceNumber.message}</p>
-            )}
-          </div>
-        </>
-      )}
+                    {allParents.length === 0 && <SelectItem value="no_parents" disabled>Belum ada data orang tua.</SelectItem>}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-attendanceNumber`}>Nomor Absen (Opsional)</Label>
+        <Input
+          id={`${formType}-student-attendanceNumber`}
+          type="number"
+          {...formInstance.register("attendanceNumber", { setValueAs: (v) => (v === "" ? null : Number(v)) })}
+          className="mt-1"
+          placeholder="Contoh: 15"
+        />
+        {formInstance.formState.errors.attendanceNumber && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.attendanceNumber.message}</p>
+        )}
+      </div>
     </>
   );
 
@@ -852,22 +848,24 @@ export default function StudentsPage() {
       }}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardHeader className="pb-4">
-              {/* Desktop Header */}
-              <div className="hidden md:flex items-center justify-between">
+              <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Users className="h-6 w-6 text-primary" />
                   <span>Daftar Murid ({displayedStudents.length})</span>
                 </CardTitle>
-                {(authRole === 'admin' || authRole === 'guru') && (
-                  <div className="flex items-center gap-2">
-                    <DialogTrigger asChild>
-                      <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
-                    </DialogTrigger>
-                    <DropdownMenu>
+                <div className="flex items-center gap-2">
+                    {authRole === 'admin' && (
+                        <div className="hidden md:flex">
+                             <DialogTrigger asChild>
+                                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
+                            </DialogTrigger>
+                        </div>
+                    )}
+                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" disabled={isExporting}>
+                        <Button variant="outline" size={isMobile ? "icon" : "sm"} disabled={isExporting}>
                           {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                          <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
+                          {!isMobile && <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
@@ -875,36 +873,15 @@ export default function StudentsPage() {
                         <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
-                )}
-              </div>
-              {/* Mobile Header */}
-              <div className="md:hidden flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-xl">
-                    <Users className="h-6 w-6 text-primary" />
-                    <span>Daftar Murid ({displayedStudents.length})</span>
-                  </CardTitle>
-                  {(authRole === 'admin' || authRole === 'guru') && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="icon" disabled={isExporting}>
-                          {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
                 </div>
-                {(authRole === 'admin' || authRole === 'guru') && (
-                  <DialogTrigger asChild>
-                    <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
-                  </DialogTrigger>
-                )}
               </div>
+              {authRole === 'admin' && (
+                <div className="md:hidden mt-4">
+                     <DialogTrigger asChild>
+                      <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Murid</Button>
+                    </DialogTrigger>
+                </div>
+              )}
           </CardHeader>
           <CardContent>
             {(authRole === 'admin' || authRole === 'guru') && (
@@ -989,12 +966,16 @@ export default function StudentsPage() {
                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuItem onClick={() => openViewStudentDialog(student)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => openEditDialog(student)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                      {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
-                                    </AlertDialog>
+                                    {authRole === 'admin' && (
+                                    <>
+                                        <DropdownMenuItem onClick={() => openEditDialog(student)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <AlertDialog>
+                                          <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
+                                          {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                        </AlertDialog>
+                                    </>
+                                    )}
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                             </TableCell>
@@ -1027,12 +1008,16 @@ export default function StudentsPage() {
                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" aria-label={`Opsi untuk ${student.name}`}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                       <DropdownMenuItem onClick={() => openViewStudentDialog(student)}><Eye className="mr-2 h-4 w-4" />Lihat Detail</DropdownMenuItem>
-                                      <DropdownMenuItem onClick={() => openEditDialog(student)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <AlertDialog>
-                                        <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                        {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
-                                      </AlertDialog>
+                                      {authRole === 'admin' && (
+                                        <>
+                                            <DropdownMenuItem onClick={() => openEditDialog(student)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
+                                                {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data murid <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                            </AlertDialog>
+                                        </>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </TableCell>
@@ -1102,7 +1087,7 @@ export default function StudentsPage() {
       </Dialog>
 
 
-      { (authRole === 'admin' || authRole === 'guru') && (
+      {authRole === 'admin' && (
         <Dialog open={isEditStudentDialogOpen} onOpenChange={(isOpen) => {
             setIsEditStudentDialogOpen(isOpen);
             if (!isOpen) {
