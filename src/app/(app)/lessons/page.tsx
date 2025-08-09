@@ -230,7 +230,7 @@ export default function LessonsPage() {
   };
 
   const fetchGuruFormDropdownData = async () => {
-    if (role !== "guru" || !authUser?.uid) return;
+    if (role !== "admin" || !authUser?.uid) return;
     setIsLoadingFormDropdownData(true);
     try {
       const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", authUser.uid), limit(1));
@@ -382,7 +382,7 @@ export default function LessonsPage() {
 
   useEffect(() => {
     if (selectedLesson && isEditDialogOpen) {
-      if (role === "guru") {
+      if (role === "admin") {
         // Ensure guru-specific dropdown data is loaded if dialog is opened directly
         if (!teacherDocId || formDialogClasses.length === 0 || formDialogSubjects.length === 0) {
           fetchGuruFormDropdownData();
@@ -393,7 +393,7 @@ export default function LessonsPage() {
         id: selectedLesson.id,
         subjectId: selectedLesson.subjectId,
         classId: selectedLesson.classId,
-        teacherId: role === "guru" ? teacherDocId || "" : selectedLesson.teacherId,
+        teacherId: role === "admin" ? selectedLesson.teacherId : (teacherDocId || ""),
         dayOfWeek: selectedLesson.dayOfWeek as typeof DAYS_OF_WEEK[number],
         startTime: selectedLesson.startTime,
         endTime: selectedLesson.endTime,
@@ -408,21 +408,15 @@ export default function LessonsPage() {
     addLessonForm.clearErrors();
     let subjectName, className, teacherName, finalTeacherId;
 
-    if (role === "guru") {
-        if (!teacherDocId || !authUser?.displayName) {
-            toast({title: "Error", description: "Profil guru tidak ditemukan.", variant: "destructive"});
-            return;
-        }
-        finalTeacherId = teacherDocId;
-        teacherName = authUser.displayName;
-        subjectName = formDialogSubjects.find(s => s.id === data.subjectId)?.name;
-        className = formDialogClasses.find(c => c.id === data.classId)?.name;
-    } else { // Admin
+    if (role === "admin") {
         const denormalized = getDenormalizedNames(data);
         subjectName = denormalized.subjectName;
         className = denormalized.className;
         teacherName = denormalized.teacherName;
         finalTeacherId = data.teacherId;
+    } else { // Should not happen with UI controls, but for safety
+        toast({title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan pelajaran.", variant: "destructive"});
+        return;
     }
     
     if (!subjectName || !className || !teacherName || !finalTeacherId) {
@@ -455,21 +449,15 @@ export default function LessonsPage() {
     editLessonForm.clearErrors();
     let subjectName, className, teacherName, finalTeacherId;
 
-    if (role === "guru") {
-        if (!teacherDocId || !authUser?.displayName) {
-            toast({title: "Error", description: "Profil guru tidak ditemukan.", variant: "destructive"});
-            return;
-        }
-        finalTeacherId = teacherDocId;
-        teacherName = authUser.displayName;
-        subjectName = formDialogSubjects.find(s => s.id === data.subjectId)?.name;
-        className = formDialogClasses.find(c => c.id === data.classId)?.name;
-    } else { // Admin
+    if (role === "admin") {
         const denormalized = getDenormalizedNames(data);
         subjectName = denormalized.subjectName;
         className = denormalized.className;
         teacherName = denormalized.teacherName;
         finalTeacherId = data.teacherId;
+    } else { // Should not happen
+        toast({title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit pelajaran.", variant: "destructive"});
+        return;
     }
 
     if (!subjectName || !className || !teacherName || !finalTeacherId) {
@@ -547,8 +535,8 @@ export default function LessonsPage() {
 
   const openEditDialog = (lesson: LessonData) => {
     setSelectedLesson(lesson);
-    if (role === 'guru' && (!teacherDocId || formDialogClasses.length === 0 || formDialogSubjects.length === 0)) {
-        fetchGuruFormDropdownData(); // Ensure data is ready for guru edit form
+    if (role === 'admin' && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) {
+        fetchAdminDropdownData(); 
     }
     setIsEditDialogOpen(true);
   };
@@ -641,7 +629,7 @@ export default function LessonsPage() {
   }, [searchTerm, selectedClassFilter]);
 
 
-  const canManageLessons = role === "admin" || role === "guru";
+  const canManageLessons = role === "admin";
   const isStudentOrParent = role === "siswa" || role === "orangtua";
   
   const isLessonCurrentlyActive = (lesson: LessonData): boolean => {
@@ -705,7 +693,6 @@ export default function LessonsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) { addLessonForm.reset(); addLessonForm.clearErrors(); }
-              else if (role === 'guru') { fetchGuruFormDropdownData(); }
               else if (role === 'admin' && (subjects.length === 0 || classes.length === 0 || teachers.length === 0)) { fetchAdminDropdownData(); }
             }}>
               <DialogTrigger asChild>
@@ -723,42 +710,34 @@ export default function LessonsPage() {
                 <form onSubmit={addLessonForm.handleSubmit(handleAddLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                   <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={addLessonForm.getValues("subjectId") || undefined} disabled={isLoadingFormDropdownData && role ==='guru'}>
-                      <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat mapel..." : "Pilih mata pelajaran"} /></SelectTrigger>
+                    <Select onValueChange={(value) => addLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={addLessonForm.getValues("subjectId") || undefined}>
+                      <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                       <SelectContent>
-                        {(role === 'guru' ? formDialogSubjects : subjects).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {addLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
                     <Label htmlFor="add-lesson-classId">Kelas</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined} disabled={isLoadingFormDropdownData && role==='guru'}>
-                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat kelas..." : "Pilih kelas"} /></SelectTrigger>
+                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
+                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
                       <SelectContent>
-                         {(role === 'guru' ? formDialogClasses : classes).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                         {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
                   </div>
-                  {role === 'admin' && (
-                    <div>
-                      <Label htmlFor="add-lesson-teacherId">Guru Pengajar</Label>
-                      <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={addLessonForm.getValues("teacherId") || undefined}>
-                        <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                        <SelectContent>
-                          {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
-                    </div>
-                  )}
-                  {role === 'guru' && authUser && (
-                    <div>
-                        <Label>Guru Pengajar</Label>
-                        <Input value={authUser.displayName || "Nama Guru Tidak Tersedia"} className="mt-1 bg-muted" readOnly />
-                    </div>
-                  )}
+                  <div>
+                    <Label htmlFor="add-lesson-teacherId">Guru Pengajar</Label>
+                    <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={addLessonForm.getValues("teacherId") || undefined}>
+                      <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                      <SelectContent>
+                        {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
+                  </div>
                   <div>
                     <Label htmlFor="add-lesson-dayOfWeek">Hari</Label>
                     <Select onValueChange={(value) => addLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} value={addLessonForm.getValues("dayOfWeek") || undefined}>
@@ -791,9 +770,9 @@ export default function LessonsPage() {
                   </div>
                   <DialogFooter>
                     <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                    <Button type="submit" disabled={addLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData)}>
-                        {(addLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData))&& <LottieLoader width={16} height={16} className="mr-2"/>}
-                        {addLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData) ? "Menyimpan..." : "Simpan Jadwal"}
+                    <Button type="submit" disabled={addLessonForm.formState.isSubmitting}>
+                        {addLessonForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2"/>}
+                        {addLessonForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Jadwal"}
                     </Button>
                   </DialogFooter>
                 </form>
@@ -896,7 +875,7 @@ export default function LessonsPage() {
                                   </Button>
                                 )
                             )
-                          ) : canManageLessons ? (
+                          ) : (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" aria-label={`Opsi untuk pelajaran ${lesson.subjectName}`}>
@@ -904,64 +883,49 @@ export default function LessonsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                {role === 'guru' && (
-                                    <>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="focus:bg-transparent cursor-default">
-                                            <div className="flex items-center justify-between w-full gap-2">
-                                                <Label htmlFor={`live-switch-${lesson.id}`} className={cn("font-normal cursor-pointer", !isTimeActive && "text-muted-foreground")}>
-                                                    {lesson.isLive ? 'Hentikan Kelas' : 'Mulai Kelas'}
-                                                </Label>
-                                                <Switch
-                                                    id={`live-switch-${lesson.id}`}
-                                                    checked={!!lesson.isLive}
-                                                    onCheckedChange={() => handleToggleLiveStatus(lesson.id, !!lesson.isLive)}
-                                                    disabled={!isTimeActive || updatingLessonId === lesson.id}
-                                                    aria-label={lesson.isLive ? "Hentikan Kelas" : "Mulai Kelas"}
-                                                />
-                                            </div>
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                    </>
-                                )}
                                 <DropdownMenuItem asChild>
                                   <Link href={`/lessons/${lesson.id}`}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     Lihat Detail
                                   </Link>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem
-                                      onSelect={(e) => { e.preventDefault(); openDeleteDialog(lesson); }}
-                                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Hapus
+                                {canManageLessons && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
                                     </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  {selectedLesson && selectedLesson.id === lesson.id && ( 
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tindakan ini akan menghapus jadwal pelajaran <span className="font-semibold">{selectedLesson?.subjectName} ({selectedLesson?.className})</span> pada hari {selectedLesson?.dayOfWeek}.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setSelectedLesson(null)}>Batal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteLesson(selectedLesson.id)}>Ya, Hapus Jadwal</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  )}
-                                </AlertDialog>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem
+                                          onSelect={(e) => { e.preventDefault(); openDeleteDialog(lesson); }}
+                                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                        >
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Hapus
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      {selectedLesson && selectedLesson.id === lesson.id && ( 
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Tindakan ini akan menghapus jadwal pelajaran <span className="font-semibold">{selectedLesson?.subjectName} ({selectedLesson?.className})</span> pada hari {selectedLesson?.dayOfWeek}.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel onClick={() => setSelectedLesson(null)}>Batal</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteLesson(selectedLesson.id)}>Ya, Hapus Jadwal</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      )}
+                                    </AlertDialog>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          ) : null}
+                          )}
                         </TableCell>
                       </TableRow>
                     );
@@ -1006,7 +970,9 @@ export default function LessonsPage() {
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
           setIsEditDialogOpen(isOpen);
             if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); }
-            else if (role === 'guru' && selectedLesson) { fetchGuruFormDropdownData(); } // Fetch on open for edit too
+            else if (role === 'admin' && selectedLesson) { 
+              if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchAdminDropdownData();
+            }
         }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
@@ -1018,42 +984,34 @@ export default function LessonsPage() {
                 <Input type="hidden" {...editLessonForm.register("id")} />
                 <div>
                   <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran</Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={editLessonForm.getValues("subjectId") || undefined} disabled={(isLoadingFormDropdownData && role==='guru')}>
-                    <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat mapel..." : "Pilih mata pelajaran"} /></SelectTrigger>
+                  <Select onValueChange={(value) => editLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={editLessonForm.getValues("subjectId") || undefined}>
+                    <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                     <SelectContent>
-                       {(role === 'guru' ? formDialogSubjects : subjects).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                       {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="edit-lesson-classId">Kelas</Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined} disabled={(isLoadingFormDropdownData && role==='guru')}>
-                    <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder={(isLoadingFormDropdownData && role==='guru') ? "Memuat kelas..." : "Pilih kelas"} /></SelectTrigger>
+                  <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined}>
+                    <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
                     <SelectContent>
-                        {(role === 'guru' ? formDialogClasses : classes).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.classId.message}</p>}
                 </div>
-                {role === 'admin' && (
-                    <div>
-                    <Label htmlFor="edit-lesson-teacherId">Guru Pengajar</Label>
-                    <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
-                        <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                        <SelectContent>
-                        {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
-                    </div>
-                )}
-                {role === 'guru' && authUser && (
-                    <div>
-                        <Label>Guru Pengajar</Label>
-                        <Input value={authUser.displayName || "Nama Guru Tidak Tersedia"} className="mt-1 bg-muted" readOnly />
-                    </div>
-                )}
+                <div>
+                  <Label htmlFor="edit-lesson-teacherId">Guru Pengajar</Label>
+                  <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
+                      <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                      <SelectContent>
+                      {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+                  {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
+                </div>
                 <div>
                   <Label htmlFor="edit-lesson-dayOfWeek">Hari</Label>
                   <Select onValueChange={(value) => editLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} value={editLessonForm.getValues("dayOfWeek") || undefined}>
@@ -1086,9 +1044,9 @@ export default function LessonsPage() {
                 </div>
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
-                  <Button type="submit" disabled={editLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData)}>
-                    {(editLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData)) && <LottieLoader width={16} height={16} className="mr-2"/>}
-                    {editLessonForm.formState.isSubmitting || (role === 'guru' && isLoadingFormDropdownData) ? "Menyimpan..." : "Simpan Perubahan"}
+                  <Button type="submit" disabled={editLessonForm.formState.isSubmitting}>
+                    {editLessonForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2"/>}
+                    {editLessonForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
                     </Button>
                 </DialogFooter>
               </form>

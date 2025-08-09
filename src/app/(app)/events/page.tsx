@@ -286,7 +286,7 @@ export default function EventsPage() {
     setSelectedEvent(event);
   };
 
-  const canManageEvents = role === "admin" || role === "guru";
+  const canManageEvents = role === "admin";
 
   const totalPages = Math.ceil(events.length / ITEMS_PER_PAGE);
   const currentTableData = useMemo(() => {
@@ -514,8 +514,7 @@ export default function EventsPage() {
                         {!isMobile && <TableCell className="truncate" title={event.category || "-"}>{event.category || "-"}</TableCell>}
                         {!isMobile && <TableCell className="truncate" title={event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>}
                         <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
-                          {role === 'admin' ? (
-                            <DropdownMenu>
+                          <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" aria-label={`Opsi untuk ${event.title}`}>
                                   <MoreVertical className="h-4 w-4" />
@@ -525,33 +524,32 @@ export default function EventsPage() {
                                 <DropdownMenuItem onClick={() => openViewDialog(event)}>
                                   <Eye className="mr-2 h-4 w-4" /> Lihat Detail
                                 </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => openEditDialog(event)}>
-                                  <Edit className="mr-2 h-4 w-4" /> Edit
-                                </DropdownMenuItem>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(event); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
-                                      <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                {canManageEvents && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => openEditDialog(event)}>
+                                      <Edit className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
-                                  </AlertDialogTrigger>
-                                  {selectedEvent && selectedEvent.id === event.id && (
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus acara <span className="font-semibold">{selectedEvent?.title}</span>.</AlertDialogDescription></AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel onClick={() => setSelectedEvent(null)}>Batal</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}>Ya, Hapus Acara</AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  )}
-                                </AlertDialog>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(event); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                                          <Trash2 className="mr-2 h-4 w-4" /> Hapus
+                                        </DropdownMenuItem>
+                                      </AlertDialogTrigger>
+                                      {selectedEvent && selectedEvent.id === event.id && (
+                                        <AlertDialogContent>
+                                          <AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus acara <span className="font-semibold">{selectedEvent?.title}</span>.</AlertDialogDescription></AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel onClick={() => setSelectedEvent(null)}>Batal</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => handleDeleteEvent(selectedEvent.id, selectedEvent.title)}>Ya, Hapus Acara</AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      )}
+                                    </AlertDialog>
+                                  </>
+                                )}
                               </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : (
-                            <Button variant="ghost" size="icon" onClick={() => openViewDialog(event)} aria-label={`Lihat detail ${event.title}`}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          )}
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
