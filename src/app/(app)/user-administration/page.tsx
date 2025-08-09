@@ -705,23 +705,32 @@ export default function UserAdministrationPage() {
                 
                 {watchAddUserRole === 'guru' ? (
                     <>
-                        <Controller name="teacherProfileId" control={addUserForm.control} render={({ field }) => (
-                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                                <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih Profil Guru"/></SelectTrigger>
-                                <SelectContent>{unlinkedTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.email})</SelectItem>)}</SelectContent>
-                            </Select>
-                        )} />
-                         {addUserForm.formState.errors.teacherProfileId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.teacherProfileId.message}</p>}
-                         
+                         <div>
+                          <Label htmlFor="teacherProfileId">Profil Guru <span className="text-destructive">*</span></Label>
+                          <Controller name="teacherProfileId" control={addUserForm.control} render={({ field }) => (
+                              <Select onValueChange={field.onChange} value={field.value || ""}>
+                                  <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih Profil Guru"/></SelectTrigger>
+                                  <SelectContent>{unlinkedTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.email})</SelectItem>)}</SelectContent>
+                              </Select>
+                          )} />
+                          {addUserForm.formState.errors.teacherProfileId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.teacherProfileId.message}</p>}
+                        </div>
+
                          {isGuruSelectedWithNoClasses && (
                            <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                             <AlertCircle className="h-5 w-5" />
                             <span>Guru ini belum memiliki jadwal pelajaran. Pengguna dapat dibuat, namun tidak ada kelas yang akan ditugaskan.</span>
                            </div>
                          )}
-
-                        <Input {...addUserForm.register("name")} type="hidden" />
-                        <Input {...addUserForm.register("email")} type="hidden" />
+                        
+                        <div>
+                          <Label htmlFor="name-guru">Nama Lengkap</Label>
+                          <Input id="name-guru" {...addUserForm.register("name")} className="mt-1 bg-muted/50" disabled />
+                        </div>
+                        <div>
+                          <Label htmlFor="email-guru">Email</Label>
+                          <Input id="email-guru" type="email" {...addUserForm.register("email")} className="mt-1 bg-muted/50" disabled />
+                        </div>
                          {renderClassAssignmentField(addUserForm, watchAddUserRole)}
 
                     </>
