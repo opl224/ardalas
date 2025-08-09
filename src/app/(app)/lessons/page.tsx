@@ -405,6 +405,10 @@ export default function LessonsPage() {
 
 
   const handleAddLessonSubmit: SubmitHandler<LessonFormValues> = async (data) => {
+    if (role !== "admin") {
+        toast({title: "Aksi Ditolak", description: "Hanya admin yang dapat menambahkan pelajaran.", variant: "destructive"});
+        return;
+    }
     addLessonForm.clearErrors();
     let subjectName, className, teacherName, finalTeacherId;
 
@@ -445,7 +449,10 @@ export default function LessonsPage() {
   };
 
   const handleEditLessonSubmit: SubmitHandler<EditLessonFormValues> = async (data) => {
-    if (!selectedLesson) return;
+    if (role !== "admin" || !selectedLesson) {
+        toast({title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit pelajaran.", variant: "destructive"});
+        return;
+    }
     editLessonForm.clearErrors();
     let subjectName, className, teacherName, finalTeacherId;
 
@@ -673,7 +680,7 @@ export default function LessonsPage() {
     return "Belum ada jadwal pelajaran yang ditambahkan.";
   };
   
-  return (
+    return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Jadwal Pelajaran</h1>
