@@ -449,10 +449,11 @@ export default function LessonsPage() {
   };
 
   const handleEditLessonSubmit: SubmitHandler<EditLessonFormValues> = async (data) => {
-    if (role !== "admin" || !selectedLesson) {
+    if (role !== "admin") {
         toast({title: "Aksi Ditolak", description: "Hanya admin yang dapat mengedit pelajaran.", variant: "destructive"});
         return;
     }
+    if (!selectedLesson) return;
     editLessonForm.clearErrors();
     let subjectName, className, teacherName, finalTeacherId;
 
@@ -517,6 +518,7 @@ export default function LessonsPage() {
   };
 
   const handleToggleLiveStatus = async (lessonId: string, currentStatus: boolean) => {
+    if (role !== "guru") return;
     setUpdatingLessonId(lessonId);
     try {
       const lessonDocRef = doc(db, "lessons", lessonId);
@@ -680,7 +682,7 @@ export default function LessonsPage() {
     return "Belum ada jadwal pelajaran yang ditambahkan.";
   };
   
-    return (
+  return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Jadwal Pelajaran</h1>
@@ -816,7 +818,7 @@ export default function LessonsPage() {
                   {isLoading && <SelectItem value="loading-classes" disabled>Memuat kelas...</SelectItem>}
                   {!isLoading && classes.length === 0 && <SelectItem value="no-classes" disabled>Tidak ada kelas</SelectItem>}
                   {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>)}
+                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
