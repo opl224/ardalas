@@ -806,8 +806,7 @@ export default function LessonsPage() {
                   {isLoading && <SelectItem value="loading-classes" disabled>Memuat kelas...</SelectItem>}
                   {!isLoading && classes.length === 0 && <SelectItem value="no-classes" disabled>Tidak ada kelas</SelectItem>}
                   {classes.map((cls) => (
-                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
-                  ))}
+                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -825,10 +824,10 @@ export default function LessonsPage() {
                     <TableHead className="w-[50px]">No.</TableHead>
                     <TableHead>Mata Pelajaran</TableHead>
                     {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
-                    {!isMobile && (role==='admin' || role==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
+                    {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
                     {!isMobile && <TableHead className="w-[100px]">Hari</TableHead>}
                     <TableHead className={cn(!isMobile ? "w-[120px]" : "w-auto", "px-4")}>Waktu</TableHead>
-                    {!isMobile && canManageLessons && <TableHead>Topik</TableHead>}
+                    {!isMobile && (canManageLessons || role === 'guru') && <TableHead>Topik</TableHead>}
                     <TableHead className={cn("text-right", !isMobile ? "w-[100px]" : "w-auto")}>Aksi</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -848,7 +847,7 @@ export default function LessonsPage() {
                         
                         <TableCell className={cn("text-xs", isMobile && "px-4")}>{lesson.startTime} - {lesson.endTime}</TableCell>
                         
-                        {!isMobile && canManageLessons && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
+                        {!isMobile && (canManageLessons || role === 'guru') && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
                         
                         <TableCell className={cn("text-right", isMobile ? "px-2" : "")}>
                           {isStudentOrParent ? (
