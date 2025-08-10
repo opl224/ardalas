@@ -268,14 +268,14 @@ export default function TeachersPage() {
         createdAt: serverTimestamp(),
       });
       
-      toast({ title: "Profil Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
+      toast({ title: "Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddTeacherDialogOpen(false);
       addTeacherForm.reset({name: "", email: "", subject: undefined, nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
       fetchTeachers(); 
     } catch (error: any) {
       console.error("Error adding teacher profile:", error);
       toast({
-        title: "Gagal Menambahkan Profil Guru",
+        title: "Gagal Menambahkan Guru",
         variant: "destructive",
       });
     }
@@ -299,14 +299,14 @@ export default function TeachersPage() {
         uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, 
       });
       
-      toast({ title: "Data Profil Guru Diperbarui", description: `${data.name} berhasil diperbarui.` });
+      toast({ title: "Data Guru Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditTeacherDialogOpen(false);
       setSelectedTeacher(null);
       fetchTeachers();
     } catch (error) {
       console.error("Error editing teacher profile:", error);
       toast({
-        title: "Gagal Memperbarui Profil Guru",
+        title: "Gagal Memperbarui Guru",
         variant: "destructive",
       });
     }
@@ -315,13 +315,13 @@ export default function TeachersPage() {
   const handleDeleteTeacher = async (teacherId: string, teacherName?: string) => {
     try {
       await deleteDoc(doc(db, "teachers", teacherId));
-      toast({ title: "Data Profil Guru Dihapus", description: `${teacherName || 'Profil Guru'} berhasil dihapus.` });
+      toast({ title: "Data Guru Dihapus", description: `${teacherName || 'Guru'} berhasil dihapus.` });
       setSelectedTeacher(null); 
       fetchTeachers();
     } catch (error) {
       console.error("Error deleting teacher profile:", error);
       toast({
-        title: "Gagal Menghapus Profil Guru",
+        title: "Gagal Menghapus Guru",
         variant: "destructive",
       });
     }
@@ -468,7 +468,7 @@ export default function TeachersPage() {
   const renderTeacherFormFields = (formInstance: typeof addTeacherForm | typeof editTeacherForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-name`}>Nama Lengkap Profil <span className="text-destructive">*</span></Label>
+        <Label htmlFor={`${formType}-name`}>Nama Lengkap<span className="text-destructive">*</span></Label>
         <Input id={`${formType}-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
@@ -482,7 +482,7 @@ export default function TeachersPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-email`}>Email Profil <span className="text-destructive">*</span></Label>
+        <Label htmlFor={`${formType}-email`}>Email<span className="text-destructive">*</span></Label>
         <Input id={`${formType}-email`} type="email" {...formInstance.register("email")} className="mt-1" />
         {formInstance.formState.errors.email && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
@@ -618,8 +618,8 @@ export default function TeachersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Manajemen Profil Guru</h1>
-        <p className="text-muted-foreground">Kelola data profil guru, termasuk penautan ke akun pengguna.</p>
+        <h1 className="text-3xl font-bold font-headline">Manajemen Guru</h1>
+        <p className="text-muted-foreground">Kelola data guru, termasuk penautan ke akun pengguna.</p>
       </div>
       <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
         setIsAddTeacherDialogOpen(isOpen);
@@ -634,11 +634,11 @@ export default function TeachersPage() {
               <div className="hidden md:flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Users className="h-6 w-6 text-primary" />
-                  <span>Daftar Profil Guru</span>
+                  <span>Daftar Guru</span>
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   <DialogTrigger asChild>
-                    <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Profil</Button>
+                    <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Guru</Button>
                   </DialogTrigger>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -659,7 +659,7 @@ export default function TeachersPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-xl">
                     <Users className="h-6 w-6 text-primary" />
-                    <span>Daftar Profil Guru</span>
+                    <span>Daftar Guru</span>
                   </CardTitle>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -674,7 +674,7 @@ export default function TeachersPage() {
                   </DropdownMenu>
                 </div>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Profil</Button>
+                  <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Guru</Button>
                 </DialogTrigger>
               </div>
           </CardHeader>
@@ -717,9 +717,9 @@ export default function TeachersPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className={cn(isMobile ? "w-10 px-2 text-center" : "w-[50px]")}>No.</TableHead>
-                      <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/4")}>Nama Profil</TableHead>
+                      <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/4")}>Nama</TableHead>
                       {!isMobile && <TableHead className="w-1/6">NIP</TableHead>}
-                      {!isMobile && <TableHead className="w-1/5">Email Profil</TableHead>}
+                      {!isMobile && <TableHead className="w-1/5">Email</TableHead>}
                       <TableHead className={cn(isMobile ? "w-2/5 px-2" : "w-1/6")}>Mapel</TableHead>
                       {!isMobile && <TableHead className="w-[80px]">Gender</TableHead>}
                       {!isMobile && <TableHead className="w-1/6">UID Akun Tertaut</TableHead>}
@@ -790,13 +790,13 @@ export default function TeachersPage() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Tindakan ini akan menghapus profil guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
+                                        Tindakan ini akan menghapus data guru <span className="font-semibold"> {selectedTeacher?.name} </span>. Ini tidak menghapus akun pengguna Auth terkait (jika ada).
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel onClick={() => setSelectedTeacher(null)}>Batal</AlertDialogCancel>
                                       <AlertDialogAction onClick={() => handleDeleteTeacher(selectedTeacher.id, selectedTeacher.name)}>
-                                        Ya, Hapus Profil
+                                        Ya, Hapus Data
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -835,18 +835,18 @@ export default function TeachersPage() {
             ) : (
               <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                 {searchTerm || subjectFilter !== "all" 
-                  ? "Tidak ada profil guru yang cocok dengan filter atau pencarian."
-                  : "Tidak ada data profil guru. Klik \"Tambah Profil Guru\" untuk membuat data baru."
+                  ? "Tidak ada data guru yang cocok dengan filter atau pencarian."
+                  : "Tidak ada data guru. Klik \"Tambah Guru\" untuk membuat data baru."
                 }
               </div>
             )}
           </CardContent>
         </Card>
         <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Penautan ke akun login akan dilakukan di Administrasi Pengguna.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Tambah Guru Baru</DialogTitle><DialogDescription>Isi detail data guru. Penautan ke akun login akan dilakukan di Administrasi Pengguna.</DialogDescription></DialogHeader>
             <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
             {renderTeacherFormFields(addTeacherForm, 'add')}
-            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting}>{addTeacherForm.formState.isSubmitting ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting}>{addTeacherForm.formState.isSubmitting ? "Memproses..." : "Simpan Guru"}</Button></DialogFooter>
             </form>
         </DialogContent>
       </Dialog>
@@ -857,14 +857,14 @@ export default function TeachersPage() {
       }}>
         <DialogContent className="sm:max-w-md">
             <DialogHeader>
-                <DialogTitle>Detail Profil Guru: {selectedTeacherForView?.name}</DialogTitle>
-                <DialogDescription>Informasi lengkap mengenai profil guru.</DialogDescription>
+                <DialogTitle>Detail Guru: {selectedTeacherForView?.name}</DialogTitle>
+                <DialogDescription>Informasi lengkap mengenai guru.</DialogDescription>
             </DialogHeader>
             {selectedTeacherForView && (
                 <div className="space-y-3 py-4 text-sm max-h-[60vh] overflow-y-auto pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedTeacherForView.name}</p></div>
                     <div><Label className="text-muted-foreground">NIP:</Label><p className="font-medium">{selectedTeacherForView.nip || "-"}</p></div>
-                    <div><Label className="text-muted-foreground">Email Profil:</Label><p className="font-medium">{selectedTeacherForView.email}</p></div>
+                    <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedTeacherForView.email}</p></div>
                     <div><Label className="text-muted-foreground">Mata Pelajaran Utama:</Label><p className="font-medium">{selectedTeacherForView.subject}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedTeacherForView.gender || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Agama:</Label><p className="font-medium">{selectedTeacherForView.agama || "-"}</p></div>
@@ -882,7 +882,7 @@ export default function TeachersPage() {
                     </div>
                      {selectedTeacherForView.createdAt && (
                        <div>
-                          <Label className="text-muted-foreground">Tanggal Dibuat (Profil):</Label>
+                          <Label className="text-muted-foreground">Tanggal Dibuat:</Label>
                           <p className="font-medium">{format(selectedTeacherForView.createdAt.toDate(), "dd MMMM yyyy, HH:mm", { locale: indonesiaLocale })}</p>
                        </div>
                     )}
@@ -903,9 +903,9 @@ export default function TeachersPage() {
       }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Profil Guru</DialogTitle>
+            <DialogTitle>Edit Data Guru</DialogTitle>
             <DialogDescription>
-              Perbarui detail profil guru dan penautan akun pengguna.
+              Perbarui detail data guru dan penautan akun pengguna.
             </DialogDescription>
           </DialogHeader>
           {selectedTeacher && (
