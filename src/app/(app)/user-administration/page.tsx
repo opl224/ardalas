@@ -397,13 +397,13 @@ export default function UserAdministrationPage() {
 
       toast({ title: "Pengguna Ditambahkan", description: `${finalName} berhasil ditambahkan.` });
       setIsAddUserDialogOpen(false);
-      addUserForm.reset({ role: "guru", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [] });
+      addUserForm.reset({ role: "guru", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [], linkedStudentId: undefined });
       setShowPassword(false);
       fetchUsers();
       fetchInitialData(); 
     } catch (error) {
       const firebaseError = error as FirebaseError;
-      console.error("Error adding user:", firebaseError);
+      console.error("Error adding user:", error);
 
       if (firebaseError.code === "auth/email-already-in-use") {
         const specificMessage = "Email ini sudah terdaftar oleh akun lain.";
@@ -679,7 +679,7 @@ export default function UserAdministrationPage() {
                       )} />
                       {addUserForm.formState.errors.linkedStudentId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.linkedStudentId.message}</p>}
                     </div>
-                    {selectedStudentData && (
+                    {watchLinkedStudentId && selectedStudentData && (
                       <div className="space-y-2 mt-2 p-3 border rounded-md bg-muted/50 text-sm">
                         <h4 className="font-semibold text-muted-foreground">Info Siswa Terpilih:</h4>
                         <p><span className="font-medium">Nama:</span> {selectedStudentData.name}</p>
@@ -796,7 +796,7 @@ export default function UserAdministrationPage() {
                     <TableRow key={user.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
-                      {!isMobile && <TableCell className="truncate" title={user.email}>{user.email || "-"}</TableCell>}
+                      {!isMobile && <TableCell className="truncate" title={user.email || "-"}>{user.email || "-"}</TableCell>}
                       <TableCell>{roleDisplayNames[user.role as keyof typeof roleDisplayNames] || user.role}</TableCell>
                       {!isMobile && (
                         <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : ''}>
