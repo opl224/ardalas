@@ -273,7 +273,7 @@ export default function UserAdministrationPage() {
     setIsLoadingUsers(true);
     try {
       const usersCollectionRef = collection(db, "users");
-      const q = query(usersCollectionRef, orderBy("name", "asc"));
+      const q = query(usersCollectionRef, where("role", "!=", "siswa"), orderBy("role", "asc"), orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: User[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
@@ -307,7 +307,6 @@ export default function UserAdministrationPage() {
   const watchAddUserRole = addUserForm.watch("role");
   const watchEditUserRole = editUserForm.watch("role");
   const watchTeacherProfileId = addUserForm.watch("teacherProfileId");
-  const watchLinkedStudentId = addUserForm.watch("linkedStudentId");
 
 
   useEffect(() => {
