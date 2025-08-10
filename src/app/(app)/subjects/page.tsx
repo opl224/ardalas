@@ -104,8 +104,17 @@ interface Subject {
   createdAt?: Timestamp;
 }
 
+const ALL_SUBJECT_OPTIONS = [
+    "Matematika", "Bahasa Indonesia", "Bahasa Inggris", "Pendidikan Agama Islam", "Pendidikan Kewarganegaraan",
+    "Ilmu Pengetahuan Alam", "Ilmu Pengetahuan Sosial", "Seni Budaya dan Keterampilan",
+    "Pendidikan Jasmani, Olahraga, dan Kesehatan", "Teknologi Informasi dan Komunikasi", "Bahasa Sunda",
+    "Fisika", "Kimia", "Biologi", "Sejarah", "Geografi", "Ekonomi", "Sosiologi",
+    "Guru Kelas"
+].sort();
+
+
 const subjectFormSchema = z.object({
-  name: z.string().min(3, { message: "Nama mata pelajaran minimal 3 karakter." }),
+  name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama mata pelajaran harus dipilih." }),
   description: z.string().optional(),
   teacherUid: z.string().optional(), // To store the selected Firebase Auth UID
 });
@@ -138,7 +147,7 @@ export default function SubjectsPage() {
   const addSubjectForm = useForm<SubjectFormValues>({
     resolver: zodResolver(subjectFormSchema),
     defaultValues: {
-      name: "",
+      name: undefined,
       description: "",
       teacherUid: undefined,
     },
@@ -330,7 +339,27 @@ export default function SubjectsPage() {
     <>
       <div>
         <Label htmlFor={`${formType}-subject-name`}>Nama Mata Pelajaran <span className="text-destructive">*</span></Label>
-        <Input id={`${formType}-subject-name`} {...formInstance.register("name")} className="mt-1" />
+        <Controller
+            name="name"
+            control={formInstance.control}
+            render={({ field }) => (
+                <Select
+                    onValueChange={(value) => field.onChange(value)}
+                    value={field.value || undefined}
+                >
+                <SelectTrigger id={`${formType}-subject-name`} className="mt-1">
+                    <SelectValue placeholder="Pilih mata pelajaran" />
+                </SelectTrigger>
+                <SelectContent>
+                    {ALL_SUBJECT_OPTIONS.map((subject) => (
+                        <SelectItem key={subject} value={subject}>
+                            {subject}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+                </Select>
+            )}
+        />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
         )}
