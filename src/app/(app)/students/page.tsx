@@ -63,7 +63,8 @@ import {
   orderBy,
   where,
   documentId,
-  limit
+  limit,
+  writeBatch
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -453,7 +454,7 @@ export default function StudentsPage() {
     const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
 
     try {
-      const studentDataForUsersCollection: any = {
+      const studentData = {
         name: data.name,
         nis: data.nis,
         nisn: data.nisn || null,
@@ -470,8 +471,16 @@ export default function StudentsPage() {
         attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
 
-      await addDoc(collection(db, "users"), studentDataForUsersCollection);
-      toast({ title: "Siswa Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
+      const batch = writeBatch(db);
+      const newUserDocRef = doc(collection(db, "users"));
+      batch.set(newUserDocRef, studentData);
+
+      const newStudentDocRef = doc(collection(db, "students"));
+      batch.set(newStudentDocRef, studentData);
+      
+      await batch.commit();
+
+      toast({ title: "Siswa Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddStudentDialogOpen(false);
       addStudentForm.reset({ name: "", nis: "", nisn: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents();
@@ -503,8 +512,7 @@ export default function StudentsPage() {
     }
     const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
     try {
-      const studentDocRef = doc(db, "users", selectedStudent.id);
-      const updateData: any = {
+      const updateData = {
         name: data.name,
         nis: data.nis,
         nisn: data.nisn || null,
@@ -518,8 +526,17 @@ export default function StudentsPage() {
         parentName: selectedParent?.name || null,
         attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
       };
+      
+      const batch = writeBatch(db);
+      
+      const userDocRef = doc(db, "users", selectedStudent.id);
+      batch.update(userDocRef, updateData);
+      
+      const studentDocRef = doc(db, "students", selectedStudent.id);
+      batch.update(studentDocRef, updateData);
 
-      await updateDoc(studentDocRef, updateData);
+      await batch.commit();
+
 
       toast({ title: "Data Siswa Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditStudentDialogOpen(false);
@@ -540,8 +557,17 @@ export default function StudentsPage() {
         return;
     }
     try {
-      await deleteDoc(doc(db, "users", studentId));
-      toast({ title: "Data Siswa Dihapus dari Profil", description: `${studentName || 'Siswa'} berhasil dihapus dari daftar profil.` });
+      const batch = writeBatch(db);
+      
+      const userDocRef = doc(db, "users", studentId);
+      batch.delete(userDocRef);
+      
+      const studentDocRef = doc(db, "students", studentId);
+      batch.delete(studentDocRef);
+
+      await batch.commit();
+
+      toast({ title: "Data Siswa Dihapus", description: `${studentName || 'Siswa'} berhasil dihapus.` });
       setSelectedStudent(null);
       fetchStudents();
     } catch (error) {
