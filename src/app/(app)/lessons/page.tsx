@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { BookCopy, PlusCircle, Edit, Trash2, LogIn, AlertCircle, MoreVertical, Eye, Search, Filter as FilterIcon } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -115,6 +115,11 @@ interface LessonData {
 
 const DAYS_OF_WEEK = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] as const;
 const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+const ALL_SUBJECT_OPTIONS = [
+    "Matematika", "Bahasa Indonesia", "Bahasa Inggris", "Pendidikan Agama Islam", "Pendidikan Kewarganegaraan",
+    "Ilmu Pengetahuan Alam", "Ilmu Pengetahuan Sosial", "Seni Budaya dan Keterampilan",
+    "PJOK", "Bahasa Sunda"
+].sort();
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 
@@ -721,17 +726,32 @@ export default function LessonsPage() {
                 </DialogHeader>
                 <form onSubmit={addLessonForm.handleSubmit(handleAddLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                   <div>
-                    <Label htmlFor="add-lesson-subjectId">Mata Pelajaran</Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={addLessonForm.getValues("subjectId") || undefined}>
-                      <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
-                      <SelectContent>
-                        {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="add-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
+                    <Controller
+                        name="subjectId"
+                        control={addLessonForm.control}
+                        render={({ field }) => (
+                            <Select
+                                onValueChange={(value) => field.onChange(value)}
+                                value={field.value || undefined}
+                            >
+                            <SelectTrigger id="add-lesson-subjectId" className="mt-1">
+                                <SelectValue placeholder="Pilih mata pelajaran" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {subjects.map((subject) => (
+                                    <SelectItem key={subject.id} value={subject.id}>
+                                        {subject.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                            </Select>
+                        )}
+                    />
                     {addLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-classId">Kelas</Label>
+                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
                     <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
                       <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
                       <SelectContent>
@@ -741,7 +761,7 @@ export default function LessonsPage() {
                     {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-teacherId">Guru Pengajar</Label>
+                    <Label htmlFor="add-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
                     <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={addLessonForm.getValues("teacherId") || undefined}>
                       <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
                       <SelectContent>
@@ -751,7 +771,7 @@ export default function LessonsPage() {
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-dayOfWeek">Hari</Label>
+                    <Label htmlFor="add-lesson-dayOfWeek">Hari <span className="text-destructive">*</span></Label>
                     <Select onValueChange={(value) => addLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} value={addLessonForm.getValues("dayOfWeek") || undefined}>
                       <SelectTrigger id="add-lesson-dayOfWeek" className="mt-1"><SelectValue placeholder="Pilih hari" /></SelectTrigger>
                       <SelectContent>
@@ -762,12 +782,12 @@ export default function LessonsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                       <div>
-                          <Label htmlFor="add-lesson-startTime">Waktu Mulai</Label>
+                          <Label htmlFor="add-lesson-startTime">Waktu Mulai <span className="text-destructive">*</span></Label>
                           <Input id="add-lesson-startTime" type="time" {...addLessonForm.register("startTime")} className="mt-1" />
                           {addLessonForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.startTime.message}</p>}
                       </div>
                       <div>
-                          <Label htmlFor="add-lesson-endTime">Waktu Selesai</Label>
+                          <Label htmlFor="add-lesson-endTime">Waktu Selesai <span className="text-destructive">*</span></Label>
                           <Input id="add-lesson-endTime" type="time" {...addLessonForm.register("endTime")} className="mt-1" />
                           {addLessonForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.endTime.message}</p>}
                       </div>
@@ -994,7 +1014,7 @@ export default function LessonsPage() {
               <form onSubmit={editLessonForm.handleSubmit(handleEditLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <Input type="hidden" {...editLessonForm.register("id")} />
                 <div>
-                  <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran</Label>
+                  <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                   <Select onValueChange={(value) => editLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={editLessonForm.getValues("subjectId") || undefined}>
                     <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                     <SelectContent>
@@ -1004,7 +1024,7 @@ export default function LessonsPage() {
                   {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="edit-lesson-classId">Kelas</Label>
+                  <Label htmlFor="edit-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
                   <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined}>
                     <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
                     <SelectContent>
@@ -1014,7 +1034,7 @@ export default function LessonsPage() {
                   {editLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.classId.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="edit-lesson-teacherId">Guru Pengajar</Label>
+                  <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
                   <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
                       <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
                       <SelectContent>
@@ -1024,7 +1044,7 @@ export default function LessonsPage() {
                   {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="edit-lesson-dayOfWeek">Hari</Label>
+                  <Label htmlFor="edit-lesson-dayOfWeek">Hari <span className="text-destructive">*</span></Label>
                   <Select onValueChange={(value) => editLessonForm.setValue("dayOfWeek", value as any, { shouldValidate: true })} value={editLessonForm.getValues("dayOfWeek") || undefined}>
                     <SelectTrigger id="edit-lesson-dayOfWeek" className="mt-1"><SelectValue placeholder="Pilih hari" /></SelectTrigger>
                     <SelectContent>
@@ -1035,12 +1055,12 @@ export default function LessonsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <Label htmlFor="edit-lesson-startTime">Waktu Mulai</Label>
+                        <Label htmlFor="edit-lesson-startTime">Waktu Mulai <span className="text-destructive">*</span></Label>
                         <Input id="edit-lesson-startTime" type="time" {...editLessonForm.register("startTime")} className="mt-1" />
                         {editLessonForm.formState.errors.startTime && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.startTime.message}</p>}
                     </div>
                     <div>
-                        <Label htmlFor="edit-lesson-endTime">Waktu Selesai</Label>
+                        <Label htmlFor="edit-lesson-endTime">Waktu Selesai <span className="text-destructive">*</span></Label>
                         <Input id="edit-lesson-endTime" type="time" {...editLessonForm.register("endTime")} className="mt-1" />
                         {editLessonForm.formState.errors.endTime && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.endTime.message}</p>}
                     </div>

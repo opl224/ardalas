@@ -107,9 +107,7 @@ interface Subject {
 const ALL_SUBJECT_OPTIONS = [
     "Matematika", "Bahasa Indonesia", "Bahasa Inggris", "Pendidikan Agama Islam", "Pendidikan Kewarganegaraan",
     "Ilmu Pengetahuan Alam", "Ilmu Pengetahuan Sosial", "Seni Budaya dan Keterampilan",
-    "Pendidikan Jasmani, Olahraga, dan Kesehatan", "Teknologi Informasi dan Komunikasi", "Bahasa Sunda",
-    "Fisika", "Kimia", "Biologi", "Sejarah", "Geografi", "Ekonomi", "Sosiologi",
-    "Guru Kelas"
+    "PJOK", "Bahasa Sunda"
 ].sort();
 
 
