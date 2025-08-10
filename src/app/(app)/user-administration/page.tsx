@@ -563,6 +563,51 @@ export default function UserAdministrationPage() {
   
   const isGuruSelectedWithNoClasses = watchAddUserRole === 'guru' && watchTeacherProfileId && (addUserForm.getValues("assignedClassIds") || []).length === 0;
   
+  const AddUserParentFields = () => {
+    const linkedStudentId = addUserForm.watch('linkedStudentId');
+
+    const selectedStudent = useMemo(() => {
+        if (!linkedStudentId) return null;
+        return unlinkedStudents.find(s => s.id === linkedStudentId) || null;
+    }, [linkedStudentId, unlinkedStudents]);
+
+    const selectedClass = useMemo(() => {
+        if (!selectedStudent || !selectedStudent.classId) return null;
+        return allClasses.find(c => c.id === selectedStudent.classId) || null;
+    }, [selectedStudent, allClasses]);
+
+    return (
+        <>
+            <div>
+                <Label htmlFor="linkedStudentId">Tautkan ke Siswa<span className="text-destructive">*</span></Label>
+                <Controller name="linkedStudentId" control={addUserForm.control} render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoadingInitialData}>
+                        <SelectTrigger className="mt-1">
+                            <SelectValue placeholder={isLoadingInitialData ? "Memuat..." : "Pilih Siswa"}/>
+                        </SelectTrigger>
+                        <SelectContent>
+                            {isLoadingInitialData && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                            {unlinkedStudents.length === 0 && !isLoadingInitialData && <SelectItem value="no-students" disabled>Tidak ada siswa tanpa orang tua.</SelectItem>}
+                            {unlinkedStudents.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.className || 'Tanpa Kelas'})</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                )} />
+                {addUserForm.formState.errors.linkedStudentId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.linkedStudentId.message}</p>}
+            </div>
+            
+            {selectedStudent && (
+                <div className="space-y-2 mt-2 p-3 border rounded-md bg-muted/50 text-sm">
+                    <h4 className="font-semibold text-muted-foreground">Info Siswa Terpilih:</h4>
+                    <p><span className="font-medium">Nama:</span> {selectedStudent.name}</p>
+                    <p><span className="font-medium">Kelas:</span> {selectedClass?.name || 'Belum ada kelas'}</p>
+                    <p><span className="font-medium">Wali Kelas:</span> {selectedClass?.teacherName || 'Belum ada wali kelas'}</p>
+                </div>
+            )}
+        </>
+    );
+  };
+
+
   return (
     <div className="space-y-6">
       <div>
@@ -659,43 +704,7 @@ export default function UserAdministrationPage() {
                     </>
                 )}
 
-                {watchAddUserRole === 'orangtua' && (
-                  <>
-                    <div>
-                      <Label htmlFor="linkedStudentId">Tautkan ke Siswa<span className="text-destructive">*</span></Label>
-                      <Controller name="linkedStudentId" control={addUserForm.control} render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoadingInitialData}>
-                              <SelectTrigger className="mt-1">
-                                <SelectValue placeholder={isLoadingInitialData ? "Memuat..." : "Pilih Siswa"}/>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {isLoadingInitialData && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                                {unlinkedStudents.length === 0 && !isLoadingInitialData && <SelectItem value="no-students" disabled>Tidak ada siswa tanpa orang tua.</SelectItem>}
-                                {unlinkedStudents.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.className || 'Tanpa Kelas'})</SelectItem>)}
-                              </SelectContent>
-                          </Select>
-                      )} />
-                      {addUserForm.formState.errors.linkedStudentId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.linkedStudentId.message}</p>}
-                    </div>
-                    {(() => {
-                        if (!watchLinkedStudentId) return null;
-                        
-                        const selectedStudent = unlinkedStudents.find(s => s.id === watchLinkedStudentId);
-                        if (!selectedStudent) return null;
-
-                        const selectedClass = allClasses.find(c => c.id === selectedStudent.classId);
-
-                        return (
-                          <div className="space-y-2 mt-2 p-3 border rounded-md bg-muted/50 text-sm">
-                            <h4 className="font-semibold text-muted-foreground">Info Siswa Terpilih:</h4>
-                            <p><span className="font-medium">Nama:</span> {selectedStudent.name}</p>
-                            <p><span className="font-medium">Kelas:</span> {selectedClass?.name || 'Belum ada kelas'}</p>
-                            <p><span className="font-medium">Wali Kelas:</span> {selectedClass?.teacherName || 'Belum ada wali kelas'}</p>
-                          </div>
-                        );
-                    })()}
-                  </>
-                )}
+                {watchAddUserRole === 'orangtua' && <AddUserParentFields />}
 
 
                 <div>
@@ -979,3 +988,4 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
