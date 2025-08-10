@@ -180,21 +180,21 @@ export default function DashboardPage() {
       try {
         if (role === 'admin') {
           const studentQuery = query(collection(db, "users"), where("role", "==", "siswa"));
-          const teacherUserQuery = query(collection(db, "users"), where("role", "==", "guru"));
+          const teachersQuery = collection(db, "teachers");
           const parentUserQuery = query(collection(db, "users"), where("role", "==", "orangtua"));
           const subjectsQuery = collection(db, "subjects");
           const classesQuery = collection(db, "classes");
 
-          const [studentSnap, teacherUserSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
+          const [studentSnap, teacherSnap, parentUserSnap, subjectSnap, classSnap] = await Promise.all([
             getDocs(studentQuery),
-            getDocs(teacherUserQuery),
-            getDocs(parentUserQuery), // Corrected line
+            getDocs(teachersQuery),
+            getDocs(parentUserQuery),
             getDocs(subjectsQuery),
             getDocs(classesQuery),
           ]);
 
           newStats.adminTotalStudents = studentSnap.size;
-          newStats.adminTotalTeachers = teacherUserSnap.size;
+          newStats.adminTotalTeachers = teacherSnap.size;
           newStats.adminTotalParents = parentUserSnap.size;
           newStats.adminTotalSubjects = subjectSnap.size;
           newStats.adminTotalClasses = classSnap.size;
