@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -239,22 +240,28 @@ export default function UserAdministrationPage() {
   const fetchInitialData = useCallback(async () => {
     setIsLoadingInitialData(true);
     try {
-      const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
-      setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      
-      const teachersSnapshot = await getDocs(query(collection(db, "teachers"), where("uid", "==", null), orderBy("name")));
-      setUnlinkedTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherProfile)));
-      
-      const lessonsSnapshot = await getDocs(collection(db, "lessons"));
-      setAllLessons(lessonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson)));
+        const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
+        setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
 
+        const teachersSnapshot = await getDocs(query(collection(db, "teachers"), orderBy("name")));
+        const allTeacherProfiles = teachersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherProfile));
+        
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        const linkedTeacherUids = new Set(usersSnapshot.docs.map(doc => doc.data().uid));
+
+        // Filter teachers who are not linked to any user account
+        const teachersWithoutAccount = allTeacherProfiles.filter(teacher => !teacher.uid || !linkedTeacherUids.has(teacher.uid));
+        setUnlinkedTeachers(teachersWithoutAccount);
+
+        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
+        setAllLessons(lessonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson)));
     } catch (error) {
-      console.error("Error fetching initial data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
+        console.error("Error fetching initial data: ", error);
+        toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
     } finally {
-      setIsLoadingInitialData(false);
+        setIsLoadingInitialData(false);
     }
-  }, [toast]);
+}, [toast]);
 
 
   const fetchUsers = async () => {
@@ -653,9 +660,15 @@ export default function UserAdministrationPage() {
                          <div>
                           <Label htmlFor="teacherProfileId">Profil Guru <span className="text-destructive">*</span></Label>
                           <Controller name="teacherProfileId" control={addUserForm.control} render={({ field }) => (
-                              <Select onValueChange={field.onChange} value={field.value || ""}>
-                                  <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih Profil Guru"/></SelectTrigger>
-                                  <SelectContent>{unlinkedTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.email})</SelectItem>)}</SelectContent>
+                              <Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoadingInitialData}>
+                                  <SelectTrigger className="mt-1">
+                                    <SelectValue placeholder={isLoadingInitialData ? "Memuat..." : "Pilih Profil Guru"}/>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {isLoadingInitialData && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                                    {unlinkedTeachers.length === 0 && !isLoadingInitialData && <SelectItem value="no-teachers" disabled>Tidak ada profil guru tanpa akun.</SelectItem>}
+                                    {unlinkedTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name} ({t.email})</SelectItem>)}
+                                  </SelectContent>
                               </Select>
                           )} />
                           {addUserForm.formState.errors.teacherProfileId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.teacherProfileId.message}</p>}
