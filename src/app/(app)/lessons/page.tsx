@@ -739,9 +739,9 @@ export default function LessonsPage() {
                                 <SelectValue placeholder="Pilih mata pelajaran" />
                             </SelectTrigger>
                             <SelectContent>
-                                {subjects.map((subject) => (
-                                    <SelectItem key={subject.id} value={subject.id}>
-                                        {subject.name}
+                                {ALL_SUBJECT_OPTIONS.map((subjectName) => (
+                                    <SelectItem key={subjectName} value={subjectName}>
+                                        {subjectName}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -1018,7 +1018,11 @@ export default function LessonsPage() {
                   <Select onValueChange={(value) => editLessonForm.setValue("subjectId", value, { shouldValidate: true })} value={editLessonForm.getValues("subjectId") || undefined}>
                     <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                     <SelectContent>
-                       {subjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                       {ALL_SUBJECT_OPTIONS.map((subjectName) => (
+                          <SelectItem key={subjectName} value={subjectName}>
+                              {subjectName}
+                          </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
