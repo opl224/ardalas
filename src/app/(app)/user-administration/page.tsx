@@ -139,6 +139,7 @@ const baseUserSchema = z.object({
   email: z.string().email({ message: "Format email tidak valid." }).optional(),
   assignedClassIds: z.array(z.string()).optional(),
   linkedStudentId: z.string().optional(),
+  adminCode: z.string().optional(),
 });
 
 const addUserFormSchema = baseUserSchema.extend({
@@ -175,7 +176,14 @@ const addUserFormSchema = baseUserSchema.extend({
 }, { message: "Email wajib diisi.", path: ["email"]})
 .refine(data => {
     return !!data.password;
-}, { message: "Password wajib diisi.", path: ["password"] });
+}, { message: "Password wajib diisi.", path: ["password"] })
+.refine(data => {
+    if (data.role === 'admin') {
+      return data.adminCode === '1234';
+    }
+    return true;
+}, { message: "Kode konfirmasi admin tidak valid.", path: ["adminCode"] });
+
 
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
@@ -330,6 +338,11 @@ export default function UserAdministrationPage() {
     if (watchAddUserRole !== 'orangtua') {
       addUserForm.setValue("linkedStudentId", undefined);
     }
+    
+    if (watchAddUserRole !== 'admin') {
+      addUserForm.setValue("adminCode", undefined);
+    }
+
 
   }, [watchAddUserRole, watchTeacherProfileId, addUserForm, unlinkedTeachers, allClasses]);
 
@@ -691,7 +704,7 @@ export default function UserAdministrationPage() {
                 ) : (
                     <>
                         <div>
-                          <Label htmlFor="name">Nama Orang Tua<span className="text-destructive">*</span></Label>
+                          <Label htmlFor="name">{watchAddUserRole === 'orangtua' ? 'Nama Orang Tua' : 'Nama Lengkap'}<span className="text-destructive">*</span></Label>
                           <Input id="name" {...addUserForm.register("name")} className="mt-1" />
                           {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
                         </div>
@@ -704,6 +717,14 @@ export default function UserAdministrationPage() {
                 )}
 
                 {watchAddUserRole === 'orangtua' && <AddUserParentFields />}
+                
+                {watchAddUserRole === 'admin' && (
+                  <div>
+                    <Label htmlFor="adminCode">Kode Konfirmasi Admin<span className="text-destructive">*</span></Label>
+                    <Input id="adminCode" {...addUserForm.register("adminCode")} className="mt-1" placeholder="Masukkan kode"/>
+                    {addUserForm.formState.errors.adminCode && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.adminCode.message}</p>}
+                  </div>
+                )}
 
 
                 <div>
@@ -987,4 +1008,5 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
 
