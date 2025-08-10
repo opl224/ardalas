@@ -560,11 +560,20 @@ export default function UserAdministrationPage() {
     }
     return pageNumbers;
   };
+  
+  const selectedStudentDataForDisplay = useMemo(() => {
+    if (!watchLinkedStudentId) return null;
+    return unlinkedStudents.find(s => s.id === watchLinkedStudentId);
+  }, [watchLinkedStudentId, unlinkedStudents]);
+  
+  const selectedStudentClassInfoForDisplay = useMemo(() => {
+    if (!selectedStudentDataForDisplay || !selectedStudentDataForDisplay.classId) return null;
+    return allClasses.find(c => c.id === selectedStudentDataForDisplay.classId);
+  }, [selectedStudentDataForDisplay, allClasses]);
+
 
   const isGuruSelectedWithNoClasses = watchAddUserRole === 'guru' && watchTeacherProfileId && (addUserForm.getValues("assignedClassIds") || []).length === 0;
-  const selectedStudentData = unlinkedStudents.find(s => s.id === watchLinkedStudentId);
-  const selectedStudentClassInfo = selectedStudentData ? allClasses.find(c => c.id === selectedStudentData.classId) : null;
-
+  
   return (
     <div className="space-y-6">
       <div>
@@ -679,12 +688,12 @@ export default function UserAdministrationPage() {
                       )} />
                       {addUserForm.formState.errors.linkedStudentId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.linkedStudentId.message}</p>}
                     </div>
-                    {watchLinkedStudentId && selectedStudentData && (
+                    {watchLinkedStudentId && selectedStudentDataForDisplay && (
                       <div className="space-y-2 mt-2 p-3 border rounded-md bg-muted/50 text-sm">
                         <h4 className="font-semibold text-muted-foreground">Info Siswa Terpilih:</h4>
-                        <p><span className="font-medium">Nama:</span> {selectedStudentData.name}</p>
-                        <p><span className="font-medium">Kelas:</span> {selectedStudentClassInfo?.name || 'Belum ada kelas'}</p>
-                        <p><span className="font-medium">Wali Kelas:</span> {selectedStudentClassInfo?.teacherName || 'Belum ada wali kelas'}</p>
+                        <p><span className="font-medium">Nama:</span> {selectedStudentDataForDisplay.name}</p>
+                        <p><span className="font-medium">Kelas:</span> {selectedStudentClassInfoForDisplay?.name || 'Belum ada kelas'}</p>
+                        <p><span className="font-medium">Wali Kelas:</span> {selectedStudentClassInfoForDisplay?.teacherName || 'Belum ada wali kelas'}</p>
                       </div>
                     )}
                   </>
@@ -796,7 +805,7 @@ export default function UserAdministrationPage() {
                     <TableRow key={user.id}>
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
-                      {!isMobile && <TableCell className="truncate" title={user.email || "-"}>{user.email || "-"}</TableCell>}
+                      {!isMobile && <TableCell className="truncate" title={user.email || ""}>{user.email || "-"}</TableCell>}
                       <TableCell>{roleDisplayNames[user.role as keyof typeof roleDisplayNames] || user.role}</TableCell>
                       {!isMobile && (
                         <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : ''}>
