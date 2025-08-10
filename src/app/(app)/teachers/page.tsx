@@ -619,7 +619,7 @@ export default function TeachersPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Guru</h1>
-        <p className="text-muted-foreground">Kelola data guru, termasuk penautan ke akun pengguna.</p>
+        <p className="text-muted-foreground">Kelola data guru. Akun login dibuat terpisah di Administrasi Pengguna.</p>
       </div>
       <Dialog open={isAddTeacherDialogOpen} onOpenChange={(isOpen) => {
         setIsAddTeacherDialogOpen(isOpen);
@@ -927,3 +927,4 @@ export default function TeachersPage() {
     </div>
   );
 }
+
