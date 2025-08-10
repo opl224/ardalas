@@ -59,7 +59,7 @@ export function RegisterForm() {
       email: "",
       password: "",
       confirmPassword: "",
-      role: "siswa", // Default role
+      role: "guru", // Default role
     },
   });
 

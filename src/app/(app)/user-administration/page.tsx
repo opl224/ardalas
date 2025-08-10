@@ -144,39 +144,19 @@ const addUserFormSchema = baseUserSchema.extend({
     path: ["teacherProfileId"],
 })
 .refine(data => {
-    if (data.role === 'siswa') return true; // Name for siswa is handled separately
     if (data.role !== 'guru') {
       return !!data.name;
     }
     return true;
 }, { message: "Nama wajib diisi.", path: ["name"]})
 .refine(data => {
-    if (data.role === 'siswa') return true; // Email for siswa is not required
     if (data.role !== 'guru') {
       return !!data.email;
     }
     return true;
 }, { message: "Email wajib diisi.", path: ["email"]})
 .refine(data => {
-    if (data.role === 'siswa') {
-      return !!data.nis;
-    }
-    return true;
-}, { message: "NIS wajib diisi untuk siswa.", path: ["nis"]})
-.refine(data => {
-    if (data.role === 'siswa') {
-      return !!data.classId;
-    }
-    return true;
-  }, {
-    message: "Siswa harus memiliki satu kelas yang ditetapkan.",
-    path: ["classId"],
-})
-.refine(data => {
-    if (data.role !== 'siswa') {
-        return !!data.password;
-    }
-    return true;
+    return !!data.password;
 }, { message: "Password wajib diisi.", path: ["password"] });
 
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
@@ -228,7 +208,7 @@ export default function UserAdministrationPage() {
   const addUserForm = useForm<AddUserFormValues>({
     resolver: zodResolver(addUserFormSchema),
     defaultValues: {
-      role: "siswa",
+      role: "guru",
       assignedClassIds: [],
     },
   });
@@ -322,27 +302,15 @@ export default function UserAdministrationPage() {
         addUserForm.setValue("assignedClassIds", []);
     }
 
-    if (watchAddUserRole !== 'siswa') {
-        addUserForm.setValue("classId", undefined);
-        addUserForm.setValue("nis", undefined);
-    }
-    
-    if (watchAddUserRole === 'siswa') {
-        addUserForm.setValue("email", undefined);
-        addUserForm.setValue("password", undefined);
-    }
-
-
   }, [watchAddUserRole, watchTeacherProfileId, addUserForm, unlinkedTeachers, allClasses]);
 
   useEffect(() => {
     if (watchEditUserRole !== 'guru') {
       editUserForm.setValue("assignedClassIds", []);
     }
-    if (watchEditUserRole !== 'siswa') {
+    if (watchEditUserRole === 'guru') { // If role is changed to guru, clear classId
       editUserForm.setValue("classId", undefined);
     }
-    editUserForm.trigger(["assignedClassIds", "classId"]);
   }, [watchEditUserRole, editUserForm]);
 
   useEffect(() => {
@@ -360,38 +328,6 @@ export default function UserAdministrationPage() {
 
   const handleAddUserSubmit: SubmitHandler<AddUserFormValues> = async (data) => {
     addUserForm.clearErrors();
-
-    if (data.role === 'siswa') {
-        // Handle student creation (no auth)
-        if (!data.name || !data.nis || !data.classId) {
-            toast({ title: "Data Siswa Tidak Lengkap", variant: "destructive" });
-            return;
-        }
-        const selectedClass = allClasses.find(c => c.id === data.classId);
-        const studentData = {
-            name: data.name,
-            nis: data.nis,
-            role: 'siswa',
-            classId: data.classId,
-            className: selectedClass?.name || "",
-            createdAt: serverTimestamp(),
-            // No UID from auth
-        };
-        try {
-            await addDoc(collection(db, "users"), studentData);
-            toast({ title: "Profil Siswa Dibuat", description: `Profil untuk ${data.name} berhasil dibuat.` });
-            setIsAddUserDialogOpen(false);
-            addUserForm.reset({ role: "siswa" });
-            fetchUsers();
-        } catch (error) {
-            console.error("Error adding student profile:", error);
-            toast({ title: "Gagal Membuat Profil Siswa", variant: "destructive" });
-        }
-        return;
-    }
-
-
-    // Handle other roles (with auth)
     let secondaryApp: FirebaseApp | undefined;
     const finalName = data.name || unlinkedTeachers.find(t => t.id === data.teacherProfileId)?.name;
     const finalEmail = data.email || unlinkedTeachers.find(t => t.id === data.teacherProfileId)?.email;
@@ -431,7 +367,7 @@ export default function UserAdministrationPage() {
 
       toast({ title: "Pengguna Ditambahkan", description: `${finalName} berhasil ditambahkan.` });
       setIsAddUserDialogOpen(false);
-      addUserForm.reset({ role: "siswa", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [], classId: undefined });
+      addUserForm.reset({ role: "guru", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [] });
       setShowPassword(false);
       fetchUsers();
       fetchInitialData(); 
@@ -539,42 +475,7 @@ export default function UserAdministrationPage() {
           </div>
         </div>
       );
-    } else if (currentRole === 'siswa') {
-      return (
-         <div>
-            <Label htmlFor="classId">Kelas Siswa<span className="text-destructive">*</span></Label>
-            {noClassesAvailable && (
-                 <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
-                </div>
-            )}
-            <Controller
-                name="classId"
-                control={formInstance.control}
-                render={({ field }) => (
-                    <Select
-                        onValueChange={(value) => { field.onChange(value); formInstance.trigger("classId");}}
-                        value={field.value || undefined}
-                        disabled={isLoadingInitialData || noClassesAvailable}
-                    >
-                        <SelectTrigger id="classId" className="mt-1">
-                            <SelectValue placeholder={isLoadingInitialData ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas tersedia." : "Pilih kelas")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoadingInitialData && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                            {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            {allClasses.length === 0 && !isLoadingInitialData && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia. Harap tambahkan kelas terlebih dahulu.</SelectItem>}
-                        </SelectContent>
-                    </Select>
-                )}
-            />
-            {(formInstance.formState.errors as any).classId && (
-                <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).classId.message}</p>
-            )}
-        </div>
-      );
-    }
+    } 
     return null;
   };
 
@@ -659,7 +560,7 @@ export default function UserAdministrationPage() {
           <Dialog open={isAddUserDialogOpen} onOpenChange={(isOpen) => {
             setIsAddUserDialogOpen(isOpen);
             if (!isOpen) {
-                addUserForm.reset({ role: "siswa", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [], classId: undefined, nis: undefined });
+                addUserForm.reset({ role: "guru", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [] });
                 setShowPassword(false);
                 addUserForm.clearErrors();
             }
@@ -733,36 +634,25 @@ export default function UserAdministrationPage() {
                           <Input id="name" {...addUserForm.register("name")} className="mt-1" />
                           {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
                         </div>
-                        {watchAddUserRole === 'siswa' ? (
-                            <div>
-                              <Label htmlFor="nis">NIS<span className="text-destructive">*</span></Label>
-                              <Input id="nis" {...addUserForm.register("nis")} className="mt-1" placeholder="Nomor Induk Siswa" />
-                              {addUserForm.formState.errors.nis && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.nis.message}</p>}
-                            </div>
-                        ) : (
-                            <div>
-                              <Label htmlFor="email">Email<span className="text-destructive">*</span></Label>
-                              <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
-                              {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
-                            </div>
-                        )}
-                         {renderClassAssignmentField(addUserForm, watchAddUserRole)}
+                        <div>
+                          <Label htmlFor="email">Email<span className="text-destructive">*</span></Label>
+                          <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
+                          {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
+                        </div>
                     </>
                 )}
 
 
-                {watchAddUserRole !== 'siswa' && (
-                    <div>
-                      <Label htmlFor="password">Password<span className="text-destructive">*</span></Label>
-                      <div className="relative mt-1">
-                        <Input id="password" type={showPassword ? "text" : "password"} {...addUserForm.register("password")} className="hide-password-reveal-icon" />
-                        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}>
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </Button>
-                      </div>
-                      {addUserForm.formState.errors.password && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.password.message}</p>}
-                    </div>
-                )}
+                <div>
+                  <Label htmlFor="password">Password<span className="text-destructive">*</span></Label>
+                  <div className="relative mt-1">
+                    <Input id="password" type={showPassword ? "text" : "password"} {...addUserForm.register("password")} className="hide-password-reveal-icon" />
+                    <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </Button>
+                  </div>
+                  {addUserForm.formState.errors.password && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.password.message}</p>}
+                </div>
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
                   <Button type="submit" disabled={addUserForm.formState.isSubmitting}>{addUserForm.formState.isSubmitting ? "Menyimpan..." : "Simpan Pengguna"}</Button>
@@ -859,12 +749,12 @@ export default function UserAdministrationPage() {
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
                       {!isMobile && <TableCell className="truncate" title={user.email}>{user.email || "-"}</TableCell>}
-                      <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
+                      <TableCell>{roleDisplayNames[user.role as keyof typeof roleDisplayNames] || user.role}</TableCell>
                       {!isMobile && (
-                        <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
+                        <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.className || user.classId || '-'}>
                           {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) :
-                           user.role === 'siswa' ? (user.className || user.classId || '-') :
-                           "-"}
+                           user.className || user.classId || '-'
+                          }
                         </TableCell>
                       )}
                       <TableCell className="text-center">
@@ -958,7 +848,7 @@ export default function UserAdministrationPage() {
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedUser.name}</p></div>
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedUser.email || " (Tidak Ada Akun Login)"}</p></div>
                     <div><Label className="text-muted-foreground">UID:</Label><p className="font-mono text-xs">{selectedUser.uid || " (Tidak Ada Akun Login)"}</p></div>
-                    <div><Label className="text-muted-foreground">Peran:</Label><p className="font-medium">{roleDisplayNames[selectedUser.role]}</p></div>
+                    <div><Label className="text-muted-foreground">Peran:</Label><p className="font-medium">{roleDisplayNames[selectedUser.role as keyof typeof roleDisplayNames]}</p></div>
                     {selectedUser.role === 'guru' && (
                         <div>
                             <Label className="text-muted-foreground">Kelas Ditugaskan:</Label>

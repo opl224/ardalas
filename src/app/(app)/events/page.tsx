@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -512,7 +513,7 @@ export default function EventsPage() {
                         <TableCell>{format(event.date.toDate(), isMobile ? "dd/MM/yy" : "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
                         {!isMobile && <TableCell>{event.startTime}{event.endTime ? ` - ${event.endTime}` : (event.startTime ? ' - Selesai' : '-')}</TableCell>}
                         {!isMobile && <TableCell className="truncate" title={event.category || "-"}>{event.category || "-"}</TableCell>}
-                        {!isMobile && <TableCell className="truncate" title={event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") : "Semua"}</TableCell>}
+                        {!isMobile && <TableCell className="truncate" title={event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ") : "Semua"}>{event.targetAudience && event.targetAudience.length > 0 ? event.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ") : "Semua"}</TableCell>}
                         <TableCell className={cn("text-right", isMobile ? "px-1" : "")}>
                           <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -605,7 +606,7 @@ export default function EventsPage() {
                   <Label className="text-muted-foreground">Target Audiens:</Label>
                   <p className="font-medium">
                     {selectedEventForView.targetAudience && selectedEventForView.targetAudience.length > 0 
-                      ? selectedEventForView.targetAudience.map(r => roleDisplayNames[r] || r).join(", ") 
+                      ? selectedEventForView.targetAudience.map(r => roleDisplayNames[r as keyof typeof roleDisplayNames] || r).join(", ") 
                       : "Semua"}
                   </p>
                 </div>

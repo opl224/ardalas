@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,7 +104,7 @@ type AnnouncementFormValues = z.infer<typeof announcementFormSchema>;
 const editAnnouncementFormSchema = baseAnnouncementSchema.extend({ id: z.string() });
 type EditAnnouncementFormValues = z.infer<typeof editAnnouncementFormSchema>;
 
-const ROLES_FOR_TEACHER_TARGETING: Role[] = ["siswa", "orangtua"];
+const ROLES_FOR_TEACHER_TARGETING: Role[] = ["orangtua"];
 
 interface ClassMin {
   id: string;
@@ -168,8 +169,8 @@ export default function AnnouncementsPage() {
       })) as AnnouncementData[];
 
       // Filter announcements based on user role and class
-      if (user && (role === 'siswa' || role === 'orangtua')) {
-        const userClassId = role === 'siswa' ? user.classId : user.linkedStudentClassId;
+      if (user && role === 'orangtua') {
+        const userClassId = user.linkedStudentClassId;
         fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
           ann.targetAudience.includes(role!) ||
           ann.targetAudience.includes("semua") || // "semua" might not be in ROLES type, adjust if needed
@@ -259,9 +260,9 @@ export default function AnnouncementsPage() {
     }
     addAnnouncementForm.clearErrors();
 
-    if (role === 'guru' && (data.targetAudience.includes('siswa') || data.targetAudience.includes('orangtua')) && (!data.targetClassIds || data.targetClassIds.length === 0)) {
+    if (role === 'guru' && data.targetAudience.includes('orangtua') && (!data.targetClassIds || data.targetClassIds.length === 0)) {
       addAnnouncementForm.setError("targetClassIds", { type: "manual", message: "Pilih minimal satu kelas target." });
-      toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan siswa atau orang tua.", variant: "destructive"});
+      toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan orang tua.", variant: "destructive"});
       return;
     }
 
@@ -299,25 +300,17 @@ export default function AnnouncementsPage() {
       if (role === 'admin' && data.targetAudience && data.targetAudience.length > 0) {
         const usersRef = collection(db, "users");
         for (const targetRole of data.targetAudience) {
-          // Skip creating individual notifications for 'siswa' or 'orangtua'
-          // if the announcement is created by an admin and targets these roles broadly.
-          // They will see these announcements on the /announcements page or dashboard.
-          if (targetRole === 'siswa' || targetRole === 'orangtua') {
+          if (targetRole === 'orangtua') {
             continue;
           }
 
-          // For other roles (e.g., 'guru', other 'admin') targeted by admin, create notifications.
-          // Also, ensure admin doesn't get self-notification if target is 'admin'
-          if (targetRole === 'admin' && user.uid === user.uid) { // Check if creator is the target admin
-            // Potentially skip self-notification or handle differently.
-            // For now, the existing userDoc.id !== user.uid check below handles this.
+          if (targetRole === 'admin' && user.uid === user.uid) { 
           }
 
           const qUsers = query(usersRef, where("role", "==", targetRole));
           try {
             const querySnapshot = await getDocs(qUsers);
             querySnapshot.forEach((userDoc) => {
-              // Don't send notification to self (admin creating for other admins or teachers)
               if (userDoc.id !== user.uid) {
                 const userNotificationRef = doc(collection(db, "notifications"));
                 batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
@@ -328,7 +321,6 @@ export default function AnnouncementsPage() {
           }
         }
       } else if (role === 'guru' && data.targetAudience && data.targetClassIds && data.targetClassIds.length > 0) {
-        // Teacher sending to specific classes for 'siswa' or 'orangtua' - this is fine.
         const usersRef = collection(db, "users");
         for (const targetRole of data.targetAudience.filter(r => ROLES_FOR_TEACHER_TARGETING.includes(r))) {
             const qStudents = query(usersRef, where("role", "==", targetRole), where("classId", "in", data.targetClassIds));
@@ -360,15 +352,15 @@ export default function AnnouncementsPage() {
     if (!selectedAnnouncement || !user) return;
     editAnnouncementForm.clearErrors();
 
-    if (role === 'guru' && (data.targetAudience.includes('siswa') || data.targetAudience.includes('orangtua')) && (!data.targetClassIds || data.targetClassIds.length === 0)) {
+    if (role === 'guru' && data.targetAudience.includes('orangtua') && (!data.targetClassIds || data.targetClassIds.length === 0)) {
       editAnnouncementForm.setError("targetClassIds", { type: "manual", message: "Pilih minimal satu kelas target." });
-      toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan siswa atau orang tua.", variant: "destructive"});
+      toast({title: "Validasi Gagal", description: "Guru harus memilih kelas target jika menargetkan orang tua.", variant: "destructive"});
       return;
     }
 
     let finalTargetClassIds = data.targetClassIds;
     if (role !== 'guru') {
-      if (data.targetAudience.length === 0 || !data.targetAudience.some(r => ['siswa', 'orangtua'].includes(r))) {
+      if (data.targetAudience.length === 0 || !data.targetAudience.some(r => ['orangtua'].includes(r))) {
         finalTargetClassIds = [];
       } else {
         finalTargetClassIds = selectedAnnouncement.targetClassIds || [];
