@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,6 +129,7 @@ const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha
 const baseStudentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
+  nisn: z.string().min(10, { message: "NISN harus 10 digit." }).max(10, { message: "NISN harus 10 digit." }).optional().or(z.literal("")),
   classId: z.string({ required_error: "Pilih kelas." }),
   dateOfBirth: z.date().optional(),
   gender: z.enum(GENDERS).optional(),
@@ -174,6 +176,7 @@ export default function StudentsPage() {
     defaultValues: {
       name: "",
       nis: "",
+      nisn: "",
       classId: undefined,
       dateOfBirth: undefined,
       gender: undefined,
@@ -189,6 +192,7 @@ export default function StudentsPage() {
     defaultValues: {
       name: "",
       nis: "",
+      nisn: "",
       classId: undefined,
       dateOfBirth: undefined,
       gender: undefined,
@@ -342,6 +346,7 @@ export default function StudentsPage() {
         id: selectedStudent.id,
         name: selectedStudent.name,
         nis: selectedStudent.nis || "",
+        nisn: selectedStudent.nisn || "",
         classId: selectedStudent.classId,
         dateOfBirth: selectedStudent.dateOfBirth ? selectedStudent.dateOfBirth.toDate() : undefined,
         gender: selectedStudent.gender,
@@ -360,7 +365,8 @@ export default function StudentsPage() {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(student =>
         student.name.toLowerCase().includes(lowerSearchTerm) ||
-        (student.nis && student.nis.toLowerCase().includes(lowerSearchTerm))
+        (student.nis && student.nis.toLowerCase().includes(lowerSearchTerm)) ||
+        (student.nisn && student.nisn.toLowerCase().includes(lowerSearchTerm))
       );
     }
     return filtered.sort((a, b) => {
@@ -450,6 +456,7 @@ export default function StudentsPage() {
       const studentDataForUsersCollection: any = {
         name: data.name,
         nis: data.nis,
+        nisn: data.nisn || null,
         classId: selectedClassObj.id,
         className: selectedClassObj.name,
         role: 'siswa',
@@ -466,7 +473,7 @@ export default function StudentsPage() {
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Siswa Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
       setIsAddStudentDialogOpen(false);
-      addStudentForm.reset({ name: "", nis: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
+      addStudentForm.reset({ name: "", nis: "", nisn: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents();
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -500,6 +507,7 @@ export default function StudentsPage() {
       const updateData: any = {
         name: data.name,
         nis: data.nis,
+        nisn: data.nisn || null,
         classId: data.classId,
         className: selectedClass.name,
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
@@ -559,6 +567,7 @@ export default function StudentsPage() {
       "No.": index + 1,
       "Nama Siswa": student.name,
       "NIS": student.nis || '-',
+      "NISN": student.nisn || '-',
       "Kelas": student.className || '-',
       "Orang Tua": student.parentName || '-',
       "No. Absen": student.attendanceNumber ?? '-',
@@ -628,6 +637,13 @@ export default function StudentsPage() {
         <Input id={`${formType}-student-nis`} {...formInstance.register("nis")} className="mt-1" />
         {formInstance.formState.errors.nis && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nis.message}</p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`${formType}-student-nisn`}>NISN</Label>
+        <Input id={`${formType}-student-nisn`} {...formInstance.register("nisn")} className="mt-1" placeholder="Nomor Induk Siswa Nasional"/>
+        {formInstance.formState.errors.nisn && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nisn.message}</p>
         )}
       </div>
       <div>
@@ -828,7 +844,7 @@ export default function StudentsPage() {
       </div>
       <Dialog open={isAddStudentDialogOpen} onOpenChange={(isOpen) => {
         setIsAddStudentDialogOpen(isOpen);
-        if (!isOpen) { addStudentForm.reset({ name: "", nis: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined }); addStudentForm.clearErrors(); }
+        if (!isOpen) { addStudentForm.reset({ name: "", nis: "", nisn: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined }); addStudentForm.clearErrors(); }
       }}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardHeader className="pb-4">
@@ -873,7 +889,7 @@ export default function StudentsPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Cari nama, NISN, atau email..."
+                    placeholder="Cari nama, NIS, atau NISN..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-8 w-full"
@@ -921,7 +937,7 @@ export default function StudentsPage() {
                           <TableHead className={cn((authRole === 'admin' || authRole === 'guru') ? "w-1/4" : "w-1/2")}>Nama</TableHead>
                           {(authRole === 'admin' || authRole === 'guru') && (
                             <>
-                              <TableHead className="w-1/5">NIS</TableHead>
+                              <TableHead className="w-1/5">NISN</TableHead>
                             </>
                           )}
                           {authRole === 'siswa' && <TableHead className="w-2/12">No. Absen</TableHead>}
@@ -969,7 +985,7 @@ export default function StudentsPage() {
                             <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
                             {(authRole === 'admin' || authRole === 'guru') && (
                               <>
-                                <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
+                                <TableCell className="truncate" title={student.nisn}>{student.nisn || "-"}</TableCell>
                               </>
                             )}
                             {authRole === 'siswa' && <TableCell>{student.attendanceNumber ?? "-"}</TableCell>}
@@ -1053,6 +1069,7 @@ export default function StudentsPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm overflow-y-auto flex-1 pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
                     <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{selectedStudentForView.nis || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">NISN:</Label><p className="font-medium">{selectedStudentForView.nisn || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedStudentForView.className || selectedStudentForView.classId}</p></div>
                     <div><Label className="text-muted-foreground">Tanggal Lahir:</Label><p className="font-medium">{selectedStudentForView.dateOfBirth ? format(selectedStudentForView.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "-"}</p></div>
                     <div><Label className="text-muted-foreground">Jenis Kelamin:</Label><p className="font-medium capitalize">{selectedStudentForView.gender || "-"}</p></div>
