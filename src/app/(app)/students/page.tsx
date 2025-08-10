@@ -154,17 +154,17 @@ export default function StudentsPage() {
   const [allParents, setAllParents] = useState<ParentMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
-  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen = useState(false);
-  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen = useState(false);
-  const [isViewStudentDialogOpen, setIsViewStudentDialogOpen = useState(false);
-  const [selectedStudent, setSelectedStudent = useState<Student | null>(null);
-  const [selectedStudentForView, setSelectedStudentForView = useState<Student | null>(null);
-  const [teacherResponsibleClassIds, setTeacherResponsibleClassIds = useState<string[] | null>(null);
+  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
+  const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudentForView, setSelectedStudentForView] = useState<Student | null>(null);
+  const [teacherResponsibleClassIds, setTeacherResponsibleClassIds] = useState<string[] | null>(null);
 
-  const [searchTerm, setSearchTerm = useState("");
-  const [selectedClassFilter, setSelectedClassFilter = useState<string>("all");
-  const [currentPage, setCurrentPage = useState(1);
-  const [isExporting, setIsExporting = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
@@ -470,7 +470,7 @@ export default function StudentsPage() {
 
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Siswa Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
-      setIsAddStudentDialogOpen = useState(false);
+      setIsAddStudentDialogOpen(false);
       addStudentForm.reset({ name: "", nisn: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents();
     } catch (error: any) {
@@ -520,7 +520,7 @@ export default function StudentsPage() {
       await updateDoc(studentDocRef, updateData);
 
       toast({ title: "Data Siswa Diperbarui", description: `${data.name} berhasil diperbarui.` });
-      setIsEditStudentDialogOpen = useState(false);
+      setIsEditStudentDialogOpen(false);
       setSelectedStudent(null);
       fetchStudents();
     } catch (error) {
@@ -600,7 +600,7 @@ export default function StudentsPage() {
 
   const openViewStudentDialog = (student: Student) => {
     setSelectedStudentForView(student);
-    setIsViewStudentDialogOpen = useState(true);
+    setIsViewStudentDialogOpen(true);
   };
 
   const openEditDialog = (student: Student) => {
@@ -611,7 +611,7 @@ export default function StudentsPage() {
       fetchInitialDropdownAndTeacherData();
     }
     setSelectedStudent(student);
-    setIsEditStudentDialogOpen = useState(true);
+    setIsEditStudentDialogOpen(true);
   };
 
   const openDeleteDialog = (student: Student) => {
@@ -841,7 +841,7 @@ export default function StudentsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Dialog open={isAddStudentDialogOpen} onOpenChange={(isOpen) => {
-        setIsAddStudentDialogOpen = useState(isOpen);
+        setIsAddStudentDialogOpen(isOpen);
         if (!isOpen) { addStudentForm.reset({ name: "", nisn: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined }); addStudentForm.clearErrors(); }
       }}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
@@ -1060,8 +1060,8 @@ export default function StudentsPage() {
       </Dialog>
       
       <Dialog open={isViewStudentDialogOpen} onOpenChange={(isOpen) => {
-          setIsViewStudentDialogOpen = useState(isOpen);
-          if (!isOpen) { setSelectedStudentForView(null); }
+        setIsViewStudentDialogOpen(isOpen);
+        if (!isOpen) { setSelectedStudentForView(null); }
       }}>
         <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl">
             <DialogHeader><DialogTitle>Detail Siswa: {selectedStudentForView?.name}</DialogTitle><DialogDescription>Informasi lengkap mengenai siswa.</DialogDescription></DialogHeader>
@@ -1087,7 +1087,7 @@ export default function StudentsPage() {
 
       {authRole === 'admin' && (
         <Dialog open={isEditStudentDialogOpen} onOpenChange={(isOpen) => {
-            setIsEditStudentDialogOpen = useState(isOpen);
+            setIsEditStudentDialogOpen(isOpen);
             if (!isOpen) {
               setSelectedStudent(null);
               editStudentForm.clearErrors();
@@ -1100,7 +1100,7 @@ export default function StudentsPage() {
                 <Input type="hidden" {...editStudentForm.register("id")} />
                 <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">{renderStudentFormFields(editStudentForm, 'edit')}</div>
                 <DialogFooter className="pt-4 border-t mt-auto">
-                   <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen = useState(false); setSelectedStudent(null); }}>Batal</Button></DialogClose>
+                   <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button></DialogClose>
                   <Button form="editStudentDialogForm" type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingInitialData}>
                     {(editStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
                     {(editStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Perubahan"}
@@ -1114,5 +1114,3 @@ export default function StudentsPage() {
     </div>
   );
 }
-
-    
