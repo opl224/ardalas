@@ -129,7 +129,7 @@ const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha
 const baseStudentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
-  nisn: z.string().min(10, { message: "NISN harus 10 digit." }).max(10, { message: "NISN harus 10 digit." }).optional().or(z.literal("")),
+  nisn: z.string().min(10, { message: "NISN harus 10 digit." }).max(10, { message: "NISN harus 10 digit." }),
   classId: z.string({ required_error: "Pilih kelas." }),
   dateOfBirth: z.date().optional(),
   gender: z.enum(GENDERS).optional(),
@@ -640,7 +640,7 @@ export default function StudentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-nisn`}>NISN</Label>
+        <Label htmlFor={`${formType}-student-nisn`}>NISN <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-student-nisn`} {...formInstance.register("nisn")} className="mt-1" placeholder="Nomor Induk Siswa Nasional"/>
         {formInstance.formState.errors.nisn && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nisn.message}</p>
