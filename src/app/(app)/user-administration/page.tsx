@@ -100,6 +100,16 @@ interface ClassMin {
   id: string;
   name: string;
   teacherId?: string;
+  teacherName?: string; 
+}
+
+interface StudentMin {
+    id: string;
+    name: string;
+    classId?: string;
+    className?: string;
+    parentName?: string;
+    linkedParentId?: string;
 }
 
 interface User {
@@ -127,9 +137,8 @@ const baseUserSchema = z.object({
   teacherProfileId: z.string().optional(),
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }).optional(),
   email: z.string().email({ message: "Format email tidak valid." }).optional(),
-  nis: z.string().min(5, {message: "NIS minimal 5 karakter."}).optional(),
   assignedClassIds: z.array(z.string()).optional(),
-  classId: z.string().optional(),
+  linkedStudentId: z.string().optional(),
 });
 
 const addUserFormSchema = baseUserSchema.extend({
@@ -142,6 +151,15 @@ const addUserFormSchema = baseUserSchema.extend({
   }, {
     message: "Pilih profil guru yang valid.",
     path: ["teacherProfileId"],
+})
+.refine(data => {
+    if (data.role === 'orangtua') {
+      return !!data.linkedStudentId;
+    }
+    return true;
+}, {
+    message: "Pilih siswa yang akan dihubungkan.",
+    path: ["linkedStudentId"],
 })
 .refine(data => {
     if (data.role !== 'guru') {
@@ -171,14 +189,6 @@ const editUserFormSchema = baseUserSchema.extend({
   }, {
     message: "Guru harus memiliki setidaknya satu kelas yang ditugaskan.",
     path: ["assignedClassIds"],
-}).refine(data => {
-    if (data.role === 'siswa') {
-      return !!data.classId;
-    }
-    return true;
-  }, {
-    message: "Siswa harus memiliki satu kelas yang ditetapkan.",
-    path: ["classId"],
 });
 type EditUserFormValues = z.infer<typeof editUserFormSchema>;
 
@@ -188,6 +198,7 @@ export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [unlinkedTeachers, setUnlinkedTeachers] = useState<TeacherProfile[]>([]);
+  const [unlinkedStudents, setUnlinkedStudents] = useState<StudentMin[]>([]);
 
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
@@ -217,7 +228,6 @@ export default function UserAdministrationPage() {
     resolver: zodResolver(editUserFormSchema),
     defaultValues: {
         assignedClassIds: [],
-        classId: undefined,
     }
   });
 
@@ -225,16 +235,31 @@ export default function UserAdministrationPage() {
     setIsLoadingInitialData(true);
     try {
         const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
-        setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, teacherId: doc.data().teacherId })));
+        const classesData = classesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClassMin));
+        setAllClasses(classesData);
 
         const teachersSnapshot = await getDocs(query(collection(db, "teachers"), orderBy("name")));
         const allTeacherProfiles = teachersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherProfile));
         
-        const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "guru")));
-        const linkedTeacherUids = new Set(usersSnapshot.docs.map(doc => doc.data().uid));
+        const usersSnapshot = await getDocs(query(collection(db, "users")));
+        const allUsers = usersSnapshot.docs.map(doc => doc.data());
         
+        const linkedTeacherUids = new Set(allUsers.filter(u => u.role === 'guru').map(u => u.uid));
         const teachersWithoutAccount = allTeacherProfiles.filter(teacher => !teacher.uid || !linkedTeacherUids.has(teacher.uid));
         setUnlinkedTeachers(teachersWithoutAccount);
+
+        const allStudents = allUsers.filter(u => u.role === 'siswa').map(u => ({
+            id: u.uid,
+            name: u.name,
+            classId: u.classId,
+            className: u.className,
+            parentName: u.parentName,
+            linkedParentId: u.linkedParentId,
+        } as StudentMin));
+
+        const studentsWithoutParents = allStudents.filter(student => !student.linkedParentId);
+        setUnlinkedStudents(studentsWithoutParents);
+
     } catch (error) {
         console.error("Error fetching initial data: ", error);
         toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
@@ -282,6 +307,7 @@ export default function UserAdministrationPage() {
   const watchAddUserRole = addUserForm.watch("role");
   const watchEditUserRole = editUserForm.watch("role");
   const watchTeacherProfileId = addUserForm.watch("teacherProfileId");
+  const watchLinkedStudentId = addUserForm.watch("linkedStudentId");
 
 
   useEffect(() => {
@@ -301,15 +327,16 @@ export default function UserAdministrationPage() {
         if (!addUserForm.formState.dirtyFields.email) addUserForm.setValue("email", undefined);
         addUserForm.setValue("assignedClassIds", []);
     }
+    
+    if (watchAddUserRole !== 'orangtua') {
+      addUserForm.setValue("linkedStudentId", undefined);
+    }
 
   }, [watchAddUserRole, watchTeacherProfileId, addUserForm, unlinkedTeachers, allClasses]);
 
   useEffect(() => {
     if (watchEditUserRole !== 'guru') {
       editUserForm.setValue("assignedClassIds", []);
-    }
-    if (watchEditUserRole === 'guru') { // If role is changed to guru, clear classId
-      editUserForm.setValue("classId", undefined);
     }
   }, [watchEditUserRole, editUserForm]);
 
@@ -321,7 +348,6 @@ export default function UserAdministrationPage() {
         email: selectedUser.email,
         role: selectedUser.role,
         assignedClassIds: selectedUser.assignedClassIds || [],
-        classId: selectedUser.classId || undefined,
       });
     }
   }, [selectedUser, isEditUserDialogOpen, editUserForm]);
@@ -355,15 +381,19 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru') {
         userData.assignedClassIds = data.assignedClassIds || [];
+        if(data.teacherProfileId) {
+            const teacherDocRef = doc(db, "teachers", data.teacherProfileId);
+            await updateDoc(teacherDocRef, { uid: newAuthUser.uid });
+        }
+      }
+      
+      if (data.role === 'orangtua' && data.linkedStudentId) {
+          const studentDocRef = doc(db, "users", data.linkedStudentId);
+          await updateDoc(studentDocRef, { linkedParentId: newAuthUser.uid });
+          userData.linkedStudentId = data.linkedStudentId;
       }
 
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
-      
-      if(data.role === 'guru' && data.teacherProfileId) {
-        const teacherDocRef = doc(db, "teachers", data.teacherProfileId);
-        await updateDoc(teacherDocRef, { uid: newAuthUser.uid });
-      }
-
 
       toast({ title: "Pengguna Ditambahkan", description: `${finalName} berhasil ditambahkan.` });
       setIsAddUserDialogOpen(false);
@@ -402,20 +432,8 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru') {
         updateData.assignedClassIds = data.assignedClassIds || [];
-        updateData.classId = deleteField();
-        updateData.className = deleteField();
       } else {
         updateData.assignedClassIds = deleteField();
-      }
-
-      if (data.role === 'siswa' && data.classId) {
-        const selectedClass = allClasses.find(c => c.id === data.classId);
-        updateData.classId = data.classId;
-        updateData.className = selectedClass?.name || "";
-        updateData.assignedClassIds = deleteField();
-      } else if (data.role !== 'guru') {
-        updateData.classId = deleteField();
-        updateData.className = deleteField();
       }
 
       await updateDoc(userDocRef, updateData);
@@ -544,6 +562,8 @@ export default function UserAdministrationPage() {
   };
 
   const isGuruSelectedWithNoClasses = watchAddUserRole === 'guru' && watchTeacherProfileId && (addUserForm.getValues("assignedClassIds") || []).length === 0;
+  const selectedStudentData = unlinkedStudents.find(s => s.id === watchLinkedStudentId);
+  const selectedStudentClassInfo = selectedStudentData ? allClasses.find(c => c.id === selectedStudentData.classId) : null;
 
   return (
     <div className="space-y-6">
@@ -560,7 +580,7 @@ export default function UserAdministrationPage() {
           <Dialog open={isAddUserDialogOpen} onOpenChange={(isOpen) => {
             setIsAddUserDialogOpen(isOpen);
             if (!isOpen) {
-                addUserForm.reset({ role: "guru", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [] });
+                addUserForm.reset({ role: "guru", password: "", name: undefined, email: undefined, teacherProfileId: undefined, assignedClassIds: [], linkedStudentId: undefined });
                 setShowPassword(false);
                 addUserForm.clearErrors();
             }
@@ -625,12 +645,11 @@ export default function UserAdministrationPage() {
                           <Input id="email-guru" type="email" {...addUserForm.register("email")} className="mt-1 bg-muted/50" disabled />
                         </div>
                          {renderClassAssignmentField(addUserForm, watchAddUserRole)}
-
                     </>
                 ) : (
                     <>
                         <div>
-                          <Label htmlFor="name">Nama Lengkap<span className="text-destructive">*</span></Label>
+                          <Label htmlFor="name">Nama Orang Tua<span className="text-destructive">*</span></Label>
                           <Input id="name" {...addUserForm.register("name")} className="mt-1" />
                           {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
                         </div>
@@ -640,6 +659,35 @@ export default function UserAdministrationPage() {
                           {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
                         </div>
                     </>
+                )}
+
+                {watchAddUserRole === 'orangtua' && (
+                  <>
+                    <div>
+                      <Label htmlFor="linkedStudentId">Tautkan ke Siswa<span className="text-destructive">*</span></Label>
+                      <Controller name="linkedStudentId" control={addUserForm.control} render={({ field }) => (
+                          <Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoadingInitialData}>
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder={isLoadingInitialData ? "Memuat..." : "Pilih Siswa"}/>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {isLoadingInitialData && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                                {unlinkedStudents.length === 0 && !isLoadingInitialData && <SelectItem value="no-students" disabled>Tidak ada siswa tanpa orang tua.</SelectItem>}
+                                {unlinkedStudents.map(s => <SelectItem key={s.id} value={s.id}>{s.name} ({s.className || 'Tanpa Kelas'})</SelectItem>)}
+                              </SelectContent>
+                          </Select>
+                      )} />
+                      {addUserForm.formState.errors.linkedStudentId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.linkedStudentId.message}</p>}
+                    </div>
+                    {selectedStudentData && (
+                      <div className="space-y-2 mt-2 p-3 border rounded-md bg-muted/50 text-sm">
+                        <h4 className="font-semibold text-muted-foreground">Info Siswa Terpilih:</h4>
+                        <p><span className="font-medium">Nama:</span> {selectedStudentData.name}</p>
+                        <p><span className="font-medium">Kelas:</span> {selectedStudentClassInfo?.name || 'Belum ada kelas'}</p>
+                        <p><span className="font-medium">Wali Kelas:</span> {selectedStudentClassInfo?.teacherName || 'Belum ada wali kelas'}</p>
+                      </div>
+                    )}
+                  </>
                 )}
 
 
@@ -751,10 +799,8 @@ export default function UserAdministrationPage() {
                       {!isMobile && <TableCell className="truncate" title={user.email}>{user.email || "-"}</TableCell>}
                       <TableCell>{roleDisplayNames[user.role as keyof typeof roleDisplayNames] || user.role}</TableCell>
                       {!isMobile && (
-                        <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.className || user.classId || '-'}>
-                          {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) :
-                           user.className || user.classId || '-'
-                          }
+                        <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : ''}>
+                          {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : '-'}
                         </TableCell>
                       )}
                       <TableCell className="text-center">
@@ -855,12 +901,6 @@ export default function UserAdministrationPage() {
                             <p className="font-medium">{renderAssignedClassesForTeacher(selectedUser.assignedClassIds) || "Tidak ada kelas ditugaskan"}</p>
                         </div>
                     )}
-                    {selectedUser.role === 'siswa' && (
-                        <div>
-                            <Label className="text-muted-foreground">Kelas Siswa:</Label>
-                            <p className="font-medium">{selectedUser.className || selectedUser.classId || "Belum ada kelas"}</p>
-                        </div>
-                    )}
                     {selectedUser.createdAt && (
                        <div>
                           <Label className="text-muted-foreground">Tanggal Dibuat:</Label>
@@ -882,7 +922,7 @@ export default function UserAdministrationPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Pengguna</DialogTitle>
-            <DialogDescription>Perbarui detail pengguna. Tetapkan kelas jika peran adalah Guru atau Siswa.</DialogDescription>
+            <DialogDescription>Perbarui detail pengguna. Tetapkan kelas jika peran adalah Guru.</DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <Form {...editUserForm}>
@@ -906,7 +946,7 @@ export default function UserAdministrationPage() {
                     render={({ field }) => (
                         <Select onValueChange={(value) => {
                             field.onChange(value as Role);
-                            editUserForm.trigger(["assignedClassIds", "classId"]);
+                            editUserForm.trigger(["assignedClassIds"]);
                         }} value={field.value}>
                             <SelectTrigger id="edit-role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
                             <SelectContent>
