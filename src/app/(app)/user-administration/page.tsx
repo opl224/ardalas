@@ -500,8 +500,8 @@ export default function UserAdministrationPage() {
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
       const matchesSearchTerm = searchTerm === "" ||
-                                user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                user.email.toLowerCase().includes(searchTerm.toLowerCase());
+                                (user.name && user.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                                (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesRoleFilter = roleFilter.length === 0 || roleFilter.includes(user.role);
       return matchesSearchTerm && matchesRoleFilter;
     });
@@ -972,3 +972,4 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
