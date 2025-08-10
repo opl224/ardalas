@@ -492,8 +492,6 @@ export default function UserAdministrationPage() {
   }
 
   const renderClassAssignmentField = (formInstance: ReturnType<typeof useForm<any>>, currentRole: Role | undefined) => {
-    const noClassesAvailable = !isLoadingInitialData && allClasses.length === 0;
-
     if (currentRole === 'guru') {
       const selectedClasses = formInstance.watch("assignedClassIds") || [];
       const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
@@ -577,16 +575,15 @@ export default function UserAdministrationPage() {
   
   const AddUserParentFields = () => {
     const linkedStudentId = addUserForm.watch('linkedStudentId');
-
     const selectedStudent = useMemo(() => {
         if (!linkedStudentId) return null;
         return unlinkedStudents.find(s => s.id === linkedStudentId) || null;
-    }, [linkedStudentId, unlinkedStudents]);
+    }, [linkedStudentId]);
 
     const selectedClass = useMemo(() => {
         if (!selectedStudent || !selectedStudent.classId) return null;
         return allClasses.find(c => c.id === selectedStudent.classId) || null;
-    }, [selectedStudent, allClasses]);
+    }, [selectedStudent]);
 
     return (
         <>
@@ -1008,5 +1005,6 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
 
 
