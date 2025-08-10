@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,7 +107,7 @@ interface ParentMin {
 interface Student {
   id: string;
   name: string;
-  nis?: string;
+  nisn?: string;
   email?: string;
   classId: string;
   className?: string;
@@ -127,7 +126,7 @@ const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha
 
 const baseStudentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
+  nisn: z.string().min(5, { message: "NISN minimal 5 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   classId: z.string({ required_error: "Pilih kelas." }),
   dateOfBirth: z.date().optional(),
@@ -155,17 +154,17 @@ export default function StudentsPage() {
   const [allParents, setAllParents] = useState<ParentMin[]>([]);
   const [isLoadingStudents, setIsLoadingStudents] = useState(true);
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
-  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
-  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
-  const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [selectedStudentForView, setSelectedStudentForView] = useState<Student | null>(null);
-  const [teacherResponsibleClassIds, setTeacherResponsibleClassIds] = useState<string[] | null>(null);
+  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen = useState(false);
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen = useState(false);
+  const [isViewStudentDialogOpen, setIsViewStudentDialogOpen = useState(false);
+  const [selectedStudent, setSelectedStudent = useState<Student | null>(null);
+  const [selectedStudentForView, setSelectedStudentForView = useState<Student | null>(null);
+  const [teacherResponsibleClassIds, setTeacherResponsibleClassIds = useState<string[] | null>(null);
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isExporting, setIsExporting] = useState(false);
+  const [searchTerm, setSearchTerm = useState("");
+  const [selectedClassFilter, setSelectedClassFilter = useState<string>("all");
+  const [currentPage, setCurrentPage = useState(1);
+  const [isExporting, setIsExporting = useState(false);
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
@@ -174,7 +173,7 @@ export default function StudentsPage() {
     resolver: zodResolver(studentFormSchema),
     defaultValues: {
       name: "",
-      nis: "",
+      nisn: "",
       email: "",
       classId: undefined,
       dateOfBirth: undefined,
@@ -190,7 +189,7 @@ export default function StudentsPage() {
     resolver: zodResolver(editStudentFormSchema),
     defaultValues: {
       name: "",
-      nis: "",
+      nisn: "",
       email: "",
       classId: undefined,
       dateOfBirth: undefined,
@@ -344,7 +343,7 @@ export default function StudentsPage() {
       editStudentForm.reset({
         id: selectedStudent.id,
         name: selectedStudent.name,
-        nis: selectedStudent.nis || "",
+        nisn: selectedStudent.nisn || "",
         email: selectedStudent.email || "",
         classId: selectedStudent.classId,
         dateOfBirth: selectedStudent.dateOfBirth ? selectedStudent.dateOfBirth.toDate() : undefined,
@@ -364,7 +363,7 @@ export default function StudentsPage() {
       const lowerSearchTerm = searchTerm.toLowerCase();
       filtered = filtered.filter(student =>
         student.name.toLowerCase().includes(lowerSearchTerm) ||
-        (student.nis && student.nis.toLowerCase().includes(lowerSearchTerm)) ||
+        (student.nisn && student.nisn.toLowerCase().includes(lowerSearchTerm)) ||
         (student.email && student.email.toLowerCase().includes(lowerSearchTerm))
       );
     }
@@ -454,7 +453,7 @@ export default function StudentsPage() {
     try {
       const studentDataForUsersCollection: any = {
         name: data.name,
-        nis: data.nis,
+        nisn: data.nisn,
         email: data.email || null,
         classId: selectedClassObj.id,
         className: selectedClassObj.name,
@@ -471,8 +470,8 @@ export default function StudentsPage() {
 
       await addDoc(collection(db, "users"), studentDataForUsersCollection);
       toast({ title: "Siswa Ditambahkan ke Profil", description: `${data.name} berhasil ditambahkan ke daftar profil.` });
-      setIsAddStudentDialogOpen(false);
-      addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
+      setIsAddStudentDialogOpen = useState(false);
+      addStudentForm.reset({ name: "", nisn: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined });
       fetchStudents();
     } catch (error: any) {
       console.error("Error adding student:", error);
@@ -505,7 +504,7 @@ export default function StudentsPage() {
       const studentDocRef = doc(db, "users", selectedStudent.id);
       const updateData: any = {
         name: data.name,
-        nis: data.nis,
+        nisn: data.nisn,
         email: data.email || null,
         classId: data.classId,
         className: selectedClass.name,
@@ -521,7 +520,7 @@ export default function StudentsPage() {
       await updateDoc(studentDocRef, updateData);
 
       toast({ title: "Data Siswa Diperbarui", description: `${data.name} berhasil diperbarui.` });
-      setIsEditStudentDialogOpen(false);
+      setIsEditStudentDialogOpen = useState(false);
       setSelectedStudent(null);
       fetchStudents();
     } catch (error) {
@@ -554,8 +553,8 @@ export default function StudentsPage() {
 
   const handleExport = async (formatType: 'pdf' | 'xlsx') => {
     if (displayedStudents.length === 0) {
-      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
-      return;
+        toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
+        return;
     }
     setIsExporting(true);
 
@@ -565,7 +564,7 @@ export default function StudentsPage() {
     const dataToExport = displayedStudents.map((student, index) => ({
       "No.": index + 1,
       "Nama Siswa": student.name,
-      "NIS": student.nis || '-',
+      "NISN": student.nisn || '-',
       "Email": student.email || '-',
       "Kelas": student.className || '-',
       "Orang Tua": student.parentName || '-',
@@ -601,7 +600,7 @@ export default function StudentsPage() {
 
   const openViewStudentDialog = (student: Student) => {
     setSelectedStudentForView(student);
-    setIsViewStudentDialogOpen(true);
+    setIsViewStudentDialogOpen = useState(true);
   };
 
   const openEditDialog = (student: Student) => {
@@ -612,7 +611,7 @@ export default function StudentsPage() {
       fetchInitialDropdownAndTeacherData();
     }
     setSelectedStudent(student);
-    setIsEditStudentDialogOpen(true);
+    setIsEditStudentDialogOpen = useState(true);
   };
 
   const openDeleteDialog = (student: Student) => {
@@ -632,10 +631,10 @@ export default function StudentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-student-nis`}>NIS <span className="text-destructive">*</span></Label>
-        <Input id={`${formType}-student-nis`} {...formInstance.register("nis")} className="mt-1" />
-        {formInstance.formState.errors.nis && (
-          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nis.message}</p>
+        <Label htmlFor={`${formType}-student-nisn`}>NISN <span className="text-destructive">*</span></Label>
+        <Input id={`${formType}-student-nisn`} {...formInstance.register("nisn")} className="mt-1" />
+        {formInstance.formState.errors.nisn && (
+          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.nisn.message}</p>
         )}
       </div>
       <div>
@@ -842,8 +841,8 @@ export default function StudentsPage() {
         <p className="text-muted-foreground">{pageDescription}</p>
       </div>
       <Dialog open={isAddStudentDialogOpen} onOpenChange={(isOpen) => {
-        setIsAddStudentDialogOpen(isOpen);
-        if (!isOpen) { addStudentForm.reset({ name: "", nis: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined }); addStudentForm.clearErrors(); }
+        setIsAddStudentDialogOpen = useState(isOpen);
+        if (!isOpen) { addStudentForm.reset({ name: "", nisn: "", email: "", classId: undefined, dateOfBirth: undefined, gender: undefined, agama: undefined, address: "", linkedParentId: undefined, attendanceNumber: undefined }); addStudentForm.clearErrors(); }
       }}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardHeader className="pb-4">
@@ -888,7 +887,7 @@ export default function StudentsPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Cari nama, NIS, atau email..."
+                    placeholder="Cari nama, NISN, atau email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-8 w-full"
@@ -936,7 +935,7 @@ export default function StudentsPage() {
                           <TableHead className={cn((authRole === 'admin' || authRole === 'guru') ? "w-1/4" : "w-1/2")}>Nama</TableHead>
                           {(authRole === 'admin' || authRole === 'guru') && (
                             <>
-                              <TableHead className="w-1/5">NIS</TableHead>
+                              <TableHead className="w-1/5">NISN</TableHead>
                               <TableHead className="w-1/4">Email</TableHead>
                             </>
                           )}
@@ -971,7 +970,7 @@ export default function StudentsPage() {
                                         <DropdownMenuSeparator />
                                         <AlertDialog>
                                           <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                          {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data siswa <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                          {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data siswa <span className="font-semibold"> {selectedStudent?.name} </span> (NISN: {selectedStudent?.nisn || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                                         </AlertDialog>
                                     </>
                                     )}
@@ -985,7 +984,7 @@ export default function StudentsPage() {
                             <TableCell className="font-medium truncate" title={student.name}>{student.name}</TableCell>
                             {(authRole === 'admin' || authRole === 'guru') && (
                               <>
-                                <TableCell className="truncate" title={student.nis}>{student.nis || "-"}</TableCell>
+                                <TableCell className="truncate" title={student.nisn}>{student.nisn || "-"}</TableCell>
                                 <TableCell className="truncate" title={student.email}>{student.email || "-"}</TableCell>
                               </>
                             )}
@@ -1013,7 +1012,7 @@ export default function StudentsPage() {
                                             <DropdownMenuSeparator />
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(student); }} className="text-destructive focus:bg-destructive/10 focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
-                                                {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data siswa <span className="font-semibold"> {selectedStudent?.name} </span> (NIS: {selectedStudent?.nis || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
+                                                {selectedStudent && selectedStudent.id === student.id && (<AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle><AlertDialogDescription>Tindakan ini akan menghapus data siswa <span className="font-semibold"> {selectedStudent?.name} </span> (NISN: {selectedStudent?.nisn || 'N/A'}). Data yang dihapus tidak dapat dikembalikan.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedStudent(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteStudent(selectedStudent.id, selectedStudent.name)}>Ya, Hapus Data</AlertDialogAction></AlertDialogFooter></AlertDialogContent>)}
                                             </AlertDialog>
                                         </>
                                       )}
@@ -1061,7 +1060,7 @@ export default function StudentsPage() {
       </Dialog>
       
       <Dialog open={isViewStudentDialogOpen} onOpenChange={(isOpen) => {
-          setIsViewStudentDialogOpen(isOpen);
+          setIsViewStudentDialogOpen = useState(isOpen);
           if (!isOpen) { setSelectedStudentForView(null); }
       }}>
         <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl">
@@ -1069,7 +1068,7 @@ export default function StudentsPage() {
             {selectedStudentForView && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4 py-4 text-sm overflow-y-auto flex-1 pr-2">
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedStudentForView.name}</p></div>
-                    <div><Label className="text-muted-foreground">NIS:</Label><p className="font-medium">{selectedStudentForView.nis || "-"}</p></div>
+                    <div><Label className="text-muted-foreground">NISN:</Label><p className="font-medium">{selectedStudentForView.nisn || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedStudentForView.email || "-"}</p></div>
                     <div><Label className="text-muted-foreground">Kelas:</Label><p className="font-medium">{selectedStudentForView.className || selectedStudentForView.classId}</p></div>
                     <div><Label className="text-muted-foreground">Tanggal Lahir:</Label><p className="font-medium">{selectedStudentForView.dateOfBirth ? format(selectedStudentForView.dateOfBirth.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale }) : "-"}</p></div>
@@ -1088,7 +1087,7 @@ export default function StudentsPage() {
 
       {authRole === 'admin' && (
         <Dialog open={isEditStudentDialogOpen} onOpenChange={(isOpen) => {
-            setIsEditStudentDialogOpen(isOpen);
+            setIsEditStudentDialogOpen = useState(isOpen);
             if (!isOpen) {
               setSelectedStudent(null);
               editStudentForm.clearErrors();
@@ -1101,7 +1100,7 @@ export default function StudentsPage() {
                 <Input type="hidden" {...editStudentForm.register("id")} />
                 <div className="space-y-4 py-4 pr-2 overflow-y-auto flex-1">{renderStudentFormFields(editStudentForm, 'edit')}</div>
                 <DialogFooter className="pt-4 border-t mt-auto">
-                   <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen(false); setSelectedStudent(null); }}>Batal</Button></DialogClose>
+                   <DialogClose asChild><Button type="button" variant="outline" onClick={() => { setIsEditStudentDialogOpen = useState(false); setSelectedStudent(null); }}>Batal</Button></DialogClose>
                   <Button form="editStudentDialogForm" type="submit" disabled={editStudentForm.formState.isSubmitting || isLoadingInitialData}>
                     {(editStudentForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
                     {(editStudentForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Perubahan"}
@@ -1115,3 +1114,5 @@ export default function StudentsPage() {
     </div>
   );
 }
+
+    
