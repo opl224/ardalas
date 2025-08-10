@@ -146,12 +146,11 @@ const addUserFormSchema = baseUserSchema.extend({
     path: ["teacherProfileId"],
 }).refine(data => {
     if (data.role === 'guru') {
-        return data.assignedClassIds && data.assignedClassIds.length > 0;
+        const hasClasses = data.assignedClassIds && data.assignedClassIds.length > 0;
+        // This check is now mainly for UI, backend logic will handle this better
+        return true; 
     }
     return true;
-}, {
-    message: "Guru yang dipilih harus memiliki setidaknya satu kelas yang diajar.",
-    path: ["assignedClassIds"],
 })
 .refine(data => {
     if (data.role !== 'guru') {
@@ -310,7 +309,7 @@ export default function UserAdministrationPage() {
             addUserForm.setValue("assignedClassIds", uniqueClassIds);
             addUserForm.trigger("assignedClassIds");
         }
-    } else {
+    } else if (watchAddUserRole !== 'guru') {
         if (!addUserForm.formState.dirtyFields.name) addUserForm.setValue("name", undefined);
         if (!addUserForm.formState.dirtyFields.email) addUserForm.setValue("email", undefined);
         addUserForm.setValue("assignedClassIds", []);
@@ -493,64 +492,10 @@ export default function UserAdministrationPage() {
       const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
       return (
         <div>
-          <Label>Kelas yang Ditugaskan <span className="text-destructive">*</span></Label>
-          {isLoadingInitialData ? (
-            <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
-          ) : noClassesAvailable ? (
-            <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
-            </div>
-          ) : (
-            <FormField
-              control={formInstance.control}
-              name="assignedClassIds"
-              render={({ field }) => (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className="w-full justify-between mt-1" disabled={watchAddUserRole === 'guru' && !!watchTeacherProfileId} >
-                      <span className="truncate">
-                        {selectedClassNames.length > 0 ? selectedClassNames.join(", ") : "Pilih kelas..."}
-                      </span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Cari kelas..." />
-                      <CommandList>
-                        <CommandEmpty>Tidak ada kelas ditemukan.</CommandEmpty>
-                        <CommandGroup>
-                          {allClasses.map((cls) => (
-                            <CommandItem key={cls.id} value={cls.name} onSelect={() => {
-                                const currentValue = field.value || [];
-                                const isSelected = currentValue.includes(cls.id);
-                                if (isSelected) {
-                                  field.onChange(currentValue.filter((id) => id !== cls.id));
-                                } else {
-                                  field.onChange([...currentValue, cls.id]);
-                                }
-                              }}
-                            >
-                              <Checkbox className="mr-2" checked={field.value?.includes(cls.id)} onCheckedChange={(checked) => {
-                                  const currentValue = field.value || [];
-                                  return checked ? field.onChange([...currentValue, cls.id]) : field.onChange(currentValue.filter((value) => value !== cls.id));
-                                }}
-                              />
-                              {cls.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              )}
-            />
-          )}
-          {(formInstance.formState.errors as any).assignedClassIds && (
-            <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).assignedClassIds.message}</p>
-          )}
+          <Label>Kelas yang Ditugaskan</Label>
+          <div className="mt-1 p-2 border rounded-md bg-muted/50 min-h-[40px]">
+            {isLoadingInitialData ? 'Memuat kelas...' : (selectedClassNames.length > 0 ? selectedClassNames.join(', ') : 'Tidak ada kelas ditugaskan.')}
+          </div>
         </div>
       );
     } else if (currentRole === 'siswa') {
