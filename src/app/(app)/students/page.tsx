@@ -454,13 +454,17 @@ export default function StudentsPage() {
     const selectedParent = data.linkedParentId ? allParents.find(p => p.id === data.linkedParentId) : undefined;
 
     try {
+      // Create a document reference with a new auto-generated ID in 'students' collection first.
+      const newStudentDocRef = doc(collection(db, "students"));
+      const newStudentId = newStudentDocRef.id;
+
       const studentData = {
         name: data.name,
         nis: data.nis,
         nisn: data.nisn || null,
         classId: selectedClassObj.id,
         className: selectedClassObj.name,
-        role: 'siswa',
+        role: 'siswa', // Keep role for user collection consistency
         createdAt: serverTimestamp(),
         dateOfBirth: data.dateOfBirth ? Timestamp.fromDate(startOfDay(data.dateOfBirth)) : null,
         gender: data.gender || null,
@@ -469,14 +473,18 @@ export default function StudentsPage() {
         linkedParentId: data.linkedParentId || null,
         parentName: selectedParent?.name || null,
         attendanceNumber: data.attendanceNumber != null && !isNaN(data.attendanceNumber) ? data.attendanceNumber : null,
+        // The UID for the 'users' collection will be the same as the doc ID from 'students'
+        uid: newStudentId, 
       };
 
       const batch = writeBatch(db);
-      const newUserDocRef = doc(collection(db, "users"));
-      batch.set(newUserDocRef, studentData);
-
-      const newStudentDocRef = doc(collection(db, "students"));
+      
+      // Set the data in 'students' collection with the pre-generated ID
       batch.set(newStudentDocRef, studentData);
+
+      // Set the data in 'users' collection using the same ID
+      const newUserDocRef = doc(db, "users", newStudentId);
+      batch.set(newUserDocRef, studentData);
       
       await batch.commit();
 
