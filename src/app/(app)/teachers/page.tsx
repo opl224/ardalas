@@ -254,7 +254,7 @@ export default function TeachersPage() {
     addTeacherForm.clearErrors();
     try {
       const teachersCollectionRef = collection(db, "teachers");
-      const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.authUserId);
+      // For adding, we no longer need to check for selectedTeacher as we are not linking it here.
       await addDoc(teachersCollectionRef, {
         name: data.name,
         email: data.email,
@@ -264,7 +264,7 @@ export default function TeachersPage() {
         phone: data.phone || null,
         gender: data.gender,
         agama: data.agama || null,
-        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, 
+        uid: null, // Always null on creation from this form.
         createdAt: serverTimestamp(),
       });
       
@@ -286,7 +286,7 @@ export default function TeachersPage() {
     editTeacherForm.clearErrors();
     try {
       const teacherDocRef = doc(db, "teachers", data.id);
-      const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.authUserId);
+      const selectedTeacherAuthUser = authGuruUsers.find(userAuth => userAuth.id === data.authUserId);
       await updateDoc(teacherDocRef, {
         name: data.name,
         email: data.email,
@@ -488,44 +488,46 @@ export default function TeachersPage() {
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
         )}
       </div>
-      <div>
-        <Label htmlFor={`${formType}-authUserId`}>Akun Pengguna Terkait (Firebase Auth)</Label>
-        <Controller
-          name="authUserId"
-          control={formInstance.control}
-          render={({ field }) => (
-            <Select
-              onValueChange={(value) => field.onChange(value === NO_AUTH_USER_SELECTED ? undefined : value)}
-              value={field.value || NO_AUTH_USER_SELECTED}
-              disabled={isLoadingAuthUsers}
-            >
-              <SelectTrigger id={`${formType}-authUserId`} className="mt-1">
-                <SelectValue placeholder={isLoadingAuthUsers ? "Memuat akun..." : "Pilih akun pengguna guru"} />
-              </SelectTrigger>
-              <SelectContent>
-                {isLoadingAuthUsers && <SelectItem key="loading-auth-users" value="loading" disabled>Memuat...</SelectItem>}
-                <SelectItem key="no-auth-user-option" value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Tautkan nanti</SelectItem>
-                {authGuruUsers
-                  .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
-                  .map((authUser) => (
-                  <SelectItem key={authUser.id} value={authUser.id}>
-                    {authUser.name} ({authUser.email})
-                  </SelectItem>
-                ))}
-                {!isLoadingAuthUsers && authGuruUsers.length === 0 && (
-                  <SelectItem key="no-auth-users-found" value="no-users" disabled>Tidak ada akun guru di User Admin.</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+       {formType === 'edit' && (
+        <div>
+          <Label htmlFor={`${formType}-authUserId`}>Akun Pengguna Terkait (Firebase Auth)</Label>
+          <Controller
+            name="authUserId"
+            control={formInstance.control}
+            render={({ field }) => (
+              <Select
+                onValueChange={(value) => field.onChange(value === NO_AUTH_USER_SELECTED ? undefined : value)}
+                value={field.value || NO_AUTH_USER_SELECTED}
+                disabled={isLoadingAuthUsers}
+              >
+                <SelectTrigger id={`${formType}-authUserId`} className="mt-1">
+                  <SelectValue placeholder={isLoadingAuthUsers ? "Memuat akun..." : "Pilih akun pengguna guru"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingAuthUsers && <SelectItem key="loading-auth-users" value="loading" disabled>Memuat...</SelectItem>}
+                  <SelectItem key="no-auth-user-option" value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Tautkan nanti</SelectItem>
+                  {authGuruUsers
+                    .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
+                    .map((authUser) => (
+                    <SelectItem key={authUser.id} value={authUser.id}>
+                      {authUser.name} ({authUser.email})
+                    </SelectItem>
+                  ))}
+                  {!isLoadingAuthUsers && authGuruUsers.length === 0 && (
+                    <SelectItem key="no-auth-users-found" value="no-users" disabled>Tidak ada akun guru di User Admin.</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Pilih akun pengguna yang sudah terdaftar di Administrasi Pengguna dengan peran 'Guru'.
+          </p>
+          {formInstance.formState.errors.authUserId && (
+            <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.authUserId.message}</p>
           )}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Pilih akun pengguna yang sudah terdaftar di Administrasi Pengguna dengan peran 'Guru'.
-        </p>
-        {formInstance.formState.errors.authUserId && (
-          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.authUserId.message}</p>
-        )}
-      </div>
+        </div>
+      )}
       <div>
         <Label htmlFor={`${formType}-subject`}>Mata Pelajaran Utama <span className="text-destructive">*</span></Label>
         <Controller
@@ -841,10 +843,10 @@ export default function TeachersPage() {
           </CardContent>
         </Card>
         <DialogContent className="sm:max-w-md">
-            <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Anda dapat menautkannya ke akun pengguna yang sudah ada.</DialogDescription></DialogHeader>
+            <DialogHeader><DialogTitle>Tambah Profil Guru Baru</DialogTitle><DialogDescription>Isi detail profil guru. Penautan ke akun login akan dilakukan di Administrasi Pengguna.</DialogDescription></DialogHeader>
             <form onSubmit={addTeacherForm.handleSubmit(handleAddTeacherSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
             {renderTeacherFormFields(addTeacherForm, 'add')}
-            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting || isLoadingAuthUsers}>{addTeacherForm.formState.isSubmitting || isLoadingAuthUsers ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
+            <DialogFooter><DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose><Button type="submit" disabled={addTeacherForm.formState.isSubmitting}>{addTeacherForm.formState.isSubmitting ? "Memproses..." : "Simpan Profil"}</Button></DialogFooter>
             </form>
         </DialogContent>
       </Dialog>
