@@ -98,6 +98,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 interface ClassMin {
   id: string;
   name: string;
+  teacherId?: string;
 }
 
 interface User {
@@ -113,16 +114,10 @@ interface User {
 }
 
 interface TeacherProfile {
-  id: string;
+  id: string; // Document ID from 'teachers' collection
   name: string;
   email: string;
-  uid?: string;
-}
-
-interface Lesson {
-    id: string;
-    classId: string;
-    teacherId: string;
+  uid?: string; // Auth UID, if linked
 }
 
 
@@ -145,13 +140,6 @@ const addUserFormSchema = baseUserSchema.extend({
   }, {
     message: "Pilih profil guru yang valid.",
     path: ["teacherProfileId"],
-}).refine(data => {
-    if (data.role === 'guru') {
-        const hasClasses = data.assignedClassIds && data.assignedClassIds.length > 0;
-        // This check is now mainly for UI, backend logic will handle this better
-        return true; 
-    }
-    return true;
 })
 .refine(data => {
     if (data.role !== 'guru') {
@@ -203,7 +191,6 @@ export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [unlinkedTeachers, setUnlinkedTeachers] = useState<TeacherProfile[]>([]);
-  const [allLessons, setAllLessons] = useState<Lesson[]>([]);
 
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
@@ -241,27 +228,23 @@ export default function UserAdministrationPage() {
     setIsLoadingInitialData(true);
     try {
         const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
-        setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name, teacherId: doc.data().teacherId })));
 
         const teachersSnapshot = await getDocs(query(collection(db, "teachers"), orderBy("name")));
         const allTeacherProfiles = teachersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherProfile));
         
-        const usersSnapshot = await getDocs(collection(db, "users"));
+        const usersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "guru")));
         const linkedTeacherUids = new Set(usersSnapshot.docs.map(doc => doc.data().uid));
-
-        // Filter teachers who are not linked to any user account
+        
         const teachersWithoutAccount = allTeacherProfiles.filter(teacher => !teacher.uid || !linkedTeacherUids.has(teacher.uid));
         setUnlinkedTeachers(teachersWithoutAccount);
-
-        const lessonsSnapshot = await getDocs(collection(db, "lessons"));
-        setAllLessons(lessonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Lesson)));
     } catch (error) {
         console.error("Error fetching initial data: ", error);
         toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
     } finally {
         setIsLoadingInitialData(false);
     }
-}, [toast]);
+  }, [toast]);
 
 
   const fetchUsers = async () => {
@@ -311,9 +294,9 @@ export default function UserAdministrationPage() {
             addUserForm.setValue("name", teacher.name);
             addUserForm.setValue("email", teacher.email);
 
-            const teacherLessons = allLessons.filter(l => l.teacherId === teacher.id);
-            const uniqueClassIds = [...new Set(teacherLessons.map(l => l.classId))];
-            addUserForm.setValue("assignedClassIds", uniqueClassIds);
+            const homeroomClasses = allClasses.filter(c => c.teacherId === teacher.id);
+            const classIds = homeroomClasses.map(c => c.id);
+            addUserForm.setValue("assignedClassIds", classIds);
             addUserForm.trigger("assignedClassIds");
         }
     } else if (watchAddUserRole !== 'guru') {
@@ -326,7 +309,7 @@ export default function UserAdministrationPage() {
         addUserForm.setValue("classId", undefined);
     }
 
-  }, [watchAddUserRole, watchTeacherProfileId, addUserForm, unlinkedTeachers, allLessons]);
+  }, [watchAddUserRole, watchTeacherProfileId, addUserForm, unlinkedTeachers, allClasses]);
 
   useEffect(() => {
     if (watchEditUserRole !== 'guru') {
@@ -499,16 +482,16 @@ export default function UserAdministrationPage() {
       const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
       return (
         <div>
-          <Label>Kelas yang Ditugaskan</Label>
+          <Label>Kelas Wali</Label>
           <div className="mt-1 p-2 border rounded-md bg-muted/50 min-h-[40px]">
-            {isLoadingInitialData ? 'Memuat kelas...' : (selectedClassNames.length > 0 ? selectedClassNames.join(', ') : 'Tidak ada kelas ditugaskan.')}
+            {isLoadingInitialData ? 'Memuat kelas...' : (selectedClassNames.length > 0 ? selectedClassNames.join(', ') : 'Tidak ada kelas wali.')}
           </div>
         </div>
       );
     } else if (currentRole === 'siswa') {
       return (
          <div>
-            <Label htmlFor="classId">Kelas Siswa <span className="text-destructive">*</span></Label>
+            <Label htmlFor="classId">Kelas Siswa<span className="text-destructive">*</span></Label>
             {noClassesAvailable && (
                  <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
@@ -677,7 +660,7 @@ export default function UserAdministrationPage() {
                          {isGuruSelectedWithNoClasses && (
                            <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                             <AlertCircle className="h-5 w-5" />
-                            <span>Guru ini belum memiliki jadwal pelajaran. Pengguna dapat dibuat, namun tidak ada kelas yang akan ditugaskan.</span>
+                            <span>Guru ini belum menjadi wali kelas. Pengguna dapat dibuat, namun tidak ada kelas wali yang akan ditugaskan.</span>
                            </div>
                          )}
                         
@@ -998,3 +981,4 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
