@@ -793,11 +793,11 @@ export default function LessonsPage() {
                       </div>
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-topic">Topik (Opsional)</Label>
+                    <Label htmlFor="add-lesson-topic">Topik</Label>
                     <Input id="add-lesson-topic" {...addLessonForm.register("topic")} className="mt-1" />
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-materials">Materi (Opsional)</Label>
+                    <Label htmlFor="add-lesson-materials">Materi</Label>
                     <Textarea id="add-lesson-materials" {...addLessonForm.register("materials")} className="mt-1" placeholder="Deskripsi singkat materi atau link..." />
                   </div>
                   <DialogFooter>
@@ -1066,11 +1066,11 @@ export default function LessonsPage() {
                     </div>
                 </div>
                 <div>
-                  <Label htmlFor="edit-lesson-topic">Topik (Opsional)</Label>
+                  <Label htmlFor="edit-lesson-topic">Topik</Label>
                   <Input id="edit-lesson-topic" {...editLessonForm.register("topic")} className="mt-1" />
                 </div>
                 <div>
-                  <Label htmlFor="edit-lesson-materials">Materi (Opsional)</Label>
+                  <Label htmlFor="edit-lesson-materials">Materi</Label>
                   <Textarea id="edit-lesson-materials" {...editLessonForm.register("materials")} className="mt-1" />
                 </div>
                 <DialogFooter>
