@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -252,6 +251,11 @@ export default function SubjectsPage() {
     if (role !== "admin") return;
     addSubjectForm.clearErrors();
     const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.teacherUid);
+    
+    if(!user?.uid) {
+      toast({title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive"});
+      return;
+    }
 
     try {
       const subjectsCollectionRef = collection(db, "subjects");
@@ -261,6 +265,7 @@ export default function SubjectsPage() {
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
         createdAt: serverTimestamp(),
+        uid: user.uid,
       });
 
       toast({ title: "Mata Pelajaran Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
