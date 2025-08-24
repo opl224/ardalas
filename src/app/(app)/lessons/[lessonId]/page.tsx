@@ -112,8 +112,9 @@ export default function LessonDetailPage() {
             setLesson(null);
           } else {
             setLesson(lessonData);
-            if (role === "siswa" && user?.uid && lessonData.id) {
-              fetchAttendanceStatus(user.uid, lessonData.id);
+            const studentIdToCheck = role === "siswa" ? user?.uid : user?.linkedStudentId;
+            if (studentIdToCheck && lessonData.id) {
+              fetchAttendanceStatus(studentIdToCheck, lessonData.id);
             } else {
               setIsCheckingAttendance(false);
             }
@@ -163,7 +164,7 @@ export default function LessonDetailPage() {
   };
 
   useEffect(() => {
-    if (!lesson || role !== "siswa" || isCheckingAttendance) {
+    if (!lesson || role !== "orangtua" || isCheckingAttendance) {
       setIsEligibleToAttend(false);
       setAttendanceStatusMessage(null);
       return;
@@ -207,18 +208,18 @@ export default function LessonDetailPage() {
 
 
   const handleSelfAttend = async () => {
-    if (!user || !lesson || !user.uid || !user.displayName || !user.className || !lesson.classId || !lesson.subjectName || !lesson.startTime || !lesson.endTime) {
-      toast({ title: "Aksi Gagal", description: "Data pengguna atau pelajaran tidak lengkap.", variant: "destructive" });
+    if (!user || role !== 'orangtua' || !user.linkedStudentId || !user.linkedStudentName || !user.linkedStudentClassName || !lesson || !lesson.classId || !lesson.subjectName || !lesson.startTime || !lesson.endTime) {
+      toast({ title: "Aksi Gagal", description: "Data orang tua, anak, atau pelajaran tidak lengkap.", variant: "destructive" });
       return;
     }
     if (!isEligibleToAttend || attendanceRecord) return;
 
     setIsSubmittingAttendance(true);
     const attendanceData: Omit<StudentSelfAttendanceRecord, 'id' | 'attendedAt'> & {attendedAt: any, date: any} = {
-      studentId: user.uid,
-      studentName: user.displayName,
+      studentId: user.linkedStudentId,
+      studentName: user.linkedStudentName,
       classId: lesson.classId,
-      className: user.className, 
+      className: user.linkedStudentClassName, 
       lessonId: lesson.id,
       subjectName: lesson.subjectName,
       lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
@@ -230,7 +231,7 @@ export default function LessonDetailPage() {
     try {
       const docRef = await addDoc(collection(db, "studentAttendanceRecords"), attendanceData);
       setAttendanceRecord({ ...attendanceData, id: docRef.id, attendedAt: Timestamp.now() }); 
-      toast({ title: "Kehadiran Tercatat", description: `Anda berhasil absen untuk pelajaran ${lesson.subjectName}.` });
+      toast({ title: "Kehadiran Tercatat", description: `Anak Anda, ${user.linkedStudentName}, berhasil absen untuk pelajaran ${lesson.subjectName}.` });
     } catch (error) {
       console.error("Error recording self-attendance:", error);
       toast({ title: "Gagal Absen", description: "Terjadi kesalahan. Coba lagi.", variant: "destructive" });
@@ -330,13 +331,13 @@ export default function LessonDetailPage() {
             </div>
           </div>
 
-          {role === "siswa" && !isCheckingAttendance && (
+          {role === "orangtua" && !isCheckingAttendance && (
             <div className="mt-6 p-4 border border-border rounded-md bg-background shadow">
               <h3 className="text-lg font-semibold mb-2 flex items-center">
                 {attendanceRecord ? <CheckCircle className="h-5 w-5 text-green-500 mr-2" /> : 
                  isEligibleToAttend ? <Clock className="h-5 w-5 text-blue-500 mr-2" /> :
                  <XCircle className="h-5 w-5 text-red-500 mr-2" />}
-                Status Kehadiran Hari Ini
+                Status Kehadiran Anak Hari Ini
               </h3>
               <p className="text-sm text-muted-foreground mb-3">{attendanceStatusMessage || "Memeriksa status..."}</p>
               {isEligibleToAttend && !attendanceRecord && (
@@ -346,12 +347,12 @@ export default function LessonDetailPage() {
                   className="w-full sm:w-auto"
                 >
                   {isSubmittingAttendance && <LottieLoader width={16} height={16} className="mr-2" />}
-                  {isSubmittingAttendance ? "Memproses..." : "Absen Sekarang"}
+                  {isSubmittingAttendance ? "Memproses..." : "Absenkan Anak Sekarang"}
                 </Button>
               )}
             </div>
           )}
-           {role === "siswa" && isCheckingAttendance && (
+           {(role === "orangtua" || role === "siswa") && isCheckingAttendance && (
              <div className="mt-6 p-4 border border-border rounded-md bg-background shadow flex items-center justify-center">
                 <LottieLoader width={24} height={24} className="mr-2" /> Memuat status kehadiran...
              </div>

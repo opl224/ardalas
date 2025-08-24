@@ -489,6 +489,11 @@ export default function ProfilePage() {
                             </div>
                              <DetailItem icon={Users} label="Jenis Kelamin" value={<span className="capitalize">{detailedProfileData.gender}</span>} />
                              <DetailItem icon={Milestone} label="Agama" value={detailedProfileData.agama} />
+                             <div className="pt-2 border-t sm:col-span-2 mt-2">
+                                <h4 className="font-semibold text-base mt-2">Info Anak</h4>
+                             </div>
+                             <DetailItem icon={UserIcon} label="Nama Anak" value={user.linkedStudentName} />
+                             <DetailItem icon={School} label="Kelas Anak" value={user.linkedStudentClassName} />
                           </>
                         )}
                       </div>
@@ -507,4 +512,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
