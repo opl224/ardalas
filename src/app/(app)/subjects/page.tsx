@@ -106,7 +106,8 @@ interface Subject {
 }
 
 interface TeacherWithClasses {
-  id: string; // Teacher's UID
+  id: string; // Teacher's Document ID from 'teachers' collection
+  uid: string; // Teacher's Auth UID
   name: string;
   email: string;
   classIds: string[];
@@ -123,7 +124,7 @@ const subjectFormSchema = z.object({
   name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama mata pelajaran harus dipilih." }),
   description: z.string().optional(),
   teacherUid: z.string().optional(),
-  classIds: z.array(z.string()).optional(), // Capture class IDs, but they are auto-set
+  classIds: z.array(z.string()).optional(),
 });
 type SubjectFormValues = z.infer<typeof subjectFormSchema>;
 
@@ -172,7 +173,6 @@ export default function SubjectsPage() {
     }
     setIsLoadingInitialData(true);
     try {
-      // Fetch all teachers, classes, and lessons in parallel
       const [teachersSnapshot, classesSnapshot, lessonsSnapshot] = await Promise.all([
         getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"))),
@@ -182,8 +182,21 @@ export default function SubjectsPage() {
       const classesMap = new Map(classesSnapshot.docs.map(doc => [doc.id, doc.data().name]));
       
       const teacherClassMap = new Map<string, Set<string>>();
-      lessonsSnapshot.forEach(doc => {
-        const lesson = doc.data();
+
+      // 1. Map classes from being a homeroom teacher (wali kelas)
+      classesSnapshot.forEach(classDoc => {
+        const classData = classDoc.data();
+        if (classData.teacherId) {
+           if (!teacherClassMap.has(classData.teacherId)) {
+            teacherClassMap.set(classData.teacherId, new Set());
+          }
+          teacherClassMap.get(classData.teacherId)!.add(classDoc.id);
+        }
+      });
+
+      // 2. Map classes from lessons taught
+      lessonsSnapshot.forEach(lessonDoc => {
+        const lesson = lessonDoc.data();
         if (lesson.teacherId && lesson.classId) {
           if (!teacherClassMap.has(lesson.teacherId)) {
             teacherClassMap.set(lesson.teacherId, new Set());
@@ -198,7 +211,8 @@ export default function SubjectsPage() {
         const classIds = Array.from(teacherClassesSet);
         const classNames = classIds.map(id => classesMap.get(id) || "Nama Kelas Tidak Ditemukan").sort();
         return {
-          id: teacher.uid, // Use UID for linking
+          id: doc.id, // Teacher's Document ID
+          uid: teacher.uid, // Teacher's Auth UID
           name: teacher.name,
           email: teacher.email,
           classIds,
@@ -265,7 +279,12 @@ export default function SubjectsPage() {
   // Auto-fill classes when teacher is selected in the 'Add' form
   const watchAddTeacherUid = addSubjectForm.watch("teacherUid");
   useEffect(() => {
-    const selectedTeacher = teachersWithClasses.find(t => t.id === watchAddTeacherUid);
+    if (!watchAddTeacherUid) {
+      addSubjectForm.setValue("classIds", []);
+      return;
+    }
+    // Find teacher by their Auth UID
+    const selectedTeacher = teachersWithClasses.find(t => t.uid === watchAddTeacherUid);
     if (selectedTeacher) {
       addSubjectForm.setValue("classIds", selectedTeacher.classIds);
     } else {
@@ -276,8 +295,13 @@ export default function SubjectsPage() {
   // Auto-fill classes when teacher is selected in the 'Edit' form
   const watchEditTeacherUid = editSubjectForm.watch("teacherUid");
   useEffect(() => {
-    const selectedTeacher = teachersWithClasses.find(t => t.id === watchEditTeacherUid);
-     if (selectedTeacher) {
+    if (!watchEditTeacherUid) {
+      editSubjectForm.setValue("classIds", []);
+      return;
+    }
+     // Find teacher by their Auth UID
+    const selectedTeacher = teachersWithClasses.find(t => t.uid === watchEditTeacherUid);
+    if (selectedTeacher) {
       editSubjectForm.setValue("classIds", selectedTeacher.classIds);
     } else {
       editSubjectForm.setValue("classIds", []);
@@ -300,7 +324,7 @@ export default function SubjectsPage() {
   const handleAddSubjectSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
     if (role !== "admin") return;
     addSubjectForm.clearErrors();
-    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.id === data.teacherUid);
+    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.uid === data.teacherUid);
     
     if(!user?.uid) {
       toast({title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive"});
@@ -335,7 +359,7 @@ export default function SubjectsPage() {
   const handleEditSubjectSubmit: SubmitHandler<EditSubjectFormValues> = async (data) => {
     if (role !== "admin" || !selectedSubject) return;
     editSubjectForm.clearErrors();
-    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.id === data.teacherUid);
+    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.uid === data.teacherUid);
 
     try {
       const subjectDocRef = doc(db, "subjects", data.id);
@@ -393,7 +417,7 @@ export default function SubjectsPage() {
 
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => {
     const teacherUid = formInstance.watch("teacherUid");
-    const selectedTeacher = teachersWithClasses.find(t => t.id === teacherUid);
+    const selectedTeacher = teachersWithClasses.find(t => t.uid === teacherUid);
     
     return (
       <>
@@ -448,9 +472,9 @@ export default function SubjectsPage() {
                       {isLoadingInitialData && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
                       <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
                       {teachersWithClasses
-                        .filter(teacher => teacher && typeof teacher.id === 'string' && teacher.id.length > 0)
+                        .filter(teacher => teacher && typeof teacher.uid === 'string' && teacher.uid.length > 0)
                         .map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
+                        <SelectItem key={teacher.uid} value={teacher.uid}>
                           {teacher.name} ({teacher.email})
                         </SelectItem>
                       ))}
