@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { BookCopy, PlusCircle, Edit, Trash2, LogIn, AlertCircle, MoreVertical, Eye, Search, Filter as FilterIcon } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -63,6 +63,7 @@ import {
   where,
   limit,
   documentId,
+  collectionGroup
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -166,11 +167,16 @@ export default function LessonsPage() {
   const [allLessons, setAllLessons] = useState<LessonData[]>([]);
   
   // For Admin: all subjects, classes, teachers for forms & filters
-  const [subjects, setSubjects] = useState<SubjectMin[]>([]);
-  const [classes, setClasses] = useState<ClassMin[]>([]);
-  const [teachers, setTeachers] = useState<TeacherMin[]>([]); 
+  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]);
+  const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
+  const [allTeachers, setAllTeachers] = useState<TeacherMin[]>([]);
+  
+  // State for form dropdowns that get filtered
+  const [subjectsForForm, setSubjectsForForm] = useState<SubjectMin[]>([]);
+  const [classesForForm, setClassesForForm] = useState<ClassMin[]>([]);
+  const [teachersForForm, setTeachersForForm] = useState<TeacherMin[]>([]);
 
-  // For Guru form dialogs: filtered lists
+  // Teacher-specific data
   const [teacherDocId, setTeacherDocId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -209,25 +215,28 @@ export default function LessonsPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchAdminDropdownData = async () => {
+  const fetchAdminDropdownData = useCallback(async () => {
     if (role !== "admin") return;
-    setIsLoading(true); // Re-use main loading for admin dropdowns
+    setIsLoading(true);
     try {
       const [subjectsSnapshot, classesSnapshot, teachersSnapshot] = await Promise.all([
         getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
         getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))), 
       ]);
-      setSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }))); 
+      setAllSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setAllTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }))); 
+      setClassesForForm(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setSubjectsForForm(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setTeachersForForm(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     } catch (error) {
       console.error("Error fetching admin dropdown data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung Admin", variant: "destructive" });
+      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [role, toast]);
   
   const fetchLessons = async () => {
     if (authLoading) return;
@@ -235,7 +244,7 @@ export default function LessonsPage() {
     try {
       if (role === "siswa" || role === "orangtua") {
          const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
-         setClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+         setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
       }
 
       const lessonsCollectionRef = collection(db, "lessons");
@@ -308,7 +317,7 @@ export default function LessonsPage() {
         fetchAdminDropdownData(); 
     }
     fetchLessons(); 
-  }, [role, authUser?.uid, authLoading, toast]);
+  }, [role, authUser?.uid, authLoading, toast, fetchAdminDropdownData]);
 
 
   useEffect(() => {
@@ -399,9 +408,9 @@ export default function LessonsPage() {
   };
   
   const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
-    const aClass = classes.find(c => c.id === data.classId);
-    const teacher = teachers.find(t => t.id === data.teacherId); 
-    const subject = subjects.find(s => s.id === data.subjectId);
+    const aClass = allClasses.find(c => c.id === data.classId);
+    const teacher = allTeachers.find(t => t.id === data.teacherId); 
+    const subject = allSubjects.find(s => s.id === data.subjectId);
     return {
       subjectName: subject?.name, 
       className: aClass?.name,
@@ -426,7 +435,7 @@ export default function LessonsPage() {
   const openEditDialog = (lesson: LessonData) => {
     if(role !== 'admin') return;
     setSelectedLesson(lesson);
-    if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) {
+    if (allSubjects.length === 0 || allClasses.length === 0 || allTeachers.length === 0) {
         fetchAdminDropdownData(); 
     }
     setIsEditDialogOpen(true);
@@ -436,7 +445,7 @@ export default function LessonsPage() {
     if(role !== 'admin') return;
     setSelectedLesson(lesson);
   };
-
+  
   const filteredAndSortedLessons = useMemo(() => {
     let tempLessons = [...allLessons];
 
@@ -585,7 +594,7 @@ export default function LessonsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) { addLessonForm.reset(); addLessonForm.clearErrors(); }
-              else if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) { fetchAdminDropdownData(); }
+              else if (allSubjects.length === 0 || allClasses.length === 0 || allTeachers.length === 0) { fetchAdminDropdownData(); }
             }}>
               <DialogTrigger asChild>
                 <Button size="sm">
@@ -601,6 +610,16 @@ export default function LessonsPage() {
                 </DialogHeader>
                 <form onSubmit={addLessonForm.handleSubmit(handleAddLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                   <div>
+                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
+                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
+                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                      <SelectContent>
+                         {classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
+                  </div>
+                  <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                     <Controller
                         name="subjectId"
@@ -614,7 +633,7 @@ export default function LessonsPage() {
                                 <SelectValue placeholder="Pilih mata pelajaran" />
                             </SelectTrigger>
                             <SelectContent>
-                                {subjects.map((subject) => (
+                                {subjectsForForm.map((subject) => (
                                     <SelectItem key={subject.id} value={subject.id}>
                                         {subject.name}
                                     </SelectItem>
@@ -626,21 +645,11 @@ export default function LessonsPage() {
                     {addLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
-                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                      <SelectContent>
-                         {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
-                  </div>
-                  <div>
                     <Label htmlFor="add-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
                     <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={addLessonForm.getValues("teacherId") || undefined}>
                       <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
                       <SelectContent>
-                        {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        {teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
@@ -702,7 +711,7 @@ export default function LessonsPage() {
               <Select
                 value={selectedClassFilter}
                 onValueChange={setSelectedClassFilter}
-                disabled={isLoading || classes.length === 0}
+                disabled={isLoading || allClasses.length === 0}
               >
                 <SelectTrigger className="w-full sm:w-[200px]">
                   <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -711,8 +720,8 @@ export default function LessonsPage() {
                 <SelectContent>
                   <SelectItem value="all">Semua Kelas</SelectItem>
                   {isLoading && <SelectItem value="loading-classes" disabled>Memuat kelas...</SelectItem>}
-                  {!isLoading && classes.length === 0 && <SelectItem value="no-classes" disabled>Tidak ada kelas</SelectItem>}
-                  {classes.map((cls) => (
+                  {!isLoading && allClasses.length === 0 && <SelectItem value="no-classes" disabled>Tidak ada kelas</SelectItem>}
+                  {allClasses.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>))}
                 </SelectContent>
               </Select>
@@ -758,15 +767,11 @@ export default function LessonsPage() {
                         <TableCell className={cn("text-right", isMobile ? "px-2" : "")}>
                           {isStudentOrParent ? (
                              role === "orangtua" ? (
-                               isMobile ? (
-                                <Button size="icon" variant="outline" disabled={true} aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)">
-                                  <LogIn className="h-4 w-4" />
+                               <Button asChild size={isMobile ? "icon" : "sm"} variant={"outline"} >
+                                    <Link href={`/lessons/${lesson.id}`} aria-label="Lihat Detail Pelajaran">
+                                      {isMobile ? <Eye className="h-4 w-4" /> : <><Eye className="mr-2 h-4 w-4" /> Detail</>}
+                                    </Link>
                                 </Button>
-                              ) : (
-                                <Button size="sm" variant="outline" disabled={true} aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)">
-                                  <LogIn className="mr-2 h-4 w-4" />
-                                </Button>
-                              )
                             ) : ( // For 'siswa' role
                                  isActiveNow ? (
                                   <Button asChild size={isMobile ? "icon" : "sm"} variant={"outline"} className="border-primary text-primary hover:bg-primary/10">
@@ -876,7 +881,7 @@ export default function LessonsPage() {
           setIsEditDialogOpen(isOpen);
             if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); }
             else if (selectedLesson) { 
-              if (subjects.length === 0 || classes.length === 0 || teachers.length === 0) fetchAdminDropdownData();
+              if (allSubjects.length === 0 || allClasses.length === 0 || allTeachers.length === 0) fetchAdminDropdownData();
             }
         }}>
           <DialogContent className="sm:max-w-lg">
@@ -901,7 +906,7 @@ export default function LessonsPage() {
                                 <SelectValue placeholder="Pilih mata pelajaran" />
                             </SelectTrigger>
                             <SelectContent>
-                                {subjects.map((subject) => (
+                                {allSubjects.map((subject) => (
                                     <SelectItem key={subject.id} value={subject.id}>
                                         {subject.name}
                                     </SelectItem>
@@ -917,7 +922,7 @@ export default function LessonsPage() {
                   <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined}>
                     <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
                     <SelectContent>
-                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.classId.message}</p>}
@@ -927,7 +932,7 @@ export default function LessonsPage() {
                   <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
                       <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
                       <SelectContent>
-                      {teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      {allTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                       </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
