@@ -252,7 +252,7 @@ export default function UserAdministrationPage() {
         const usersSnapshot = await getDocs(query(collection(db, "users")));
         const allUsers = usersSnapshot.docs.map(doc => doc.data());
         
-        const linkedTeacherUids = new Set(allUsers.filter(u => u.role === 'guru').map(u => u.uid));
+        const linkedTeacherUids = new Set(allUsers.filter(u => u.role === 'guru' && u.uid).map(u => u.uid));
         const teachersWithoutAccount = allTeacherProfiles.filter(teacher => !teacher.uid || !linkedTeacherUids.has(teacher.uid));
         setUnlinkedTeachers(teachersWithoutAccount);
 
@@ -1005,6 +1005,7 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
 
 
 
