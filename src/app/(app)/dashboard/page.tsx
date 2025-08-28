@@ -204,30 +204,33 @@ export default function DashboardPage() {
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
 
             if (!teacherProfileSnapshot.empty) {
-                const teacherProfileDoc = teacherProfileSnapshot.docs[0];
-                const teacherProfileId = teacherProfileDoc.id;
+                const teacherProfileId = teacherProfileSnapshot.docs[0].id;
+                
+                // Get all relevant data in parallel
+                const [lessonsSnapshot, homeroomClassesSnapshot, assignmentsGivenSnap] = await Promise.all([
+                    getDocs(query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId))),
+                    getDocs(query(collection(db, "classes"), where("teacherId", "==", teacherProfileId))),
+                    getDocs(query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId)))
+                ]);
 
-                const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
-                const lessonsSnapshot = await getDocs(lessonsQuery);
-
-                const teacherLessonsData = lessonsSnapshot.docs.map(doc => doc.data());
-                const taughtClassIds = new Set<string>();
-                const taughtSubjectIds = new Set<string>();
-
-                teacherLessonsData.forEach(lesson => {
-                    if (lesson.classId) taughtClassIds.add(lesson.classId);
-                    if (lesson.subjectId) taughtSubjectIds.add(lesson.subjectId);
-                });
-
-                newStats.teacherTotalClassesTaught = taughtClassIds.size;
-                newStats.teacherTotalSubjectsTaught = taughtSubjectIds.size;
-
-                const assignmentsGivenQuery = query(collection(db, "assignments"), where("teacherId", "==", teacherProfileId));
-                const assignmentsGivenSnap = await getDocs(assignmentsGivenQuery);
                 newStats.teacherTotalAssignmentsGiven = assignmentsGivenSnap.size;
 
-                if (taughtClassIds.size > 0) {
-                    const studentClassesArray = Array.from(taughtClassIds);
+                const taughtLessonData = lessonsSnapshot.docs.map(doc => doc.data());
+                const homeroomClassIds = new Set(homeroomClassesSnapshot.docs.map(doc => doc.id));
+
+                const allTaughtClassIds = new Set<string>(homeroomClassIds);
+                const allTaughtSubjectIds = new Set<string>();
+
+                taughtLessonData.forEach(lesson => {
+                    if (lesson.classId) allTaughtClassIds.add(lesson.classId);
+                    if (lesson.subjectId) allTaughtSubjectIds.add(lesson.subjectId);
+                });
+
+                newStats.teacherTotalClassesTaught = allTaughtClassIds.size;
+                newStats.teacherTotalSubjectsTaught = allTaughtSubjectIds.size;
+                
+                if (allTaughtClassIds.size > 0) {
+                    const studentClassesArray = Array.from(allTaughtClassIds);
                     const allStudentIds = new Set<string>();
                     const CHUNK_SIZE = 30;
 
