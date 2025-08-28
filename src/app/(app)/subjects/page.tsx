@@ -43,7 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookOpen, PlusCircle, Edit, Trash2, Search, MoreVertical, FileDown } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -100,7 +100,17 @@ interface Subject {
   description?: string;
   teacherUid?: string; // UID of the responsible teacher from Auth
   teacherName?: string; // Denormalized name of the responsible teacher
+  classIds?: string[]; // Array of class IDs
+  classNames?: string[]; // Denormalized class names
   createdAt?: Timestamp;
+}
+
+interface TeacherWithClasses {
+  id: string; // Teacher's UID
+  name: string;
+  email: string;
+  classIds: string[];
+  classNames: string[];
 }
 
 const ALL_SUBJECT_OPTIONS = [
@@ -109,11 +119,11 @@ const ALL_SUBJECT_OPTIONS = [
     "PJOK", "Bahasa Sunda"
 ].sort();
 
-
 const subjectFormSchema = z.object({
   name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama mata pelajaran harus dipilih." }),
   description: z.string().optional(),
-  teacherUid: z.string().optional(), // To store the selected Firebase Auth UID
+  teacherUid: z.string().optional(),
+  classIds: z.array(z.string()).optional(), // Capture class IDs, but they are auto-set
 });
 type SubjectFormValues = z.infer<typeof subjectFormSchema>;
 
@@ -127,9 +137,9 @@ const ITEMS_PER_PAGE = 10;
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [authGuruUsers, setAuthGuruUsers] = useState<AuthUserMin[]>([]);
+  const [teachersWithClasses, setTeachersWithClasses] = useState<TeacherWithClasses[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
-  const [isLoadingAuthUsers, setIsLoadingAuthUsers] = useState(true);
+  const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -147,6 +157,7 @@ export default function SubjectsPage() {
       name: undefined,
       description: "",
       teacherUid: undefined,
+      classIds: [],
     },
   });
 
@@ -154,32 +165,56 @@ export default function SubjectsPage() {
     resolver: zodResolver(editSubjectFormSchema),
   });
 
-  const fetchAuthGuruUsers = async () => {
+  const fetchInitialData = useCallback(async () => {
     if (role !== "admin") {
-      setIsLoadingAuthUsers(false);
+      setIsLoadingInitialData(false);
       return;
     }
-    setIsLoadingAuthUsers(true);
+    setIsLoadingInitialData(true);
     try {
-      const usersCollectionRef = collection(db, "users");
-      const q = query(usersCollectionRef, where("role", "==", "guru"), orderBy("name", "asc"));
-      const querySnapshot = await getDocs(q);
-      const fetchedUsers: AuthUserMin[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.data().uid,
-        name: docSnap.data().name,
-        email: docSnap.data().email,
-      }));
-      setAuthGuruUsers(fetchedUsers);
-    } catch (error) {
-      console.error("Error fetching auth guru users: ", error);
-      toast({
-        title: "Gagal Memuat Akun Guru",
-        variant: "destructive",
+      // Fetch all teachers, classes, and lessons in parallel
+      const [teachersSnapshot, classesSnapshot, lessonsSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
+        getDocs(query(collection(db, "classes"))),
+        getDocs(query(collection(db, "lessons")))
+      ]);
+      
+      const classesMap = new Map(classesSnapshot.docs.map(doc => [doc.id, doc.data().name]));
+      
+      const teacherClassMap = new Map<string, Set<string>>();
+      lessonsSnapshot.forEach(doc => {
+        const lesson = doc.data();
+        if (lesson.teacherId && lesson.classId) {
+          if (!teacherClassMap.has(lesson.teacherId)) {
+            teacherClassMap.set(lesson.teacherId, new Set());
+          }
+          teacherClassMap.get(lesson.teacherId)!.add(lesson.classId);
+        }
       });
+
+      const processedTeachers: TeacherWithClasses[] = teachersSnapshot.docs.map(doc => {
+        const teacher = doc.data();
+        const teacherClassesSet = teacherClassMap.get(doc.id) || new Set();
+        const classIds = Array.from(teacherClassesSet);
+        const classNames = classIds.map(id => classesMap.get(id) || "Nama Kelas Tidak Ditemukan").sort();
+        return {
+          id: teacher.uid, // Use UID for linking
+          name: teacher.name,
+          email: teacher.email,
+          classIds,
+          classNames
+        };
+      });
+      setTeachersWithClasses(processedTeachers);
+
+    } catch (error) {
+      console.error("Error fetching initial data: ", error);
+      toast({ title: "Gagal Memuat Data Guru & Kelas", variant: "destructive" });
     } finally {
-      setIsLoadingAuthUsers(false);
+      setIsLoadingInitialData(false);
     }
-  };
+  }, [role, toast]);
+
 
   const fetchSubjects = async () => {
     if (authLoading) return;
@@ -204,27 +239,22 @@ export default function SubjectsPage() {
         description: docSnap.data().description,
         teacherUid: docSnap.data().teacherUid,
         teacherName: docSnap.data().teacherName,
+        classIds: docSnap.data().classIds,
+        classNames: docSnap.data().classNames,
         createdAt: docSnap.data().createdAt,
       }));
       setSubjects(fetchedSubjects);
     } catch (error) {
       console.error("Error fetching subjects: ", error);
-      toast({
-        title: "Gagal Memuat Mata Pelajaran",
-        variant: "destructive",
-      });
+      toast({ title: "Gagal Memuat Mata Pelajaran", variant: "destructive" });
     } finally {
       setIsLoadingSubjects(false);
     }
   };
 
   useEffect(() => {
-    if (role === "admin" && !authLoading) {
-      fetchAuthGuruUsers();
-    } else {
-        setIsLoadingAuthUsers(false);
-    }
-  }, [role, authLoading]);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   useEffect(() => {
     if (!authLoading && role) {
@@ -232,25 +262,45 @@ export default function SubjectsPage() {
     }
   }, [role, user, authLoading]);
 
+  // Auto-fill classes when teacher is selected in the 'Add' form
+  const watchAddTeacherUid = addSubjectForm.watch("teacherUid");
+  useEffect(() => {
+    const selectedTeacher = teachersWithClasses.find(t => t.id === watchAddTeacherUid);
+    if (selectedTeacher) {
+      addSubjectForm.setValue("classIds", selectedTeacher.classIds);
+    } else {
+      addSubjectForm.setValue("classIds", []);
+    }
+  }, [watchAddTeacherUid, teachersWithClasses, addSubjectForm]);
+  
+  // Auto-fill classes when teacher is selected in the 'Edit' form
+  const watchEditTeacherUid = editSubjectForm.watch("teacherUid");
+  useEffect(() => {
+    const selectedTeacher = teachersWithClasses.find(t => t.id === watchEditTeacherUid);
+     if (selectedTeacher) {
+      editSubjectForm.setValue("classIds", selectedTeacher.classIds);
+    } else {
+      editSubjectForm.setValue("classIds", []);
+    }
+  }, [watchEditTeacherUid, teachersWithClasses, editSubjectForm]);
+
 
   useEffect(() => {
     if (selectedSubject && isEditDialogOpen && role === "admin") {
-      if (authGuruUsers.length === 0 && !isLoadingAuthUsers && role === "admin") {
-        fetchAuthGuruUsers();
-      }
       editSubjectForm.reset({
         id: selectedSubject.id,
         name: selectedSubject.name,
         description: selectedSubject.description || "",
         teacherUid: selectedSubject.teacherUid || undefined,
+        classIds: selectedSubject.classIds || [],
       });
     }
-  }, [selectedSubject, isEditDialogOpen, editSubjectForm, role, authGuruUsers, isLoadingAuthUsers]);
+  }, [selectedSubject, isEditDialogOpen, editSubjectForm, role]);
 
   const handleAddSubjectSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
     if (role !== "admin") return;
     addSubjectForm.clearErrors();
-    const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.teacherUid);
+    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.id === data.teacherUid);
     
     if(!user?.uid) {
       toast({title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive"});
@@ -264,8 +314,9 @@ export default function SubjectsPage() {
         description: data.description || null,
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
+        classIds: selectedTeacher?.classIds || [],
+        classNames: selectedTeacher?.classNames || [],
         createdAt: serverTimestamp(),
-        uid: user.uid,
       });
 
       toast({ title: "Mata Pelajaran Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
@@ -284,7 +335,7 @@ export default function SubjectsPage() {
   const handleEditSubjectSubmit: SubmitHandler<EditSubjectFormValues> = async (data) => {
     if (role !== "admin" || !selectedSubject) return;
     editSubjectForm.clearErrors();
-    const selectedTeacher = authGuruUsers.find(userAuth => userAuth.id === data.teacherUid);
+    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.id === data.teacherUid);
 
     try {
       const subjectDocRef = doc(db, "subjects", data.id);
@@ -293,6 +344,8 @@ export default function SubjectsPage() {
         description: data.description || null,
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
+        classIds: selectedTeacher?.classIds || [],
+        classNames: selectedTeacher?.classNames || [],
       });
 
       toast({ title: "Mata Pelajaran Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -326,8 +379,8 @@ export default function SubjectsPage() {
 
   const openEditDialog = (subject: Subject) => {
     if (role !== "admin") return;
-    if (authGuruUsers.length === 0 && !isLoadingAuthUsers && role === "admin") {
-        fetchAuthGuruUsers();
+    if (teachersWithClasses.length === 0 && !isLoadingInitialData) {
+        fetchInitialData();
     }
     setSelectedSubject(subject);
     setIsEditDialogOpen(true);
@@ -338,81 +391,94 @@ export default function SubjectsPage() {
     setSelectedSubject(subject);
   };
 
-  const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => (
-    <>
-      <div>
-        <Label htmlFor={`${formType}-subject-name`}>Nama Mata Pelajaran <span className="text-destructive">*</span></Label>
-        <Controller
-            name="name"
-            control={formInstance.control}
-            render={({ field }) => (
-                <Select
-                    onValueChange={(value) => field.onChange(value)}
-                    value={field.value || undefined}
-                >
-                <SelectTrigger id={`${formType}-subject-name`} className="mt-1">
-                    <SelectValue placeholder="Pilih mata pelajaran" />
-                </SelectTrigger>
-                <SelectContent>
-                    {ALL_SUBJECT_OPTIONS.map((subject) => (
-                        <SelectItem key={subject} value={subject}>
-                            {subject}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-                </Select>
-            )}
-        />
-        {formInstance.formState.errors.name && (
-          <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
-        )}
-      </div>
-      <div>
-        <Label htmlFor={`${formType}-subject-description`}>Deskripsi</Label>
-        <Textarea id={`${formType}-subject-description`} {...formInstance.register("description")} className="mt-1" />
-      </div>
-      {role === "admin" && (
+  const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => {
+    const teacherUid = formInstance.watch("teacherUid");
+    const selectedTeacher = teachersWithClasses.find(t => t.id === teacherUid);
+    
+    return (
+      <>
         <div>
-          <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab</Label>
+          <Label htmlFor={`${formType}-subject-name`}>Nama Mata Pelajaran <span className="text-destructive">*</span></Label>
           <Controller
-            name="teacherUid"
-            control={formInstance.control}
-            render={({ field }) => (
-              <Select
-                onValueChange={(value) => field.onChange(value === NO_RESPONSIBLE_TEACHER ? undefined : value)}
-                value={field.value || NO_RESPONSIBLE_TEACHER}
-                disabled={isLoadingAuthUsers}
-              >
-                <SelectTrigger id={`${formType}-subject-teacherUid`} className="mt-1">
-                  <SelectValue placeholder={isLoadingAuthUsers ? "Memuat guru..." : "Pilih guru"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingAuthUsers && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
-                  <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
-                  {authGuruUsers
-                    .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
-                    .map((authUser) => (
-                    <SelectItem key={authUser.id} value={authUser.id}>
-                      {authUser.name} ({authUser.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+              name="name"
+              control={formInstance.control}
+              render={({ field }) => (
+                  <Select
+                      onValueChange={(value) => field.onChange(value)}
+                      value={field.value || undefined}
+                  >
+                  <SelectTrigger id={`${formType}-subject-name`} className="mt-1">
+                      <SelectValue placeholder="Pilih mata pelajaran" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {ALL_SUBJECT_OPTIONS.map((subject) => (
+                          <SelectItem key={subject} value={subject}>
+                              {subject}
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+                  </Select>
+              )}
           />
-           {formInstance.formState.errors.teacherUid && (
-            <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.teacherUid.message}</p>
+          {formInstance.formState.errors.name && (
+            <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
           )}
         </div>
-      )}
-    </>
-  );
+        <div>
+          <Label htmlFor={`${formType}-subject-description`}>Deskripsi</Label>
+          <Textarea id={`${formType}-subject-description`} {...formInstance.register("description")} className="mt-1" />
+        </div>
+        {role === "admin" && (
+          <>
+            <div>
+              <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab</Label>
+              <Controller
+                name="teacherUid"
+                control={formInstance.control}
+                render={({ field }) => (
+                  <Select
+                    onValueChange={(value) => field.onChange(value === NO_RESPONSIBLE_TEACHER ? undefined : value)}
+                    value={field.value || NO_RESPONSIBLE_TEACHER}
+                    disabled={isLoadingInitialData}
+                  >
+                    <SelectTrigger id={`${formType}-subject-teacherUid`} className="mt-1">
+                      <SelectValue placeholder={isLoadingInitialData ? "Memuat guru..." : "Pilih guru"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingInitialData && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
+                      <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
+                      {teachersWithClasses
+                        .filter(teacher => teacher && typeof teacher.id === 'string' && teacher.id.length > 0)
+                        .map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.name} ({teacher.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {formInstance.formState.errors.teacherUid && (
+                <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.teacherUid.message}</p>
+              )}
+            </div>
+             <div>
+              <Label>Kelas Diajar (Otomatis)</Label>
+              <div className="mt-1 min-h-[40px] w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+                {selectedTeacher ? selectedTeacher.classNames.join(', ') || 'Guru ini belum mengajar di kelas manapun.' : 'Pilih guru untuk melihat kelas.'}
+              </div>
+            </div>
+          </>
+        )}
+      </>
+    );
+  };
 
   const pageDescription = role === "guru"
     ? "Daftar mata pelajaran yang menjadi tanggung jawab."
     : "Kelola daftar mata pelajaran yang diajarkan.";
 
-  const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingAuthUsers);
+  const showSkeleton = isLoadingSubjects || authLoading || (role === "admin" && isLoadingInitialData);
 
   const displayedSubjects = useMemo(() => {
     if (role !== 'admin') return subjects;
@@ -440,7 +506,7 @@ export default function SubjectsPage() {
         "Nama Mata Pelajaran": subject.name,
         "Deskripsi": subject.description || '-',
         "Guru Penanggung Jawab": subject.teacherName || '-',
-        "UID Guru": subject.teacherUid || 'N/A',
+        "Diajarkan di Kelas": subject.classNames?.join(', ') || '-',
     }));
 
     try {
@@ -550,7 +616,7 @@ export default function SubjectsPage() {
                             addSubjectForm.reset();
                             addSubjectForm.clearErrors();
                           } else {
-                            if (authGuruUsers.length === 0 && !isLoadingAuthUsers) fetchAuthGuruUsers();
+                            if (teachersWithClasses.length === 0 && !isLoadingInitialData) fetchInitialData();
                           }
                         }}>
                           <DialogTrigger asChild>
@@ -571,9 +637,9 @@ export default function SubjectsPage() {
                                 <DialogClose asChild>
                                    <Button type="button" variant="outline">Batal</Button>
                                 </DialogClose>
-                                <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
-                                  {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? <LottieLoader width={16} height={16} className="mr-2" /> : null}
-                                  {addSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Mata Pelajaran"}
+                                <Button type="submit" disabled={addSubjectForm.formState.isSubmitting || isLoadingInitialData}>
+                                  {(addSubjectForm.formState.isSubmitting || isLoadingInitialData) && <LottieLoader width={16} height={16} className="mr-2" />}
+                                  {(addSubjectForm.formState.isSubmitting || isLoadingInitialData) ? "Menyimpan..." : "Simpan Mata Pelajaran"}
                                 </Button>
                               </DialogFooter>
                             </form>
@@ -620,9 +686,10 @@ export default function SubjectsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className={cn(isMobile ? "w-1/2 px-2" : "w-1/3")}>Nama Mata Pelajaran</TableHead>
-                    {!isMobile && <TableHead className="w-1/2">Deskripsi</TableHead>}
-                    <TableHead className={cn(isMobile ? "w-1/2 px-2" : "w-1/3")}>Guru Penanggung Jawab</TableHead>
+                    <TableHead className={cn("w-1/4", isMobile && "w-1/3 px-2")}>Nama Mapel</TableHead>
+                    {!isMobile && <TableHead className="w-1/3">Deskripsi</TableHead>}
+                    <TableHead className={cn("w-1/4", isMobile && "w-1/3 px-2")}>Guru Penanggung Jawab</TableHead>
+                    {!isMobile && <TableHead className="w-1/4">Kelas Diajar</TableHead>}
                     {role === "admin" && <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -633,6 +700,7 @@ export default function SubjectsPage() {
                       <TableCell className="font-medium truncate" title={subject.name}>{subject.name}</TableCell>
                       {!isMobile && <TableCell className="truncate" title={subject.description || "-"}>{subject.description || "-"}</TableCell>}
                       <TableCell className="truncate" title={subject.teacherName || subject.teacherUid || "-"}>{subject.teacherName || subject.teacherUid || "-"}</TableCell>
+                      {!isMobile && <TableCell className="truncate" title={subject.classNames?.join(', ') || "-"}>{subject.classNames?.join(', ') || "-"}</TableCell>}
                       {role === "admin" && (
                         <TableCell className={cn("text-right", isMobile && "px-1")}>
                            <DropdownMenu>
@@ -735,9 +803,9 @@ export default function SubjectsPage() {
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedSubject(null); }}>Batal</Button>
                    </DialogClose>
-                  <Button type="submit" disabled={editSubjectForm.formState.isSubmitting || isLoadingAuthUsers}>
-                    {editSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? <LottieLoader width={16} height={16} className="mr-2" /> : null}
-                    {editSubjectForm.formState.isSubmitting || isLoadingAuthUsers ? "Menyimpan..." : "Simpan Perubahan"}
+                  <Button type="submit" disabled={editSubjectForm.formState.isSubmitting || isLoadingInitialData}>
+                    {editSubjectForm.formState.isSubmitting || isLoadingInitialData ? <LottieLoader width={16} height={16} className="mr-2" /> : null}
+                    {editSubjectForm.formState.isSubmitting || isLoadingInitialData ? "Menyimpan..." : "Simpan Perubahan"}
                   </Button>
                 </DialogFooter>
               </form>
