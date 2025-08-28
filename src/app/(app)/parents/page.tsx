@@ -1,5 +1,5 @@
 
-
+      
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -387,102 +387,108 @@ export default function ParentsPage() {
   };
 
   const handleEditParentSubmit: SubmitHandler<EditParentFormValues> = async (data) => {
-    if (authRole !== 'admin') {
-      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
-      return;
-    }
-    if (!selectedParent) return;
-    editParentForm.clearErrors();
-    const selectedStudent = studentsForDialog.find(s => s.id === data.studentId); // s.id is student's UID
-    if (!selectedStudent) {
-      toast({ title: "Error", description: "Siswa tidak ditemukan.", variant: "destructive" });
-      return;
-    }
-
-    const batch = writeBatch(db);
-
-    // Update parent profile document
-    const parentDocRef = doc(db, "parents", data.id);
-    batch.update(parentDocRef, {
-      name: data.name,
-      email: data.email || null,
-      phone: data.phone || null,
-      address: data.address || null,
-      gender: data.gender,
-      agama: data.agama || null,
-      studentId: data.studentId, // Student's UID
-      studentName: selectedStudent.name,
-      uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null, // Parent's Auth UID
-    });
-
-    // Handle student link changes
-    // If the student link changed from the original selectedParent
-    if (selectedParent.studentId && selectedParent.studentId !== data.studentId) {
-      // Clear link from old student
-      const oldStudentUserDocRef = doc(db, "users", selectedParent.studentId);
-      batch.update(oldStudentUserDocRef, {
-        linkedParentId: deleteField(),
-        parentName: deleteField()
-      });
-    }
-
-    // Update (or set) link for the new/current student
-    const studentUserDocRef = doc(db, "users", data.studentId); // data.studentId is the student's UID
-    batch.update(studentUserDocRef, {
-      linkedParentId: data.id, // Firestore Doc ID of the parent profile
-      parentName: data.name
-    });
-    
-    try {
-      await batch.commit();
-      toast({ title: "Data Orang Tua Diperbarui", description: `${data.name} berhasil diperbarui.` });
-      setIsEditDialogOpen(false);
-      setSelectedParent(null);
-      fetchPageData();
-    } catch (error) {
-      console.error("Error editing parent:", error);
-      toast({
-        title: "Gagal Memperbarui Data Orang Tua",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteParent = async (parentId: string, parentName?: string) => {
-    if (authRole !== 'admin') {
-      toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
-      return;
-    }
-    try {
-      const parentDocRef = doc(db, "parents", parentId);
-      const parentDocSnap = await getDoc(parentDocRef);
-
-      const batch = writeBatch(db);
-
-      if (parentDocSnap.exists()) {
-          const parentData = parentDocSnap.data();
-          if (parentData.studentId) { // studentId is the student's UID
-              const studentUserDocRef = doc(db, "users", parentData.studentId);
-              batch.update(studentUserDocRef, {
-                  linkedParentId: deleteField(), 
-                  parentName: deleteField()    
-              });
-          }
+      if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk mengedit data.", variant: "destructive" });
+        return;
       }
-      batch.delete(parentDocRef);
-      await batch.commit();
-      
-      toast({ title: "Data Orang Tua Dihapus", description: `${parentName || 'Data'} berhasil dihapus.` });
-      setSelectedParent(null);
-      fetchPageData();
-    } catch (error) {
-      console.error("Error deleting parent:", error);
-      toast({
-        title: "Gagal Menghapus Data Orang Tua",
-        variant: "destructive",
+      if (!selectedParent) return;
+      editParentForm.clearErrors();
+      const selectedStudent = studentsForDialog.find(s => s.id === data.studentId);
+      if (!selectedStudent) {
+        toast({ title: "Error", description: "Siswa tidak ditemukan.", variant: "destructive" });
+        return;
+      }
+  
+      const batch = writeBatch(db);
+  
+      const parentDocRef = doc(db, "parents", data.id);
+      batch.update(parentDocRef, {
+        name: data.name,
+        email: data.email || null,
+        phone: data.phone || null,
+        address: data.address || null,
+        gender: data.gender,
+        agama: data.agama || null,
+        studentId: data.studentId,
+        studentName: selectedStudent.name,
+        uid: data.authUserId === NO_AUTH_USER_SELECTED ? null : data.authUserId || null,
       });
-    }
-  };
+  
+      // If the student link changed
+      if (selectedParent.studentId && selectedParent.studentId !== data.studentId) {
+        const oldStudentUserDocRef = doc(db, "users", selectedParent.studentId);
+        batch.update(oldStudentUserDocRef, {
+          linkedParentId: deleteField(),
+          parentName: deleteField()
+        });
+      }
+  
+      const newStudentUserDocRef = doc(db, "users", data.studentId);
+      batch.update(newStudentUserDocRef, {
+        linkedParentId: data.id,
+        parentName: data.name
+      });
+  
+      try {
+        await batch.commit();
+        toast({ title: "Data Orang Tua Diperbarui", description: `${data.name} berhasil diperbarui.` });
+        setIsEditDialogOpen(false);
+        setSelectedParent(null);
+        fetchPageData();
+      } catch (error) {
+        console.error("Error editing parent:", error);
+        toast({
+          title: "Gagal Memperbarui Data Orang Tua",
+          variant: "destructive",
+        });
+      }
+    };
+  
+    const handleDeleteParent = async (parentId: string, parentName?: string) => {
+      if (authRole !== 'admin') {
+        toast({ title: "Aksi Ditolak", description: "Anda tidak memiliki izin untuk menghapus data.", variant: "destructive" });
+        return;
+      }
+      try {
+        const parentDocRef = doc(db, "parents", parentId);
+        const parentDocSnap = await getDoc(parentDocRef);
+    
+        const batch = writeBatch(db);
+    
+        if (parentDocSnap.exists()) {
+          const parentData = parentDocSnap.data();
+          if (parentData.studentId) {
+            const studentUserDocRef = doc(db, "users", parentData.studentId);
+            batch.update(studentUserDocRef, {
+              linkedParentId: deleteField(),
+              parentName: deleteField()
+            });
+          }
+           if (parentData.uid) {
+            const parentUserDocRef = doc(db, "users", parentData.uid);
+            batch.update(parentUserDocRef, {
+              linkedStudentId: deleteField(),
+              linkedStudentName: deleteField(),
+              linkedStudentClassId: deleteField(),
+              linkedStudentClassName: deleteField()
+            });
+          }
+        }
+        
+        batch.delete(parentDocRef);
+        await batch.commit();
+    
+        toast({ title: "Data Orang Tua Dihapus", description: `${parentName || 'Data'} berhasil dihapus.` });
+        setSelectedParent(null);
+        fetchPageData();
+      } catch (error) {
+        console.error("Error deleting parent:", error);
+        toast({
+          title: "Gagal Menghapus Data Orang Tua",
+          variant: "destructive",
+        });
+      }
+    };
 
   const openViewDialog = (parent: Parent) => {
     setSelectedParentForView(parent);
@@ -1030,3 +1036,5 @@ export default function ParentsPage() {
     </div>
   );
 }
+
+    
