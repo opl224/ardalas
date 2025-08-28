@@ -281,7 +281,7 @@ export default function UserAdministrationPage() {
     setIsLoadingUsers(true);
     try {
       const usersCollectionRef = collection(db, "users");
-      const q = query(usersCollectionRef, where("role", "in", ["admin", "orangtua"]), orderBy("name", "asc"));
+      const q = query(usersCollectionRef, where("role", "in", ["admin", "guru", "orangtua"]), orderBy("name", "asc"));
       const querySnapshot = await getDocs(q);
       const fetchedUsers: User[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
@@ -1005,6 +1005,7 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
 
 
 
