@@ -62,7 +62,8 @@ import {
   Timestamp,
   query,
   orderBy,
-  where
+  where,
+  writeBatch
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -252,21 +253,43 @@ export default function TeachersPage() {
 
   const handleAddTeacherSubmit: SubmitHandler<TeacherFormValues> = async (data) => {
     addTeacherForm.clearErrors();
+    
+    // Create a new document reference with an auto-generated ID
+    const newTeacherDocRef = doc(collection(db, "teachers"));
+    const teacherId = newTeacherDocRef.id;
+
+    const teacherProfileData = {
+      name: data.name,
+      email: data.email,
+      subject: data.subject,
+      nip: data.nip || null,
+      address: data.address || null,
+      phone: data.phone || null,
+      gender: data.gender,
+      agama: data.agama || null,
+      uid: null, // Initially not linked to any auth account
+      createdAt: serverTimestamp(),
+    };
+
+    const userData = {
+      uid: teacherId, // Use the same ID for the user document
+      name: data.name,
+      email: data.email,
+      role: 'guru',
+      createdAt: serverTimestamp(),
+    };
+
     try {
-      const teachersCollectionRef = collection(db, "teachers");
-      // For adding, we no longer need to check for selectedTeacher as we are not linking it here.
-      await addDoc(teachersCollectionRef, {
-        name: data.name,
-        email: data.email,
-        subject: data.subject,
-        nip: data.nip || null,
-        address: data.address || null,
-        phone: data.phone || null,
-        gender: data.gender,
-        agama: data.agama || null,
-        uid: null, // Always null on creation from this form.
-        createdAt: serverTimestamp(),
-      });
+      const batch = writeBatch(db);
+      
+      // Set the data in 'teachers' collection
+      batch.set(newTeacherDocRef, teacherProfileData);
+      
+      // Set the data in 'users' collection with the same ID
+      const userDocRef = doc(db, "users", teacherId);
+      batch.set(userDocRef, userData);
+      
+      await batch.commit();
       
       toast({ title: "Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddTeacherDialogOpen(false);
@@ -927,4 +950,3 @@ export default function TeachersPage() {
     </div>
   );
 }
-

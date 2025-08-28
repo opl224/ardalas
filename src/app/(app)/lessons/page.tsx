@@ -732,7 +732,7 @@ export default function LessonsPage() {
                     <TableHead>Mata Pelajaran</TableHead>
                     {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
                     {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
-                    {!isMobile && <TableHead className="w-[100px]">Hari</TableHead>}
+                    {!isMobile && <TableHead className="w-[120px]">Hari</TableHead>}
                     <TableHead className={cn(!isMobile ? "w-[120px]" : "w-auto", "px-4")}>Waktu</TableHead>
                     {!isMobile && (canManageLessons || role === 'guru') && <TableHead>Topik</TableHead>}
                     <TableHead className={cn("text-right", !isMobile ? "w-[100px]" : "w-auto")}>Aksi</TableHead>
@@ -764,7 +764,7 @@ export default function LessonsPage() {
                                 </Button>
                               ) : (
                                 <Button size="sm" variant="outline" disabled={true} aria-label="Masuk Kelas (Tidak tersedia untuk Orang Tua)">
-                                  <LogIn className="mr-2 h-4 w-4" /> Masuk Kelas
+                                  <LogIn className="mr-2 h-4 w-4" />
                                 </Button>
                               )
                             ) : ( // For 'siswa' role
