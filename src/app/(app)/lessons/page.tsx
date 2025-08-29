@@ -232,7 +232,6 @@ export default function LessonsPage() {
         ]);
         const classesData = classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setAllClasses(classesData);
-        setClassesForForm(classesData);
 
         const subjectsData = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setAllSubjects(subjectsData);
@@ -244,16 +243,18 @@ export default function LessonsPage() {
         const classesMap = new Map(classesData.map(c => [c.id, c.name]));
         const teacherClassMap = new Map<string, Set<string>>();
 
+        // 1. Map classes from being a homeroom teacher (wali kelas)
         classesSnapshot.forEach(classDoc => {
             const classData = classDoc.data();
             if (classData.teacherId) {
-                if (!teacherClassMap.has(classData.teacherId)) {
-                    teacherClassMap.set(classData.teacherId, new Set());
-                }
-                teacherClassMap.get(classData.teacherId)!.add(classDoc.id);
+               if (!teacherClassMap.has(classData.teacherId)) {
+                teacherClassMap.set(classData.teacherId, new Set());
+              }
+              teacherClassMap.get(classData.teacherId)!.add(classDoc.id);
             }
         });
 
+        // 2. Map classes from lessons taught
         lessonsSnapshot.docs.forEach(lessonDoc => {
             const lesson = lessonDoc.data();
             if (lesson.teacherId && lesson.classId) {
@@ -391,7 +392,7 @@ export default function LessonsPage() {
               addLessonForm.setValue("classId", undefined, {shouldValidate: true});
           }
       } else {
-          setClassesForForm(allClasses);
+          setClassesForForm([]);
       }
   }, [watchTeacherIdForAdd, allTeachersWithClasses, allClasses, addLessonForm]);
   
@@ -404,7 +405,7 @@ export default function LessonsPage() {
               editLessonForm.setValue("classId", undefined, {shouldValidate: true});
           }
       } else {
-          setClassesForForm(allClasses);
+          setClassesForForm([]);
       }
   }, [watchTeacherIdForEdit, allTeachersWithClasses, allClasses, editLessonForm]);
 
@@ -441,6 +442,7 @@ export default function LessonsPage() {
       setIsAddDialogOpen(false);
       addLessonForm.reset();
       fetchLessons();
+      fetchAdminDropdownData(); // Refresh teacher-class mapping
     } catch (error: any) {
       console.error("Error adding lesson:", error);
       toast({ title: "Gagal Menambahkan Pelajaran", variant: "destructive" });
@@ -473,6 +475,7 @@ export default function LessonsPage() {
       setIsEditDialogOpen(false);
       setSelectedLesson(null);
       fetchLessons();
+      fetchAdminDropdownData(); // Refresh teacher-class mapping
     } catch (error) {
       console.error("Error editing lesson:", error);
       toast({ title: "Gagal Memperbarui Pelajaran", variant: "destructive" });
@@ -497,6 +500,7 @@ export default function LessonsPage() {
       toast({ title: "Pelajaran Dihapus", description: "Jadwal pelajaran berhasil dihapus." });
       setSelectedLesson(null);
       fetchLessons();
+      fetchAdminDropdownData(); // Refresh teacher-class mapping
     } catch (error) {
       console.error("Error deleting lesson:", error);
       toast({ title: "Gagal Menghapus Pelajaran", variant: "destructive" });
