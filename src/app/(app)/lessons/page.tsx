@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -609,16 +610,6 @@ export default function LessonsPage() {
                 </DialogHeader>
                 <form onSubmit={addLessonForm.handleSubmit(handleAddLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                   <div>
-                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
-                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                      <SelectContent>
-                         {classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
-                  </div>
-                  <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                     <Controller
                         name="subjectId"
@@ -652,6 +643,16 @@ export default function LessonsPage() {
                       </SelectContent>
                     </Select>
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
+                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
+                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
+                      <SelectContent>
+                         {classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
                   </div>
                   <div>
                     <Label htmlFor="add-lesson-dayOfWeek">Hari <span className="text-destructive">*</span></Label>
@@ -916,6 +917,16 @@ export default function LessonsPage() {
                     />
                   {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
                 </div>
+                 <div>
+                    <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                    <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
+                      <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                      <SelectContent>
+                        {allTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
+                </div>
                 <div>
                   <Label htmlFor="edit-lesson-classId">Kelas<span className="text-destructive">*</span></Label>
                   <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined}>
@@ -925,16 +936,6 @@ export default function LessonsPage() {
                     </SelectContent>
                   </Select>
                   {editLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.classId.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="edit-lesson-teacherId">Guru Pengajar<span className="text-destructive">*</span></Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
-                      <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                      <SelectContent>
-                      {allTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
-                  {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="edit-lesson-dayOfWeek">Hari<span className="text-destructive">*</span></Label>
