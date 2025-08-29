@@ -273,6 +273,7 @@ export default function AssignmentsPage() {
   const isAdminRole = role === "admin";
   const isParentRole = role === "orangtua";
   const isTeacherOrAdminRole = isTeacherRole || isAdminRole;
+  const canSubmitAssignment = isStudentRole || isParentRole;
 
   const fetchAdminDropdownData = async () => {
     if (!isAdminRole) return;
@@ -388,21 +389,24 @@ export default function AssignmentsPage() {
       let assignmentsQueryRef = collection(db, "assignments");
       let finalAssignmentsQuery;
       let studentToQueryId: string | null = null;
+      let classToQueryId: string | null = null;
 
       if (isStudentRole && user.uid) {
         studentToQueryId = user.uid;
-        if (user.classId && user.classId.trim() !== "") {
-          finalAssignmentsQuery = query(assignmentsQueryRef, where("classId", "==", user.classId), orderBy("dueDate", "desc"));
-        } else {
-          setAllAssignments([]); setIsLoading(false); return;
-        }
+        classToQueryId = user.classId;
       } else if (isParentRole && user.linkedStudentId) {
         studentToQueryId = user.linkedStudentId;
-         if (user.linkedStudentClassId && user.linkedStudentClassId.trim() !== "") {
-          finalAssignmentsQuery = query(assignmentsQueryRef, where("classId", "==", user.linkedStudentClassId), orderBy("dueDate", "desc"));
-        } else {
-          setAllAssignments([]); setIsLoading(false); return;
-        }
+        classToQueryId = user.linkedStudentClassId;
+      }
+
+      if (isStudentRole || isParentRole) {
+          if (classToQueryId) {
+            finalAssignmentsQuery = query(assignmentsQueryRef, where("classId", "==", classToQueryId), orderBy("dueDate", "desc"));
+          } else {
+              setAllAssignments([]);
+              setIsLoading(false);
+              return;
+          }
       } else if (isTeacherRole) {
           if (!teacherProfileId) {
             setIsLoading(false); 
@@ -794,19 +798,36 @@ export default function AssignmentsPage() {
   };
 
   const handleStudentSubmitAssignment: SubmitHandler<StudentSubmissionFormValues> = async (data) => {
-    if (!user || !selectedAssignmentForSubmission || !user.uid || !user.displayName || !user.classId || !user.className) {
-      toast({ title: "Aksi Gagal", description: "Data pengguna (nama, ID kelas, atau nama kelas) atau data tugas tidak lengkap. Harap logout dan login kembali, atau hubungi admin jika masalah berlanjut.", variant: "destructive" });
-      return;
+    let studentId: string | undefined;
+    let studentName: string | undefined;
+    let classId: string | undefined;
+    let className: string | undefined;
+
+    if (role === 'siswa' && user) {
+        studentId = user.uid;
+        studentName = user.displayName || undefined;
+        classId = user.classId;
+        className = user.className;
+    } else if (role === 'orangtua' && user) {
+        studentId = user.linkedStudentId;
+        studentName = user.linkedStudentName;
+        classId = user.linkedStudentClassId;
+        className = user.linkedStudentClassName;
+    }
+
+    if (!user || !selectedAssignmentForSubmission || !studentId || !studentName || !classId || !className) {
+        toast({ title: "Aksi Gagal", description: "Data pengguna, anak, atau tugas tidak lengkap. Harap logout dan login kembali, atau hubungi admin jika masalah berlanjut.", variant: "destructive" });
+        return;
     }
 
     studentSubmitForm.clearErrors();
 
     const submissionData: Omit<AssignmentSubmission, "id"> = {
       assignmentId: selectedAssignmentForSubmission.id,
-      studentId: user.uid,
-      studentName: user.displayName,
-      classId: user.classId,
-      className: user.className,
+      studentId: studentId,
+      studentName: studentName,
+      classId: classId,
+      className: className,
       submissionLink: data.submissionLink,
       submittedAt: Timestamp.now(),
       notes: data.notes,
@@ -945,7 +966,7 @@ export default function AssignmentsPage() {
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Tugas</h1>
         <p className="text-muted-foreground">
-          {isStudentRole ? "Lihat dan kerjakan tugas." : isParentRole ? "Lihat tugas anak." : "Kelola pemberian tugas, pengumpulan, dan penilaian."}
+          {isStudentRole ? "Lihat dan kerjakan tugas." : isParentRole ? "Lihat dan kerjakan tugas anak." : "Kelola pemberian tugas, pengumpulan, dan penilaian."}
         </p>
       </div>
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
@@ -1249,7 +1270,7 @@ export default function AssignmentsPage() {
                                       </AlertDialog>
                                   </>
                               )}
-                              {isStudentRole && (
+                              {canSubmitAssignment && (
                                   <>
                                       {assignment.submissionStatus === "Sudah Dikerjakan" ? (
                                           <DropdownMenuItem onClick={() => handleOpenSubmitAssignmentDialog(assignment)}>
@@ -1260,16 +1281,11 @@ export default function AssignmentsPage() {
                                               <Send className="mr-2 h-4 w-4" /> Kerjakan Tugas
                                           </DropdownMenuItem>
                                       )}
-                                      {assignment.result && (
-                                          <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
-                                              <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil
-                                          </DropdownMenuItem>
-                                      )}
                                   </>
                               )}
-                                {isParentRole && assignment.result && (
+                              {(isStudentRole || isParentRole) && assignment.result && (
                                   <DropdownMenuItem onClick={() => handleOpenViewResultDialog(assignment)}>
-                                      <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil Anak
+                                      <BarChart3 className="mr-2 h-4 w-4" /> Lihat Hasil {isParentRole ? 'Anak' : ''}
                                   </DropdownMenuItem>
                               )}
                           </DropdownMenuContent>
@@ -1389,7 +1405,7 @@ export default function AssignmentsPage() {
         </Dialog>
       )}
 
-      {isStudentRole && selectedAssignmentForSubmission && (
+      {canSubmitAssignment && selectedAssignmentForSubmission && (
         <Dialog open={isSubmitAssignmentDialogOpen} onOpenChange={(isOpen) => { setIsSubmitAssignmentDialogOpen(isOpen); if (!isOpen) setSelectedAssignmentForSubmission(null); studentSubmitForm.reset(); }}>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
@@ -1584,3 +1600,4 @@ export default function AssignmentsPage() {
     </div>
   );
 }
+
