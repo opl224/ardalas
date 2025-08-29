@@ -130,7 +130,7 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 
 const baseLessonObjectSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
-  classId: z.string({ required_error: "Pilih kelas." }),
+  classId: z.string({ required_error: "" }),
   teacherId: z.string({ required_error: "Guru pengajar harus ditentukan." }), 
   dayOfWeek: z.enum(DAYS_OF_WEEK, { required_error: "Pilih hari." }),
   startTime: z.string().regex(timeRegex, { message: "Format waktu mulai JJ:MM (e.g., 07:00)." }),
@@ -707,7 +707,7 @@ export default function LessonsPage() {
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive"></span></Label>
                     <Controller name="classId" control={addLessonForm.control} render={({field}) => (
                         <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!watchTeacherIdForAdd}>
                             <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder={!watchTeacherIdForAdd ? "Pilih guru dulu" : "Pilih kelas"} /></SelectTrigger>

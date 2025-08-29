@@ -70,7 +70,7 @@ export const navItems: NavItem[] = [
       { title: "Kelas", href: "/classes", icon: School, roles: ["admin", "guru"] },
       { title: "Kelas Anak", href: "/classes", icon: School, roles: ["orangtua"] },
       { title: "Kelas Saya", href: "/my-class", icon: School, roles: ["siswa"] },
-      { title: "Pelajaran", href: "/lessons", icon: BookCopy, roles: ["admin", "guru", "siswa", "orangtua"] },
+      { title: "Jadwal Pelajaran", href: "/lessons", icon: BookCopy, roles: ["admin", "guru", "siswa", "orangtua"] },
       { title: "Kehadiran", href: "/attendance", icon: CalendarCheck, roles: ["admin", "guru", "siswa", "orangtua"] },
     ],
   },
