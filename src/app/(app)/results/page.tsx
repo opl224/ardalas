@@ -134,10 +134,10 @@ interface ResultData {
 
 const baseResultFormSchema = z.object({
   classId: z.string({ required_error: "Pilih kelas." }),
-  studentId: z.string({ required_error: "Pilih siswa." }),
+  studentId: z.string({ required_error: "" }),
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   assessmentType: z.enum(ASSESSMENT_TYPES, { required_error: "Pilih tipe asesmen." }),
-  assessmentTitle: z.string().min(3, { message: "Judul asesmen minimal 3 karakter." }),
+  assessmentTitle: z.string().min(3, { message: "" }),
   score: z.coerce.number().min(0, "Nilai minimal 0.").max(1000, "Nilai maksimal 1000."),
   dateOfAssessment: z.date({ required_error: "Tanggal asesmen harus diisi." }),
   feedback: z.string().optional(),
