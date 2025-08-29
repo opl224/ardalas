@@ -134,12 +134,6 @@ export function LoginForm() {
             </Button>
           </form>
         </Form>
-        {/* <p className="mt-6 text-center text-sm text-muted-foreground">
-          Belum punya akun?{" "}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Daftar di sini
-          </Link>
-        </p> */}
       </CardContent>
     </Card>
   );

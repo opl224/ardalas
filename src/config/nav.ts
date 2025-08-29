@@ -13,7 +13,6 @@ import {
   BarChart3,
   CalendarCheck,
   CalendarDays,
-  MessageSquare,
   Settings,
   UserCog,
   GraduationCap,
@@ -101,5 +100,3 @@ export const navItems: NavItem[] = [
 export const bottomNavItems: NavItem[] = [
     
 ];
-
-    
