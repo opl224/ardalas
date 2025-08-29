@@ -640,11 +640,25 @@ export default function AssignmentsPage() {
       const usersRef = collection(db, "users");
       const qStudents = query(usersRef, where("role", "==", "siswa"), where("classId", "==", data.classId));
       const studentsSnapshot = await getDocs(qStudents);
+      
+      const studentIds = studentsSnapshot.docs.map(doc => doc.id);
 
+      // Create notifications for students
       studentsSnapshot.forEach((studentDoc) => {
         const studentNotificationRef = doc(collection(db, "notifications"));
         batch.set(studentNotificationRef, { ...notificationBase, userId: studentDoc.id });
       });
+
+      // Create notifications for parents
+      if (studentIds.length > 0) {
+        const parentsQuery = query(collection(db, "users"), where("role", "==", "orangtua"), where("linkedStudentId", "in", studentIds));
+        const parentsSnapshot = await getDocs(parentsQuery);
+        parentsSnapshot.forEach((parentDoc) => {
+            const parentNotificationRef = doc(collection(db, "notifications"));
+            batch.set(parentNotificationRef, { ...notificationBase, userId: parentDoc.id });
+        });
+      }
+
 
       const creatorNotificationRef = doc(collection(db, "notifications"));
       batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda membuat tugas baru: ${data.title}` });
@@ -732,11 +746,23 @@ export default function AssignmentsPage() {
       const usersRef = collection(db, "users");
       const qStudents = query(usersRef, where("role", "==", "siswa"), where("classId", "==", data.classId));
       const studentsSnapshot = await getDocs(qStudents);
+      const studentIds = studentsSnapshot.docs.map(doc => doc.id);
+
 
       studentsSnapshot.forEach((studentDoc) => {
         const studentNotificationRef = doc(collection(db, "notifications"));
         batch.set(studentNotificationRef, { ...notificationBase, userId: studentDoc.id });
       });
+
+      // Create notifications for parents
+      if (studentIds.length > 0) {
+        const parentsQuery = query(collection(db, "users"), where("role", "==", "orangtua"), where("linkedStudentId", "in", studentIds));
+        const parentsSnapshot = await getDocs(parentsQuery);
+        parentsSnapshot.forEach((parentDoc) => {
+            const parentNotificationRef = doc(collection(db, "notifications"));
+            batch.set(parentNotificationRef, { ...notificationBase, userId: parentDoc.id });
+        });
+      }
       
       const editorNotificationRef = doc(collection(db, "notifications"));
       batch.set(editorNotificationRef, { ...notificationBase, userId: user.uid, title: `Anda memperbarui tugas: ${data.title}` });
