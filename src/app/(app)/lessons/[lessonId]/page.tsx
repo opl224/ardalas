@@ -135,7 +135,7 @@ export default function LessonDetailPage() {
     };
 
     fetchLessonDetails();
-  }, [lessonId, authLoading, user, role]); // isLoading removed from dependency array
+  }, [lessonId, authLoading, user, role]);
 
 
   const fetchAttendanceStatus = async (studentUid: string, currentLessonId: string) => {

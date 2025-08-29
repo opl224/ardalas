@@ -7,7 +7,6 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { Sheet } from "@/components/ui/sheet"; 
 import LottieLoader from "@/components/ui/LottieLoader";
