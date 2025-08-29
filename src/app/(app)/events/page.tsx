@@ -60,7 +60,9 @@ import {
   serverTimestamp,
   Timestamp,
   query,
-  orderBy
+  orderBy,
+  writeBatch,
+  where
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -218,7 +220,7 @@ export default function EventsPage() {
     }
     addEventForm.clearErrors();
     try {
-      await addDoc(collection(db, "events"), {
+      const eventData = {
         ...data,
         date: Timestamp.fromDate(startOfDay(data.date)),
         targetAudience: data.targetAudience || [],
@@ -226,8 +228,39 @@ export default function EventsPage() {
         createdByName: user.displayName || user.email || "N/A",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+      
+      await addDoc(collection(db, "events"), eventData);
       toast({ title: "Acara Ditambahkan", description: `${data.title} berhasil ditambahkan.` });
+      
+      const batch = writeBatch(db);
+      const notificationBase = {
+        title: `Acara Baru: ${data.title.substring(0,30)}${data.title.length > 30 ? "..." : ""}`,
+        description: `${data.description?.substring(0,50) || 'Acara sekolah baru telah ditambahkan.'}${data.description && data.description.length > 50 ? "..." : ""}`,
+        href: `/events`,
+        read: false,
+        createdAt: serverTimestamp(),
+        type: "new_event", 
+      };
+
+      const creatorNotificationRef = doc(collection(db, "notifications"));
+      batch.set(creatorNotificationRef, { ...notificationBase, userId: user.uid });
+
+      if (data.targetAudience && data.targetAudience.length > 0) {
+        const usersRef = collection(db, "users");
+        for (const targetRole of data.targetAudience) {
+          const qUsers = query(usersRef, where("role", "==", targetRole));
+          const querySnapshot = await getDocs(qUsers);
+          querySnapshot.forEach((userDoc) => {
+            if (userDoc.id !== user.uid) {
+              const userNotificationRef = doc(collection(db, "notifications"));
+              batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
+            }
+          });
+        }
+      }
+      await batch.commit();
+
       setIsAddDialogOpen(false);
       addEventForm.reset({ date: startOfDay(new Date()), title: "", description: "", startTime: "", endTime: "", location: "", category: undefined, targetAudience: [] });
       fetchEvents();

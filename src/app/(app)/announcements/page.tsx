@@ -173,13 +173,11 @@ export default function AnnouncementsPage() {
         const userClassId = user.linkedStudentClassId;
         fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
           ann.targetAudience.includes(role!) ||
-          ann.targetAudience.includes("semua") || // "semua" might not be in ROLES type, adjust if needed
           (ann.targetClassIds && userClassId && ann.targetClassIds.includes(userClassId))
         );
       } else if (user && role === 'guru') {
          fetchedAnnouncements = fetchedAnnouncements.filter(ann =>
             ann.targetAudience.includes('guru') ||
-            ann.targetAudience.includes("semua") ||
             (ann.createdById === user.uid) || // Show announcements created by this teacher
             (teacherClasses.length > 0 && ann.targetClassIds && ann.targetClassIds.some(tcId => teacherClasses.map(tc => tc.id).includes(tcId)) ) // Show if targets any of their classes
         );
@@ -300,13 +298,6 @@ export default function AnnouncementsPage() {
       if (role === 'admin' && data.targetAudience && data.targetAudience.length > 0) {
         const usersRef = collection(db, "users");
         for (const targetRole of data.targetAudience) {
-          if (targetRole === 'orangtua') {
-            continue;
-          }
-
-          if (targetRole === 'admin' && user.uid === user.uid) { 
-          }
-
           const qUsers = query(usersRef, where("role", "==", targetRole));
           try {
             const querySnapshot = await getDocs(qUsers);
@@ -322,19 +313,17 @@ export default function AnnouncementsPage() {
         }
       } else if (role === 'guru' && data.targetAudience && data.targetClassIds && data.targetClassIds.length > 0) {
         const usersRef = collection(db, "users");
-        for (const targetRole of data.targetAudience.filter(r => ROLES_FOR_TEACHER_TARGETING.includes(r))) {
-            const qStudents = query(usersRef, where("role", "==", targetRole), where("classId", "in", data.targetClassIds));
-             try {
-              const querySnapshot = await getDocs(qStudents);
-              querySnapshot.forEach((userDoc) => {
-                if (userDoc.id !== user.uid) {
-                  const userNotificationRef = doc(collection(db, "notifications"));
-                  batch.set(userNotificationRef, { ...notificationBase, userId: userDoc.id });
-                }
-              });
-            } catch (e) {
-              console.error(`Error querying users for role ${targetRole} in classes for notification:`, e);
-            }
+        const studentQuery = query(usersRef, where("role", "==", "siswa"), where("classId", "in", data.targetClassIds));
+        const studentsSnapshot = await getDocs(studentQuery);
+        const studentIds = studentsSnapshot.docs.map(doc => doc.id);
+        
+        if(studentIds.length > 0) {
+            const parentsQuery = query(usersRef, where("role", "==", "orangtua"), where("linkedStudentId", "in", studentIds));
+            const parentsSnapshot = await getDocs(parentsQuery);
+            parentsSnapshot.forEach(parentDoc => {
+                 const userNotificationRef = doc(collection(db, "notifications"));
+                 batch.set(userNotificationRef, { ...notificationBase, userId: parentDoc.id });
+            });
         }
       }
       await batch.commit();
