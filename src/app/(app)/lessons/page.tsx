@@ -97,6 +97,7 @@ interface ClassMin { id: string; name: string; }
 interface TeacherMin { id: string; name: string; uid: string; } // Represents documents from 'teachers' collection
 interface TeacherWithClasses extends TeacherMin {
     classIds: string[];
+    classNames: string[];
 }
 
 
@@ -240,19 +241,35 @@ export default function LessonsPage() {
         const teachersData = teachersSnapshot.docs.map(doc => ({ id: doc.id, uid: doc.data().uid, name: doc.data().name, email: doc.data().email }));
         setTeachersForForm(teachersData);
 
+        const classesMap = new Map(classesData.map(c => [c.id, c.name]));
         const teacherClassMap = new Map<string, Set<string>>();
-        lessonsSnapshot.docs.forEach(doc => {
-            const lesson = doc.data();
+
+        classesSnapshot.forEach(classDoc => {
+            const classData = classDoc.data();
+            if (classData.teacherId) {
+                if (!teacherClassMap.has(classData.teacherId)) {
+                    teacherClassMap.set(classData.teacherId, new Set());
+                }
+                teacherClassMap.get(classData.teacherId)!.add(classDoc.id);
+            }
+        });
+
+        lessonsSnapshot.docs.forEach(lessonDoc => {
+            const lesson = lessonDoc.data();
             if (lesson.teacherId && lesson.classId) {
-                if (!teacherClassMap.has(lesson.teacherId)) teacherClassMap.set(lesson.teacherId, new Set());
+                if (!teacherClassMap.has(lesson.teacherId)) {
+                    teacherClassMap.set(lesson.teacherId, new Set());
+                }
                 teacherClassMap.get(lesson.teacherId)!.add(lesson.classId);
             }
         });
         
-        const processedTeachers = teachersData.map(teacher => ({
-            ...teacher,
-            classIds: Array.from(teacherClassMap.get(teacher.id) || [])
-        }));
+        const processedTeachers = teachersData.map(teacher => {
+            const teacherClassesSet = teacherClassMap.get(teacher.id) || new Set();
+            const classIds = Array.from(teacherClassesSet);
+            const classNames = classIds.map(id => classesMap.get(id) || "Nama Kelas Tidak Ditemukan").sort();
+            return { ...teacher, classIds, classNames };
+        });
         setAllTeachersWithClasses(processedTeachers);
 
     } catch (error) {
