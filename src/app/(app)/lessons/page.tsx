@@ -94,7 +94,11 @@ import { useSidebar } from "@/components/ui/sidebar";
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
 interface ClassMin { id: string; name: string; }
-interface TeacherMin { id: string; name: string; } // Represents documents from 'teachers' collection
+interface TeacherMin { id: string; name: string; uid: string; } // Represents documents from 'teachers' collection
+interface TeacherWithClasses extends TeacherMin {
+    classIds: string[];
+}
+
 
 interface LessonData {
   id: string;
@@ -169,7 +173,7 @@ export default function LessonsPage() {
   // For Admin: all subjects, classes, teachers for forms & filters
   const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
-  const [allTeachers, setAllTeachers] = useState<TeacherMin[]>([]);
+  const [allTeachersWithClasses, setAllTeachersWithClasses] = useState<TeacherWithClasses[]>([]);
   
   // State for form dropdowns that get filtered
   const [subjectsForForm, setSubjectsForForm] = useState<SubjectMin[]>([]);
@@ -219,24 +223,46 @@ export default function LessonsPage() {
     if (role !== "admin") return;
     setIsLoading(true);
     try {
-      const [subjectsSnapshot, classesSnapshot, teachersSnapshot] = await Promise.all([
-        getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))), 
-      ]);
-      setAllSubjects(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setAllClasses(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setAllTeachers(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }))); 
-      setClassesForForm(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setSubjectsForForm(subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-      setTeachersForForm(teachersSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        const [subjectsSnapshot, classesSnapshot, teachersSnapshot, lessonsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "lessons")))
+        ]);
+        const classesData = classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        setAllClasses(classesData);
+        setClassesForForm(classesData);
+
+        const subjectsData = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        setAllSubjects(subjectsData);
+        setSubjectsForForm(subjectsData);
+        
+        const teachersData = teachersSnapshot.docs.map(doc => ({ id: doc.id, uid: doc.data().uid, name: doc.data().name, email: doc.data().email }));
+        setTeachersForForm(teachersData);
+
+        const teacherClassMap = new Map<string, Set<string>>();
+        lessonsSnapshot.docs.forEach(doc => {
+            const lesson = doc.data();
+            if (lesson.teacherId && lesson.classId) {
+                if (!teacherClassMap.has(lesson.teacherId)) teacherClassMap.set(lesson.teacherId, new Set());
+                teacherClassMap.get(lesson.teacherId)!.add(lesson.classId);
+            }
+        });
+        
+        const processedTeachers = teachersData.map(teacher => ({
+            ...teacher,
+            classIds: Array.from(teacherClassMap.get(teacher.id) || [])
+        }));
+        setAllTeachersWithClasses(processedTeachers);
+
     } catch (error) {
-      console.error("Error fetching admin dropdown data: ", error);
-      toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
+        console.error("Error fetching admin dropdown data: ", error);
+        toast({ title: "Gagal Memuat Data Pendukung", variant: "destructive" });
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
   }, [role, toast]);
+  
   
   const fetchLessons = async () => {
     if (authLoading) return;
@@ -336,6 +362,35 @@ export default function LessonsPage() {
     }
   }, [selectedLesson, isEditDialogOpen, editLessonForm]);
 
+  const watchTeacherIdForAdd = addLessonForm.watch("teacherId");
+  const watchTeacherIdForEdit = editLessonForm.watch("teacherId");
+
+  useEffect(() => {
+      const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForAdd);
+      if (teacher) {
+          const taughtClasses = allClasses.filter(c => teacher.classIds.includes(c.id));
+          setClassesForForm(taughtClasses);
+          if (!teacher.classIds.includes(addLessonForm.getValues("classId"))) {
+              addLessonForm.setValue("classId", undefined, {shouldValidate: true});
+          }
+      } else {
+          setClassesForForm(allClasses);
+      }
+  }, [watchTeacherIdForAdd, allTeachersWithClasses, allClasses, addLessonForm]);
+  
+  useEffect(() => {
+      const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForEdit);
+      if (teacher) {
+          const taughtClasses = allClasses.filter(c => teacher.classIds.includes(c.id));
+          setClassesForForm(taughtClasses);
+          if (!teacher.classIds.includes(editLessonForm.getValues("classId"))) {
+              editLessonForm.setValue("classId", undefined, {shouldValidate: true});
+          }
+      } else {
+          setClassesForForm(allClasses);
+      }
+  }, [watchTeacherIdForEdit, allTeachersWithClasses, allClasses, editLessonForm]);
+
 
   const handleAddLessonSubmit: SubmitHandler<LessonFormValues> = async (data) => {
     if (role !== "admin") {
@@ -409,7 +464,7 @@ export default function LessonsPage() {
   
   const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
     const aClass = allClasses.find(c => c.id === data.classId);
-    const teacher = allTeachers.find(t => t.id === data.teacherId); 
+    const teacher = allTeachersWithClasses.find(t => t.id === data.teacherId); 
     const subject = allSubjects.find(s => s.id === data.subjectId);
     return {
       subjectName: subject?.name, 
@@ -435,9 +490,10 @@ export default function LessonsPage() {
   const openEditDialog = (lesson: LessonData) => {
     if(role !== 'admin') return;
     setSelectedLesson(lesson);
-    if (allSubjects.length === 0 || allClasses.length === 0 || allTeachers.length === 0) {
+    if (allSubjects.length === 0 || allClasses.length === 0 || allTeachersWithClasses.length === 0) {
         fetchAdminDropdownData(); 
     }
+    setClassesForForm(allClasses); // Initialize with all, will filter on teacher change
     setIsEditDialogOpen(true);
   };
 
@@ -594,7 +650,7 @@ export default function LessonsPage() {
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
               if (!isOpen) { addLessonForm.reset(); addLessonForm.clearErrors(); }
-              else if (allSubjects.length === 0 || allClasses.length === 0 || allTeachers.length === 0) { fetchAdminDropdownData(); }
+              else if (allSubjects.length === 0 || allClasses.length === 0 || allTeachersWithClasses.length === 0) { fetchAdminDropdownData(); }
             }}>
               <DialogTrigger asChild>
                 <Button size="sm">
@@ -611,47 +667,32 @@ export default function LessonsPage() {
                 <form onSubmit={addLessonForm.handleSubmit(handleAddLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                   <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
-                    <Controller
-                        name="subjectId"
-                        control={addLessonForm.control}
-                        render={({ field }) => (
-                            <Select
-                                onValueChange={(value) => field.onChange(value)}
-                                value={field.value || undefined}
-                            >
-                            <SelectTrigger id="add-lesson-subjectId" className="mt-1">
-                                <SelectValue placeholder="Pilih mata pelajaran" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {subjectsForForm.map((subject) => (
-                                    <SelectItem key={subject.id} value={subject.id}>
-                                        {subject.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
+                    <Controller name="subjectId" control={addLessonForm.control} render={({ field }) => (
+                            <Select onValueChange={(value) => field.onChange(value)} value={field.value || undefined} >
+                                <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                                <SelectContent>{subjectsForForm.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
                             </Select>
-                        )}
-                    />
+                    )} />
                     {addLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
                     <Label htmlFor="add-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={addLessonForm.getValues("teacherId") || undefined}>
-                      <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                      <SelectContent>
-                        {teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Controller name="teacherId" control={addLessonForm.control} render={({field}) => (
+                        <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined); }} value={field.value || undefined}>
+                            <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                            <SelectContent>{teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                    )} />
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
                   </div>
                   <div>
                     <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
-                    <Select onValueChange={(value) => addLessonForm.setValue("classId", value, { shouldValidate: true })} value={addLessonForm.getValues("classId") || undefined}>
-                      <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                      <SelectContent>
-                         {classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Controller name="classId" control={addLessonForm.control} render={({field}) => (
+                        <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!watchTeacherIdForAdd}>
+                            <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder={!watchTeacherIdForAdd ? "Pilih guru dulu" : "Pilih kelas"} /></SelectTrigger>
+                            <SelectContent>{classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                    )} />
                     {addLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.classId.message}</p>}
                   </div>
                   <div>
@@ -881,7 +922,7 @@ export default function LessonsPage() {
           setIsEditDialogOpen(isOpen);
             if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); }
             else if (selectedLesson) { 
-              if (allSubjects.length === 0 || allClasses.length === 0 || allTeachers.length === 0) fetchAdminDropdownData();
+              if (allSubjects.length === 0 || allClasses.length === 0 || allTeachersWithClasses.length === 0) fetchAdminDropdownData();
             }
         }}>
           <DialogContent className="sm:max-w-lg">
@@ -893,48 +934,33 @@ export default function LessonsPage() {
               <form onSubmit={editLessonForm.handleSubmit(handleEditLessonSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <Input type="hidden" {...editLessonForm.register("id")} />
                 <div>
-                  <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran<span className="text-destructive">*</span></Label>
-                   <Controller
-                        name="subjectId"
-                        control={editLessonForm.control}
-                        render={({ field }) => (
-                            <Select
-                                onValueChange={(value) => field.onChange(value)}
-                                value={field.value || undefined}
-                            >
-                            <SelectTrigger id="edit-lesson-subjectId" className="mt-1">
-                                <SelectValue placeholder="Pilih mata pelajaran" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {allSubjects.map((subject) => (
-                                    <SelectItem key={subject.id} value={subject.id}>
-                                        {subject.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                            </Select>
-                        )}
-                    />
-                  {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
+                    <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
+                    <Controller name="subjectId" control={editLessonForm.control} render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value || undefined}>
+                            <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
+                            <SelectContent>{allSubjects.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
+                        </Select>
+                    )} />
+                    {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
                 </div>
                  <div>
                     <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
-                    <Select onValueChange={(value) => editLessonForm.setValue("teacherId", value, { shouldValidate: true })} value={editLessonForm.getValues("teacherId") || undefined}>
-                      <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
-                      <SelectContent>
-                        {allTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                     <Controller name="teacherId" control={editLessonForm.control} render={({field}) => (
+                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined); }} value={field.value || undefined}>
+                          <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                          <SelectContent>{teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                    )} />
                     {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="edit-lesson-classId">Kelas<span className="text-destructive">*</span></Label>
-                  <Select onValueChange={(value) => editLessonForm.setValue("classId", value, { shouldValidate: true })} value={editLessonForm.getValues("classId") || undefined}>
-                    <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger>
-                    <SelectContent>
-                        {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <Controller name="classId" control={editLessonForm.control} render={({field}) => (
+                        <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!watchTeacherIdForEdit}>
+                            <SelectTrigger id="edit-lesson-classId" className="mt-1"><SelectValue placeholder={!watchTeacherIdForEdit ? "Pilih guru dulu" : "Pilih kelas"} /></SelectTrigger>
+                            <SelectContent>{classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                    )} />
                   {editLessonForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.classId.message}</p>}
                 </div>
                 <div>
