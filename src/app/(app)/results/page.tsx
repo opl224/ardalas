@@ -42,7 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarDatePicker } from "@/components/calendar-date-picker";
+import { Calendar } from "@/components/ui/calendar";
 import { BarChart3, PlusCircle, Edit, Trash2, AlertCircle, Save, Filter, Link as LinkIcon, Search, MoreVertical, Eye, FileDown, Send } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useMemo } from "react";
@@ -96,6 +96,8 @@ import { useSidebar } from "@/components/ui/sidebar";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
 
 
 interface ClassMin { id: string; name: string; }
@@ -1175,16 +1177,28 @@ export default function ResultsPage() {
                 control={formInstance.control}
                 name="dateOfAssessment"
                 render={({ field }) => (
-                  <CalendarDatePicker
-                    id={`${dialogType}-result-dateOfAssessment-picker`}
-                    date={{ from: field.value, to: field.value }}
-                    onDateSelect={(range) => field.onChange(range.from)}
-                    numberOfMonths={1}
-                    closeOnSelect={true}
-                    yearsRange={5}
-                    className="mt-1 w-full"
-                    variant="outline"
-                  />
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal mt-1",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(field.value, "PPP", {locale: indonesiaLocale}) : <span>Pilih tanggal</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                 )}
               />
               {formInstance.formState.errors.dateOfAssessment && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfAssessment.message}</p>}
