@@ -855,8 +855,10 @@ function TeacherAdminAttendanceManagement() {
                         <thead className="border-b">
                             <tr>
                                 <th className="p-2 text-left min-w-[150px]">Nama Siswa</th>
-                                <th className="p-2 text-left w-36 min-w-[144px]">Status</th>
-                                <th className={cn("p-2 text-left", isMobile ? "w-20 text-center" : "min-w-[200px]")}>Catatan</th>
+                                <th className={cn("p-2 text-left", isMobile ? "w-32" : "w-36 min-w-[144px]")}>Status</th>
+                                <th className={cn("p-2 text-left", isMobile ? "w-16 text-center" : "min-w-[200px]")}>
+                                  {isMobile ? <Edit className="h-4 w-4 mx-auto" /> : "Catatan"}
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
@@ -951,7 +953,7 @@ function TeacherAdminAttendanceManagement() {
         </CardFooter>
       </Card>
       
-      {isMobile && currentNoteIndex !== null && (
+      {currentNoteIndex !== null && (
         <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
             <DialogContent>
                 <DialogHeader>
@@ -1394,7 +1396,7 @@ export default function AttendancePageWrapper() {
       return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold font-headline">Kehadiran Anak</h1>
-             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6"><div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground"><AlertCircle className="w-12 h-12 mb-4 text-warning" /><p className="font-semibold">Siswa Belum Tertaut</p><p>Akun belum terhubung dengan data siswa. Silakan hubungi administrator sekolah.</p></div></CardContent></Card>
+             <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md"><CardContent className="pt-6"><div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground"><AlertCircle className="w-12 h-12 mb-4 text-warning" /><p className="font-semibold">Siswa Belum Tertaut</p><p>Akun anda belum terhubung dengan data siswa. Silakan hubungi administrator sekolah.</p></div></CardContent></Card>
         </div>
       );
     }
