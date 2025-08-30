@@ -253,11 +253,6 @@ export default function TeachersPage() {
 
   const handleAddTeacherSubmit: SubmitHandler<TeacherFormValues> = async (data) => {
     addTeacherForm.clearErrors();
-    
-    // Create a new document reference with an auto-generated ID
-    const newTeacherDocRef = doc(collection(db, "teachers"));
-    const teacherId = newTeacherDocRef.id;
-
     const teacherProfileData = {
       name: data.name,
       email: data.email,
@@ -267,31 +262,13 @@ export default function TeachersPage() {
       phone: data.phone || null,
       gender: data.gender,
       agama: data.agama || null,
-      uid: null, // Initially not linked to any auth account
-      createdAt: serverTimestamp(),
-    };
-
-    const userData = {
-      uid: teacherId, // Use the same ID for the user document
-      name: data.name,
-      email: data.email,
-      role: 'guru',
+      uid: null, // UID is not set when creating profile, it will be linked later
       createdAt: serverTimestamp(),
     };
 
     try {
-      const batch = writeBatch(db);
-      
-      // Set the data in 'teachers' collection
-      batch.set(newTeacherDocRef, teacherProfileData);
-      
-      // Set the data in 'users' collection with the same ID
-      const userDocRef = doc(db, "users", teacherId);
-      batch.set(userDocRef, userData);
-      
-      await batch.commit();
-      
-      toast({ title: "Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
+      await addDoc(collection(db, "teachers"), teacherProfileData);
+      toast({ title: "Profil Guru Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddTeacherDialogOpen(false);
       addTeacherForm.reset({name: "", email: "", subject: undefined, nip: "", address: "", phone: "", gender: undefined, authUserId: undefined});
       fetchTeachers(); 

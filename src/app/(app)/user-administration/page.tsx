@@ -98,6 +98,13 @@ interface ClassMin {
   name: string;
 }
 
+interface TeacherProfileMin {
+    id: string; // Document ID from 'teachers' collection
+    name: string;
+    email: string;
+    classIds: string[];
+}
+
 interface User {
   id: string;
   uid: string;
@@ -111,23 +118,23 @@ interface User {
 }
 
 const baseUserSchema = z.object({
+  role: z.enum(ROLES, { required_error: "Pilih peran yang valid." }),
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
   email: z.string().email({ message: "Format email tidak valid." }),
-  role: z.enum(ROLES, { message: "Pilih peran yang valid." }),
+  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
   assignedClassIds: z.array(z.string()).optional(),
   classId: z.string().optional(),
+  teacherProfileId: z.string().optional(),
 });
 
-const addUserFormSchema = baseUserSchema.extend({
-  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
-}).refine(data => {
+const addUserFormSchema = baseUserSchema.refine(data => {
     if (data.role === 'guru') {
-      return data.assignedClassIds && data.assignedClassIds.length > 0;
+      return !!data.teacherProfileId;
     }
     return true;
-  }, {
-    message: "Guru harus memiliki setidaknya satu kelas yang ditugaskan.",
-    path: ["assignedClassIds"],
+}, {
+    message: "Pilih profil guru.",
+    path: ["teacherProfileId"],
 }).refine(data => {
     if (data.role === 'siswa') {
       return !!data.classId;
@@ -139,8 +146,13 @@ const addUserFormSchema = baseUserSchema.extend({
 });
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
-const editUserFormSchema = baseUserSchema.extend({
+const editUserFormSchema = z.object({
   id: z.string(),
+  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
+  email: z.string().email({ message: "Format email tidak valid." }),
+  role: z.enum(ROLES, { message: "Pilih peran yang valid." }),
+  assignedClassIds: z.array(z.string()).optional(),
+  classId: z.string().optional(),
 }).refine(data => {
     if (data.role === 'guru') {
       return data.assignedClassIds && data.assignedClassIds.length > 0;
@@ -165,8 +177,10 @@ const ITEMS_PER_PAGE = 10;
 export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
-  const [isLoadingClasses, setIsLoadingClasses] = useState(true);
+  const [unlinkedTeachers, setUnlinkedTeachers] = useState<TeacherProfileMin[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [isViewUserDialogOpen, setIsViewUserDialogOpen] = useState(false);
@@ -186,9 +200,10 @@ export default function UserAdministrationPage() {
       name: "",
       email: "",
       password: "",
-      role: "siswa",
+      role: "admin",
       assignedClassIds: [],
       classId: undefined,
+      teacherProfileId: undefined,
     },
   });
 
@@ -199,51 +214,77 @@ export default function UserAdministrationPage() {
         classId: undefined,
     }
   });
-
-  const fetchAllClasses = async () => {
-    setIsLoadingClasses(true);
+  
+  const fetchPageData = async () => {
+    setIsLoading(true);
     try {
-      const classesCollectionRef = collection(db, "classes");
-      const q = query(classesCollectionRef, orderBy("name", "asc"));
-      const querySnapshot = await getDocs(q);
-      setAllClasses(querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        const [usersSnapshot, classesSnapshot, teachersSnapshot, lessonsSnapshot] = await Promise.all([
+            getDocs(query(collection(db, "users"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "lessons")))
+        ]);
+
+        const fetchedUsers: User[] = usersSnapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            uid: docSnap.data().uid,
+            name: docSnap.data().name,
+            email: docSnap.data().email,
+            role: docSnap.data().role,
+            assignedClassIds: docSnap.data().assignedClassIds || [],
+            classId: docSnap.data().classId,
+            className: docSnap.data().className,
+            createdAt: docSnap.data().createdAt,
+        }));
+        setUsers(fetchedUsers);
+
+        const fetchedClasses = classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+        setAllClasses(fetchedClasses);
+        
+        const classesMap = new Map(fetchedClasses.map(c => [c.id, c.name]));
+        const teacherClassMap = new Map<string, Set<string>>();
+
+        // Map classes from homeroom teacher
+        classesSnapshot.forEach(classDoc => {
+            const classData = classDoc.data();
+            if (classData.teacherId) {
+               if (!teacherClassMap.has(classData.teacherId)) teacherClassMap.set(classData.teacherId, new Set());
+               teacherClassMap.get(classData.teacherId)!.add(classDoc.id);
+            }
+        });
+
+        // Map classes from lessons taught
+        lessonsSnapshot.docs.forEach(lessonDoc => {
+            const lesson = lessonDoc.data();
+            if (lesson.teacherId && lesson.classId) {
+                if (!teacherClassMap.has(lesson.teacherId)) teacherClassMap.set(lesson.teacherId, new Set());
+                teacherClassMap.get(lesson.teacherId)!.add(lesson.classId);
+            }
+        });
+        
+        const allTeacherProfiles = teachersSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as (TeacherProfileMin & {uid?: string});
+        
+        const profilesWithClassIds = allTeacherProfiles.map(teacher => ({
+            ...teacher,
+            classIds: Array.from(teacherClassMap.get(teacher.id) || new Set()),
+        }));
+
+        setUnlinkedTeachers(profilesWithClassIds.filter(t => !t.uid));
+
     } catch (error) {
-      console.error("Error fetching classes: ", error);
-      toast({ title: "Gagal Memuat Daftar Kelas", description: "Pastikan memiliki koneksi internet dan coba lagi. Jika berlanjut, hubungi administrator.", variant: "destructive" });
+        console.error("Error fetching page data: ", error);
+        toast({ title: "Gagal Memuat Data", variant: "destructive" });
     } finally {
-      setIsLoadingClasses(false);
+        setIsLoading(false);
     }
   };
 
-  const fetchUsers = async () => {
-    setIsLoadingUsers(true);
-    try {
-      const usersCollectionRef = collection(db, "users");
-      const q = query(usersCollectionRef, orderBy("name", "asc"));
-      const querySnapshot = await getDocs(q);
-      const fetchedUsers: User[] = querySnapshot.docs.map(docSnap => ({
-        id: docSnap.id,
-        uid: docSnap.data().uid,
-        name: docSnap.data().name,
-        email: docSnap.data().email,
-        role: docSnap.data().role,
-        assignedClassIds: docSnap.data().assignedClassIds || [],
-        classId: docSnap.data().classId,
-        className: docSnap.data().className,
-        createdAt: docSnap.data().createdAt,
-      }));
-      setUsers(fetchedUsers);
-    } catch (error) {
-      console.error("Error fetching users: ", error);
-      toast({ title: "Gagal Memuat Pengguna", variant: "destructive" });
-    } finally {
-      setIsLoadingUsers(false);
-    }
-  };
 
   useEffect(() => {
-    fetchAllClasses();
-    fetchUsers();
+    fetchPageData();
   }, []);
 
   useEffect(() => {
@@ -252,16 +293,31 @@ export default function UserAdministrationPage() {
 
   const watchAddUserRole = addUserForm.watch("role");
   const watchEditUserRole = editUserForm.watch("role");
+  const watchAddTeacherProfileId = addUserForm.watch("teacherProfileId");
+
 
   useEffect(() => {
-    if (watchAddUserRole !== 'guru') {
-      addUserForm.setValue("assignedClassIds", []);
-    }
-    if (watchAddUserRole !== 'siswa') {
-      addUserForm.setValue("classId", undefined);
-    }
-     addUserForm.trigger(["assignedClassIds", "classId"]);
+    // Reset fields when role changes
+    addUserForm.setValue("name", "");
+    addUserForm.setValue("email", "");
+    addUserForm.setValue("teacherProfileId", undefined);
+    addUserForm.setValue("assignedClassIds", []);
+    addUserForm.setValue("classId", undefined);
+    addUserForm.clearErrors();
   }, [watchAddUserRole, addUserForm]);
+
+
+  useEffect(() => {
+    if (watchAddUserRole === 'guru' && watchAddTeacherProfileId) {
+        const selectedTeacher = unlinkedTeachers.find(t => t.id === watchAddTeacherProfileId);
+        if (selectedTeacher) {
+            addUserForm.setValue("name", selectedTeacher.name);
+            addUserForm.setValue("email", selectedTeacher.email);
+            addUserForm.setValue("assignedClassIds", selectedTeacher.classIds);
+        }
+    }
+  }, [watchAddTeacherProfileId, watchAddUserRole, unlinkedTeachers, addUserForm]);
+
 
   useEffect(() => {
     if (watchEditUserRole !== 'guru') {
@@ -291,8 +347,6 @@ export default function UserAdministrationPage() {
     let secondaryApp: FirebaseApp | undefined;
 
     try {
-      // Initialize a temporary, secondary Firebase app to create the user.
-      // This prevents the admin from being logged out and the new user from being logged in.
       secondaryApp = initializeApp(firebaseConfig, `user-creation-app-${Date.now()}`);
       const secondaryAuth = getAuth(secondaryApp);
       
@@ -318,6 +372,10 @@ export default function UserAdministrationPage() {
 
       if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
         userData.assignedClassIds = data.assignedClassIds;
+        if(data.teacherProfileId){
+            const teacherDocRef = doc(db, "teachers", data.teacherProfileId);
+            await updateDoc(teacherDocRef, { uid: newAuthUser.uid });
+        }
       }
 
       if (data.role === 'siswa' && data.classId) {
@@ -330,9 +388,9 @@ export default function UserAdministrationPage() {
 
       toast({ title: "Pengguna Ditambahkan", description: `${data.name} berhasil ditambahkan.` });
       setIsAddUserDialogOpen(false);
-      addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined });
+      addUserForm.reset({ name: "", email: "", password: "", role: "admin" });
       setShowPassword(false);
-      fetchUsers();
+      fetchPageData(); // Refetch all data
     } catch (error) {
       const firebaseError = error as FirebaseError;
       console.error("Error adding user:", firebaseError);
@@ -397,7 +455,7 @@ export default function UserAdministrationPage() {
       toast({ title: "Pengguna Diperbarui", description: `${data.name} berhasil diperbarui.` });
       setIsEditUserDialogOpen(false);
       setSelectedUser(null);
-      fetchUsers();
+      fetchPageData();
     } catch (error) {
       console.error("Error editing user:", error);
       toast({ title: "Gagal Memperbarui Pengguna", variant: "destructive" });
@@ -409,7 +467,7 @@ export default function UserAdministrationPage() {
       await deleteDoc(doc(db, "users", userId));
       toast({ title: "Pengguna Dihapus (dari Database)", description: `${userName || 'Pengguna'} berhasil dihapus.` });
       setSelectedUser(null);
-      fetchUsers();
+      fetchPageData();
     } catch (error) {
       console.error("Error deleting user from Firestore:", error);
       toast({ title: "Gagal Menghapus Pengguna", variant: "destructive" });
@@ -435,21 +493,19 @@ export default function UserAdministrationPage() {
     return assignedIds.map(id => allClasses.find(c => c.id === id)?.name || id).join(", ");
   }
 
-  const renderClassAssignmentField = (formInstance: ReturnType<typeof useForm<AddUserFormValues | EditUserFormValues>>, currentRole: Role | undefined) => {
-    const noClassesAvailable = !isLoadingClasses && allClasses.length === 0;
-
+  const renderClassAssignmentField = (formInstance: ReturnType<typeof useForm<EditUserFormValues>>, currentRole: Role | undefined) => {
+    const noClassesAvailable = !isLoading && allClasses.length === 0;
+    
     if (currentRole === 'guru') {
-      const selectedClasses = formInstance.watch("assignedClassIds") || [];
-      const selectedClassNames = selectedClasses.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean);
       return (
         <div>
           <Label>Kelas yang Ditugaskan <span className="text-destructive">*</span></Label>
-          {isLoadingClasses ? (
+           {isLoading ? (
             <p className="text-sm text-muted-foreground mt-1">Memuat kelas...</p>
           ) : noClassesAvailable ? (
             <div className="mt-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
+              <span>Tidak ada kelas. Tambahkan di menu "Akademik &gt; Kelas".</span>
             </div>
           ) : (
             <FormField
@@ -458,14 +514,10 @@ export default function UserAdministrationPage() {
               render={({ field }) => (
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className="w-full justify-between mt-1"
-                    >
+                    <Button variant="outline" role="combobox" className="w-full justify-between mt-1">
                       <span className="truncate">
-                        {selectedClassNames.length > 0
-                          ? selectedClassNames.join(", ")
+                        {(field.value && field.value.length > 0)
+                          ? field.value.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean).join(", ")
                           : "Pilih kelas..."}
                       </span>
                       <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -524,7 +576,7 @@ export default function UserAdministrationPage() {
             {noClassesAvailable && (
                  <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
                     <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada kelas yang dapat dipilih. Tambahkan data kelas melalui menu "Akademik &gt; Kelas" terlebih dahulu.</span>
+                    <span>Tidak ada kelas. Tambahkan di menu "Akademik &gt; Kelas".</span>
                 </div>
             )}
             <Controller
@@ -534,15 +586,15 @@ export default function UserAdministrationPage() {
                     <Select
                         onValueChange={(value) => { field.onChange(value); formInstance.trigger("classId");}}
                         value={field.value || undefined}
-                        disabled={isLoadingClasses || noClassesAvailable}
+                        disabled={isLoading || noClassesAvailable}
                     >
                         <SelectTrigger id="classId" className="mt-1">
-                            <SelectValue placeholder={isLoadingClasses ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas tersedia." : "Pilih kelas")} />
+                            <SelectValue placeholder={isLoading ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas." : "Pilih kelas")} />
                         </SelectTrigger>
                         <SelectContent>
-                            {isLoadingClasses && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
+                            {isLoading && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
                             {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            {allClasses.length === 0 && !isLoadingClasses && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia. Harap tambahkan kelas terlebih dahulu.</SelectItem>}
+                            {allClasses.length === 0 && !isLoading && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
                         </SelectContent>
                     </Select>
                 )}
@@ -635,13 +687,13 @@ export default function UserAdministrationPage() {
           <Dialog open={isAddUserDialogOpen} onOpenChange={(isOpen) => {
             setIsAddUserDialogOpen(isOpen);
             if (!isOpen) {
-                addUserForm.reset({ name: "", email: "", password: "", role: "siswa", assignedClassIds: [], classId: undefined });
+                addUserForm.reset({ name: "", email: "", password: "", role: "admin" });
                 setShowPassword(false);
                 addUserForm.clearErrors();
             }
           }}>
             <DialogTrigger asChild>
-              <Button size="sm" onClick={() => { if(allClasses.length === 0 && !isLoadingClasses) fetchAllClasses();}}>
+              <Button size="sm" onClick={() => { if(allClasses.length === 0 || unlinkedTeachers.length === 0) fetchPageData();}}>
                 <PlusCircle className="mr-2 h-4 w-4" /> {isMobile ? 'Tambah' : 'Tambah Pengguna'}
               </Button>
             </DialogTrigger>
@@ -649,21 +701,79 @@ export default function UserAdministrationPage() {
               <DialogHeader>
                 <DialogTitle>Tambah Pengguna Baru</DialogTitle>
                 <DialogDescription>
-                  Isi detail pengguna. Tetapkan kelas jika peran adalah Guru atau Siswa.
+                  Pilih peran, lalu isi detail pengguna untuk membuat akun login.
                 </DialogDescription>
               </DialogHeader>
               <Form {...addUserForm}>
               <form onSubmit={addUserForm.handleSubmit(handleAddUserSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                 <div>
-                  <Label htmlFor="name">Nama Lengkap <span className="text-destructive">*</span></Label>
-                  <Input id="name" {...addUserForm.register("name")} className="mt-1" />
-                  {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
+                  <Label htmlFor="role">Peran <span className="text-destructive">*</span></Label>
+                  <Controller
+                    name="role"
+                    control={addUserForm.control}
+                    render={({ field }) => (
+                        <Select onValueChange={(value) => field.onChange(value as Role)} defaultValue={field.value}>
+                            <SelectTrigger id="role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
+                            <SelectContent>
+                            {ROLES.map((roleItem) => ( <SelectItem key={roleItem} value={roleItem}>{roleDisplayNames[roleItem]}</SelectItem> ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                  />
+                  {addUserForm.formState.errors.role && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.role.message}</p>}
                 </div>
-                <div>
-                  <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
-                  <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
-                  {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
-                </div>
+                
+                {watchAddUserRole === 'guru' ? (
+                    <>
+                        <Controller
+                            name="teacherProfileId"
+                            control={addUserForm.control}
+                            render={({ field }) => (
+                                <div>
+                                    <Label>Nama Guru <span className="text-destructive">*</span></Label>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih dari profil guru" /></SelectTrigger>
+                                        <SelectContent>
+                                            {unlinkedTeachers.length === 0 ? (
+                                                <SelectItem value="no-teachers" disabled>Tidak ada profil guru yang belum punya akun.</SelectItem>
+                                            ) : (
+                                                unlinkedTeachers.map(teacher => <SelectItem key={teacher.id} value={teacher.id}>{teacher.name}</SelectItem>)
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                        />
+                         {addUserForm.formState.errors.teacherProfileId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.teacherProfileId.message}</p>}
+                        
+                        <div>
+                            <Label>Email</Label>
+                            <Input {...addUserForm.register("email")} className="mt-1 bg-muted" readOnly />
+                        </div>
+                        <div>
+                            <Label>Kelas yang Ditugaskan</Label>
+                            <Input 
+                                value={addUserForm.watch('assignedClassIds')?.map(id => allClasses.find(c => c.id === id)?.name).filter(Boolean).join(', ') || 'Pilih guru untuk melihat kelas'}
+                                className="mt-1 bg-muted h-auto" readOnly 
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <>
+                      <div>
+                        <Label htmlFor="name">Nama Lengkap <span className="text-destructive">*</span></Label>
+                        <Input id="name" {...addUserForm.register("name")} className="mt-1" />
+                        {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
+                      </div>
+                      <div>
+                        <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
+                        <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
+                        {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
+                      </div>
+                    </>
+                )}
+
+
                 <div>
                   <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
                   <div className="relative mt-1">
@@ -674,27 +784,7 @@ export default function UserAdministrationPage() {
                   </div>
                   {addUserForm.formState.errors.password && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.password.message}</p>}
                 </div>
-                <div>
-                  <Label htmlFor="role">Peran <span className="text-destructive">*</span></Label>
-                  <Controller
-                    name="role"
-                    control={addUserForm.control}
-                    render={({ field }) => (
-                        <Select onValueChange={(value) => {
-                            field.onChange(value as Role);
-                            addUserForm.trigger(["assignedClassIds", "classId"]);
-                        }} defaultValue={field.value}>
-                            <SelectTrigger id="role" className="mt-1"><SelectValue placeholder="Pilih peran" /></SelectTrigger>
-                            <SelectContent>
-                            {ROLES.map((roleItem) => ( <SelectItem key={roleItem} value={roleItem}>{roleDisplayNames[roleItem]}</SelectItem> ))}
-                            </SelectContent>
-                        </Select>
-                    )}
-                  />
-                  {addUserForm.formState.errors.role && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.role.message}</p>}
-                </div>
-
-                {renderClassAssignmentField(addUserForm, watchAddUserRole)}
+                
 
                 <DialogFooter>
                   <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
@@ -770,7 +860,7 @@ export default function UserAdministrationPage() {
             </div>
           </div>
 
-          {isLoadingUsers || isLoadingClasses ? (
+          {isLoading ? (
              <div className="space-y-2 mt-4"> {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)} </div>
           ) : currentTableData.length > 0 ? (
             <>
@@ -975,7 +1065,3 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
-
-    
-
-    
