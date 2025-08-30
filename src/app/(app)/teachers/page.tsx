@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -505,7 +504,7 @@ export default function TeachersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {isLoadingAuthUsers && <SelectItem key="loading-auth-users" value="loading" disabled>Memuat...</SelectItem>}
-                  <SelectItem key="no-auth-user-option" value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Tautkan nanti</SelectItem>
+                  <SelectItem key="no-auth-user-option" value={NO_AUTH_USER_SELECTED}>Tidak ditautkan / Kosongkan</SelectItem>
                   {authGuruUsers
                     .filter(authUser => authUser && typeof authUser.id === 'string' && authUser.id.length > 0)
                     .map((authUser) => (
