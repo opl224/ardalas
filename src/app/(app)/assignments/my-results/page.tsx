@@ -48,7 +48,7 @@ export default function MyAssignmentResultsPage() {
 
   useEffect(() => {
     const fetchMyGrades = async () => {
-      if (authLoading || !user) {
+      if (!user) {
         setIsLoading(false);
         setGrades([]);
         return;
@@ -155,11 +155,8 @@ export default function MyAssignmentResultsPage() {
       }
     };
 
-    if (!authLoading && user) {
+    if (!authLoading) {
         fetchMyGrades();
-    } else if (!authLoading && !user) {
-        setIsLoading(false);
-        setGrades([]);
     }
   }, [authLoading, user, role]);
 

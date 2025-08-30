@@ -46,7 +46,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { ClipboardCheck, PlusCircle, Edit, Trash2, CalendarIcon, DownloadCloud, Send, Eye, BarChart3, Link as LinkIcon, GraduationCap, FilePenLine, MoreVertical, Search, Filter as FilterIcon, BookOpen, Users } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, isPast, startOfDay } from "date-fns";
@@ -66,7 +66,6 @@ import {
   orderBy,
   where,
   documentId,
-  getDoc,
   writeBatch,
   limit
 } from "firebase/firestore";
@@ -619,7 +618,7 @@ export default function AssignmentsPage() {
       }
 
 
-      const newAssignmentRef = await addDoc(collection(db, "assignments"), assignmentData);
+      await addDoc(collection(db, "assignments"), assignmentData);
       toast({ title: "Tugas Ditambahkan" });
 
       const batch = writeBatch(db);
@@ -1041,11 +1040,11 @@ export default function AssignmentsPage() {
                   <DialogHeader><DialogTitle>Tambah Tugas Baru</DialogTitle><DialogDescription>Isi detail tugas.</DialogDescription></DialogHeader>
                   <form onSubmit={addAssignmentForm.handleSubmit(handleAddAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div><Label htmlFor="add-assignment-title">Judul Tugas <span className="text-destructive">*</span></Label><Input id="add-assignment-title" {...addAssignmentForm.register("title")} className="mt-1" />{addAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.title.message}</p>}</div>
-                    <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
-                    <div><Label htmlFor="add-assignment-classId">Kelas <span className="text-destructive">*</span></Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{(isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{(isAdminRole ? classes : teacherTaughtClassesForFilter).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label><Select onValueChange={(value) => addAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} value={addAssignmentForm.getValues("subjectId")}><SelectTrigger id="add-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.subjectId.message}</p>}</div>
+                    <div><Label htmlFor="add-assignment-classId">Kelas <span className="text-destructive">*</span></Label><Select onValueChange={(value) => addAssignmentForm.setValue("classId", value, { shouldValidate: true })} value={addAssignmentForm.getValues("classId")}><SelectTrigger id="add-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{(isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{(isAdminRole ? classes : teacherTaughtClassesForFilter).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.classId.message}</p>}</div>
                     
                     {isAdminRole && (
-                        <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas <span className="text-destructive">*</span></Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
+                        <div><Label htmlFor="add-assignment-teacherId">Guru Pemberi Tugas <span className="text-destructive">*</span></Label><Select onValueChange={(value) => addAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} value={addAssignmentForm.getValues("teacherId")}><SelectTrigger id="add-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.length === 0 && <SelectItem value="loading" disabled>Memuat...</SelectItem>}{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{addAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addAssignmentForm.formState.errors.teacherId.message}</p>}</div>
                     )}
                     {isTeacherRole && (
                         <Input type="hidden" {...addAssignmentForm.register("teacherId", { value: teacherProfileId || ""})} />
@@ -1159,7 +1158,6 @@ export default function AssignmentsPage() {
                     value={selectedClassFilter}
                     onValueChange={setSelectedClassFilter}
                     disabled={isLoading || (isAdminRole ? classes : teacherTaughtClassesForFilter).length === 0}
-                     className="flex-1"
                 >
                     <SelectTrigger className="md:min-w-[150px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
@@ -1174,7 +1172,6 @@ export default function AssignmentsPage() {
                     value={selectedSubjectFilter}
                     onValueChange={setSelectedSubjectFilter}
                     disabled={isLoading || (isAdminRole ? subjects : teacherTaughtSubjectsForFilter).length === 0}
-                    className="flex-1"
                 >
                     <SelectTrigger className="md:min-w-[180px]">
                     <FilterIcon className="mr-2 h-4 w-4 text-muted-foreground"/>
@@ -1360,11 +1357,11 @@ export default function AssignmentsPage() {
             <form onSubmit={editAssignmentForm.handleSubmit(handleEditAssignmentSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Input type="hidden" {...editAssignmentForm.register("id")} />
               <div><Label htmlFor="edit-assignment-title">Judul Tugas <span className="text-destructive">*</span></Label><Input id="edit-assignment-title" {...editAssignmentForm.register("title")} className="mt-1" />{editAssignmentForm.formState.errors.title && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.title.message}</p>}</div>
-              <div><Label htmlFor="edit-assignment-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label><Select onValueChange={(value) => editAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("subjectId")}><SelectTrigger id="edit-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.subjectId.message}</p>}</div>
-              <div><Label htmlFor="edit-assignment-classId">Kelas <span className="text-destructive">*</span></Label><Select onValueChange={(value) => editAssignmentForm.setValue("classId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("classId")}><SelectTrigger id="edit-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{(isAdminRole ? classes : teacherTaughtClassesForFilter).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.classId.message}</p>}</div>
+              <div><Label htmlFor="edit-assignment-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label><Select onValueChange={(value) => editAssignmentForm.setValue("subjectId", value, { shouldValidate: true })} value={editAssignmentForm.getValues("subjectId")}><SelectTrigger id="edit-assignment-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger><SelectContent>{(isAdminRole ? subjects : teacherTaughtSubjectsForFilter).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.subjectId.message}</p>}</div>
+              <div><Label htmlFor="edit-assignment-classId">Kelas <span className="text-destructive">*</span></Label><Select onValueChange={(value) => editAssignmentForm.setValue("classId", value, { shouldValidate: true })} value={editAssignmentForm.getValues("classId")}><SelectTrigger id="edit-assignment-classId" className="mt-1"><SelectValue placeholder="Pilih kelas" /></SelectTrigger><SelectContent>{(isAdminRole ? classes : teacherTaughtClassesForFilter).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.classId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.classId.message}</p>}</div>
               
               {isAdminRole && (
-                <div><Label htmlFor="edit-assignment-teacherId">Guru <span className="text-destructive">*</span></Label><Select onValueChange={(value) => editAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} defaultValue={editAssignmentForm.getValues("teacherId")}><SelectTrigger id="edit-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.teacherId.message}</p>}</div>
+                <div><Label htmlFor="edit-assignment-teacherId">Guru <span className="text-destructive">*</span></Label><Select onValueChange={(value) => editAssignmentForm.setValue("teacherId", value, { shouldValidate: true })} value={editAssignmentForm.getValues("teacherId")}><SelectTrigger id="edit-assignment-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger><SelectContent>{teachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent></Select>{editAssignmentForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editAssignmentForm.formState.errors.teacherId.message}</p>}</div>
               )}
                {isTeacherRole && (
                     <Input type="hidden" {...editAssignmentForm.register("teacherId", { value: teacherProfileId || ""})} />
@@ -1626,4 +1623,3 @@ export default function AssignmentsPage() {
     </div>
   );
 }
-
