@@ -135,6 +135,7 @@ function TeacherAdminAttendanceManagement() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); 
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [existingAttendanceDocId, setExistingAttendanceDocId] = useState<string | null>(null);
+  const [isLessonScheduled, setIsLessonScheduled] = useState<boolean | null>(null);
 
   const [selectedExportMonth, setSelectedExportMonth] = useState<number>(getMonth(new Date()));
   const [selectedExportYear, setSelectedExportYear] = useState<number>(getYear(new Date()));
@@ -291,14 +292,35 @@ function TeacherAdminAttendanceManagement() {
     const fetchAttendanceData = async () => {
       if (!selectedClassId || !selectedSubjectId || !selectedDate) {
         replace([]);
+        setIsLessonScheduled(null);
         return;
       }
       setIsLoadingFormData(true);
       setExistingAttendanceDocId(null);
+      setIsLessonScheduled(null);
+      
       const dateToQuery = Timestamp.fromDate(startOfDay(selectedDate));
       const currentDayName = DAY_NAMES_ID[getDay(selectedDate)];
-
+      
       try {
+        // Step 1: Check if a lesson is scheduled for the selected day
+        const lessonScheduleQuery = query(collection(db, "lessons"),
+            where("classId", "==", selectedClassId),
+            where("subjectId", "==", selectedSubjectId),
+            where("dayOfWeek", "==", currentDayName),
+            limit(1)
+        );
+        const lessonScheduleSnapshot = await getDocs(lessonScheduleQuery);
+
+        if (lessonScheduleSnapshot.empty) {
+            setIsLessonScheduled(false);
+            replace([]);
+            setIsLoadingFormData(false);
+            return;
+        }
+        setIsLessonScheduled(true);
+
+        // Step 2: Fetch students of the class
         const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
@@ -309,6 +331,7 @@ function TeacherAdminAttendanceManagement() {
             return;
         }
 
+        // Step 3: Check for existing attendance record for that day
         const attendanceQuery = query(
           collection(db, "attendances"),
           where("classId", "==", selectedClassId),
@@ -804,11 +827,16 @@ function TeacherAdminAttendanceManagement() {
                 <div className="space-y-2 mt-4">
                   <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" />
                 </div>
+              ) : isLessonScheduled === false ? (
+                 <div className="mt-4 p-4 border border-dashed border-destructive rounded-md text-center text-destructive flex items-center justify-center gap-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <span>Tidak ada jadwal pelajaran untuk kelas, mata pelajaran, dan tanggal yang dipilih.</span>
+                 </div>
               ) : fields.length === 0 ? (
                  <div className="mt-4 p-4 border border-dashed border-border rounded-md text-center text-muted-foreground">
                     Tidak ada siswa di kelas ini atau data siswa belum termuat.
                  </div>
-              ) : fields.length > 0 ? (
+              ) : fields.length > 0 && isLessonScheduled ? (
                 <div className="mt-4 space-y-4">
                   <h3 className="text-lg font-medium">Daftar Siswa ({fields.length} siswa)</h3>
                   <div className="overflow-x-auto">
@@ -843,7 +871,7 @@ function TeacherAdminAttendanceManagement() {
                 </div>
               ) : null
             )}
-            {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingFormData && (
+            {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingFormData && isLessonScheduled && (
               <div className="flex justify-end mt-6">
                 <Button type="submit" disabled={isSubmitting || isLoadingFormData}>
                   {isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
