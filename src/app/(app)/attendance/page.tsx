@@ -20,10 +20,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink, Eye, MoreHorizontal, Filter } from "lucide-react";
+import { CalendarCheck, CalendarIcon, AlertCircle, Save, FileDown, FileSpreadsheet, Clock, CheckCircle, XCircle, Info, RefreshCw, BookOpen, ExternalLink, Eye, MoreHorizontal, Filter, Edit } from "lucide-react";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useForm, useFieldArray, type SubmitHandler, Controller } from "react-hook-form";
+import { useForm, useFieldArray, type SubmitHandler, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid, getDay, isWithinInterval } from "date-fns";
@@ -52,9 +52,10 @@ import * as XLSX from 'xlsx';
 import Link from "next/link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSidebar } from "@/components/ui/sidebar";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 
 // --- Types for Teacher/Admin View ---
@@ -123,6 +124,7 @@ interface StudentAttendanceViewProps {
 
 function TeacherAdminAttendanceManagement() {
   const { user, role, loading: authLoading } = useAuth(); 
+  const { isMobile } = useSidebar();
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]); 
   const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); 
   const [classesForDropdown, setClassesForDropdown] = useState<ClassMin[]>([]);
@@ -140,6 +142,9 @@ function TeacherAdminAttendanceManagement() {
   const [selectedExportMonth, setSelectedExportMonth] = useState<number>(getMonth(new Date()));
   const [selectedExportYear, setSelectedExportYear] = useState<number>(getYear(new Date()));
   const [isExporting, setIsExporting] = useState(false);
+
+  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+  const [currentNoteIndex, setCurrentNoteIndex] = useState<number | null>(null);
 
   const { toast } = useToast();
 
@@ -743,6 +748,12 @@ function TeacherAdminAttendanceManagement() {
     }
   };
 
+  const handleOpenNoteDialog = (index: number) => {
+    setCurrentNoteIndex(index);
+    setIsNoteDialogOpen(true);
+  };
+
+
   return (
     <div className="space-y-6">
       <div>
@@ -841,7 +852,13 @@ function TeacherAdminAttendanceManagement() {
                   <h3 className="text-lg font-medium">Daftar Siswa ({fields.length} siswa)</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="border-b"><tr><th className="p-2 text-left min-w-[150px]">Nama Siswa</th><th className="p-2 text-left w-36 min-w-[144px]">Status</th><th className="p-2 text-left min-w-[200px]">Catatan (Opsional)</th></tr></thead>
+                        <thead className="border-b">
+                            <tr>
+                                <th className="p-2 text-left min-w-[150px]">Nama Siswa</th>
+                                <th className="p-2 text-left w-36 min-w-[144px]">Status</th>
+                                <th className={cn("p-2 text-left", isMobile ? "w-20 text-center" : "min-w-[200px]")}>Catatan</th>
+                            </tr>
+                        </thead>
                         <tbody>
                         {fields.map((item, index) => (
                             <tr key={item.id} className="border-b">
@@ -858,8 +875,14 @@ function TeacherAdminAttendanceManagement() {
                                 )}/>
                                 {form.formState.errors.studentAttendances?.[index]?.status && (<p className="text-sm text-destructive mt-1">{form.formState.errors.studentAttendances?.[index]?.status?.message}</p>)}
                             </td>
-                            <td className="p-2">
-                                <Input {...form.register(`studentAttendances.${index}.notes`)} placeholder="Catatan..." className="mt-0 w-full" disabled={isSubmitting}/>
+                            <td className={cn("p-2", isMobile && "text-center")}>
+                                {isMobile ? (
+                                     <Button type="button" variant="ghost" size="icon" onClick={() => handleOpenNoteDialog(index)}>
+                                        <Edit className="h-4 w-4" />
+                                    </Button>
+                                ) : (
+                                    <Input {...form.register(`studentAttendances.${index}.notes`)} placeholder="Catatan..." className="mt-0 w-full" disabled={isSubmitting}/>
+                                )}
                             </td>
                             </tr>
                         ))}
@@ -927,6 +950,28 @@ function TeacherAdminAttendanceManagement() {
           </DropdownMenu>
         </CardFooter>
       </Card>
+      
+      {isMobile && currentNoteIndex !== null && (
+        <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Catatan Kehadiran</DialogTitle>
+                    <DialogDescription>
+                        Tambahkan catatan untuk siswa: {fields[currentNoteIndex]?.studentName || 'Siswa'}
+                    </DialogDescription>
+                </DialogHeader>
+                <Textarea
+                  {...form.register(`studentAttendances.${currentNoteIndex}.notes`)}
+                  placeholder="Masukkan catatan di sini..."
+                  className="min-h-[100px]"
+                />
+                <DialogFooter>
+                    <Button onClick={() => setIsNoteDialogOpen(false)}>Simpan & Tutup</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 }
