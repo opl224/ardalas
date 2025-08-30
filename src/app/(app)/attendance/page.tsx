@@ -857,7 +857,7 @@ function TeacherAdminAttendanceManagement() {
                                 <th className="p-2 text-left min-w-[150px]">Nama Siswa</th>
                                 <th className={cn("p-2 text-left", isMobile ? "w-32" : "w-36 min-w-[144px]")}>Status</th>
                                 <th className={cn("p-2 text-left", isMobile ? "w-16 text-center" : "min-w-[200px]")}>
-                                  {isMobile ? <Edit className="h-4 w-4 mx-auto" /> : "Catatan"}
+                                  {isMobile ? "" : "Catatan"}
                                 </th>
                             </tr>
                         </thead>
