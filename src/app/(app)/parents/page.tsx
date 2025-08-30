@@ -117,7 +117,7 @@ interface ClassMin {
 interface Parent {
   id: string; // Firestore document ID of the parent profile
   name: string;
-  email?: string;
+  email: string;
   phone?: string;
   address?: string;
   gender?: "laki-laki" | "perempuan";
@@ -133,7 +133,7 @@ const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha
 
 const parentFormSchema = z.object({
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
+  email: z.string({ required_error: "Email harus diisi." }).email({ message: "Format email tidak valid." }),
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   address: z.string().trim().optional(),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
@@ -328,7 +328,7 @@ export default function ParentsPage() {
       editParentForm.reset({
         id: selectedParent.id,
         name: selectedParent.name,
-        email: selectedParent.email || "",
+        email: selectedParent.email,
         phone: selectedParent.phone || "",
         address: selectedParent.address || "",
         gender: selectedParent.gender,
@@ -355,7 +355,7 @@ export default function ParentsPage() {
       const parentsCollectionRef = collection(db, "parents");
       const newParentDocRef = await addDoc(parentsCollectionRef, {
         name: data.name,
-        email: data.email || null,
+        email: data.email,
         phone: data.phone || null,
         address: data.address || null,
         gender: data.gender,
@@ -404,7 +404,7 @@ export default function ParentsPage() {
       const parentDocRef = doc(db, "parents", data.id);
       batch.update(parentDocRef, {
         name: data.name,
-        email: data.email || null,
+        email: data.email,
         phone: data.phone || null,
         address: data.address || null,
         gender: data.gender,
@@ -652,7 +652,7 @@ export default function ParentsPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-parent-email`}>Email</Label>
+        <Label htmlFor={`${formType}-parent-email`}>Email <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-parent-email`} type="email" {...formInstance.register("email")} className="mt-1" />
         {formInstance.formState.errors.email && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>
