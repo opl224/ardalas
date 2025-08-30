@@ -92,6 +92,7 @@ import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import { useSidebar } from "@/components/ui/sidebar";
 
+const ADMIN_SECURITY_CODE = "1234";
 
 interface ClassMin {
   id: string;
@@ -104,6 +105,14 @@ interface TeacherProfileMin {
     email: string;
     classIds: string[];
 }
+
+interface ParentProfileMin {
+    id: string; // Document ID from 'parents' collection
+    name: string;
+    email: string | null;
+    studentName: string;
+}
+
 
 interface User {
   id: string;
@@ -120,30 +129,33 @@ interface User {
 const baseUserSchema = z.object({
   role: z.enum(ROLES, { required_error: "Pilih peran yang valid." }),
   name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  email: z.string().email({ message: "Format email tidak valid." }),
+  email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   password: z.string().min(6, { message: "Password minimal 6 karakter." }),
   assignedClassIds: z.array(z.string()).optional(),
   classId: z.string().optional(),
   teacherProfileId: z.string().optional(),
+  parentProfileId: z.string().optional(),
+  adminSecurityCode: z.string().optional(),
 });
 
 const addUserFormSchema = baseUserSchema.refine(data => {
-    if (data.role === 'guru') {
-      return !!data.teacherProfileId;
-    }
+    if (data.role === 'guru') return !!data.teacherProfileId;
     return true;
-}, {
-    message: "Pilih profil guru.",
-    path: ["teacherProfileId"],
-}).refine(data => {
-    if (data.role === 'siswa') {
-      return !!data.classId;
-    }
+}, { message: "Pilih profil guru.", path: ["teacherProfileId"] })
+.refine(data => {
+    if (data.role === 'guru') return data.assignedClassIds && data.assignedClassIds.length > 0;
     return true;
-  }, {
-    message: "Siswa harus memiliki satu kelas yang ditetapkan.",
-    path: ["classId"],
-});
+}, { message: "Guru ini belum ditugaskan ke kelas manapun. Harap tugaskan di menu Guru/Pelajaran.", path: ["teacherProfileId"] })
+.refine(data => {
+    if (data.role === 'orangtua') return !!data.parentProfileId;
+    return true;
+}, { message: "Pilih profil orang tua.", path: ["parentProfileId"] })
+.refine(data => {
+    if (data.role === 'admin') return data.adminSecurityCode === ADMIN_SECURITY_CODE;
+    return true;
+}, { message: "Kode keamanan salah.", path: ["adminSecurityCode"] });
+
+
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 const editUserFormSchema = z.object({
@@ -178,6 +190,7 @@ export default function UserAdministrationPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [unlinkedTeachers, setUnlinkedTeachers] = useState<TeacherProfileMin[]>([]);
+  const [unlinkedParents, setUnlinkedParents] = useState<ParentProfileMin[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
 
@@ -204,6 +217,8 @@ export default function UserAdministrationPage() {
       assignedClassIds: [],
       classId: undefined,
       teacherProfileId: undefined,
+      parentProfileId: undefined,
+      adminSecurityCode: "",
     },
   });
 
@@ -218,11 +233,12 @@ export default function UserAdministrationPage() {
   const fetchPageData = async () => {
     setIsLoading(true);
     try {
-        const [usersSnapshot, classesSnapshot, teachersSnapshot, lessonsSnapshot] = await Promise.all([
+        const [usersSnapshot, classesSnapshot, teachersSnapshot, lessonsSnapshot, parentsSnapshot] = await Promise.all([
             getDocs(query(collection(db, "users"), orderBy("name", "asc"))),
             getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
             getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
-            getDocs(query(collection(db, "lessons")))
+            getDocs(query(collection(db, "lessons"))),
+            getDocs(query(collection(db, "parents"), orderBy("name", "asc")))
         ]);
 
         const fetchedUsers: User[] = usersSnapshot.docs.map(docSnap => ({
@@ -273,6 +289,13 @@ export default function UserAdministrationPage() {
         }));
 
         setUnlinkedTeachers(profilesWithClassIds.filter(t => !t.uid));
+        
+        const allParentProfiles = parentsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as (ParentProfileMin & {uid?: string});
+        setUnlinkedParents(allParentProfiles.filter(p => !p.uid));
+
 
     } catch (error) {
         console.error("Error fetching page data: ", error);
@@ -294,15 +317,21 @@ export default function UserAdministrationPage() {
   const watchAddUserRole = addUserForm.watch("role");
   const watchEditUserRole = editUserForm.watch("role");
   const watchAddTeacherProfileId = addUserForm.watch("teacherProfileId");
+  const watchAddParentProfileId = addUserForm.watch("parentProfileId");
 
 
   useEffect(() => {
-    // Reset fields when role changes
-    addUserForm.setValue("name", "");
-    addUserForm.setValue("email", "");
-    addUserForm.setValue("teacherProfileId", undefined);
-    addUserForm.setValue("assignedClassIds", []);
-    addUserForm.setValue("classId", undefined);
+    addUserForm.reset({
+      role: addUserForm.getValues("role"),
+      name: "",
+      email: "",
+      password: "",
+      assignedClassIds: [],
+      classId: undefined,
+      teacherProfileId: undefined,
+      parentProfileId: undefined,
+      adminSecurityCode: "",
+    });
     addUserForm.clearErrors();
   }, [watchAddUserRole, addUserForm]);
 
@@ -317,6 +346,18 @@ export default function UserAdministrationPage() {
         }
     }
   }, [watchAddTeacherProfileId, watchAddUserRole, unlinkedTeachers, addUserForm]);
+
+  useEffect(() => {
+    if (watchAddUserRole === 'orangtua' && watchAddParentProfileId) {
+        const selectedParent = unlinkedParents.find(p => p.id === watchAddParentProfileId);
+        if (selectedParent) {
+            addUserForm.setValue("name", selectedParent.name);
+            if (selectedParent.email) {
+                addUserForm.setValue("email", selectedParent.email);
+            }
+        }
+    }
+  }, [watchAddParentProfileId, watchAddUserRole, unlinkedParents, addUserForm]);
 
 
   useEffect(() => {
@@ -345,12 +386,14 @@ export default function UserAdministrationPage() {
   const handleAddUserSubmit: SubmitHandler<AddUserFormValues> = async (data) => {
     addUserForm.clearErrors();
     let secondaryApp: FirebaseApp | undefined;
+    
+    const finalEmail = data.email || `${data.name.toLowerCase().replace(/\s+/g, '.')}@sekolah.sch.id`;
 
     try {
       secondaryApp = initializeApp(firebaseConfig, `user-creation-app-${Date.now()}`);
       const secondaryAuth = getAuth(secondaryApp);
       
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password);
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, finalEmail, data.password);
       const newAuthUser = userCredential.user;
 
       const userData: {
@@ -360,28 +403,25 @@ export default function UserAdministrationPage() {
         role: Role;
         createdAt: Timestamp;
         assignedClassIds?: string[];
-        classId?: string;
-        className?: string;
       } = {
         uid: newAuthUser.uid,
         name: data.name,
-        email: data.email,
+        email: finalEmail,
         role: data.role,
         createdAt: serverTimestamp() as Timestamp,
       };
 
-      if (data.role === 'guru' && data.assignedClassIds && data.assignedClassIds.length > 0) {
-        userData.assignedClassIds = data.assignedClassIds;
+      if (data.role === 'guru') {
+        userData.assignedClassIds = data.assignedClassIds || [];
         if(data.teacherProfileId){
             const teacherDocRef = doc(db, "teachers", data.teacherProfileId);
             await updateDoc(teacherDocRef, { uid: newAuthUser.uid });
         }
-      }
-
-      if (data.role === 'siswa' && data.classId) {
-        const selectedClass = allClasses.find(c => c.id === data.classId);
-        userData.classId = data.classId;
-        userData.className = selectedClass?.name || "";
+      } else if (data.role === 'orangtua') {
+         if (data.parentProfileId) {
+            const parentDocRef = doc(db, "parents", data.parentProfileId);
+            await updateDoc(parentDocRef, { uid: newAuthUser.uid });
+         }
       }
 
       await setDoc(doc(db, "users", newAuthUser.uid), userData);
@@ -569,41 +609,6 @@ export default function UserAdministrationPage() {
           )}
         </div>
       );
-    } else if (currentRole === 'siswa') {
-      return (
-         <div>
-            <Label htmlFor="classId">Kelas Siswa <span className="text-destructive">*</span></Label>
-            {noClassesAvailable && (
-                 <div className="mt-2 mb-2 p-3 border border-dashed border-destructive rounded-md text-destructive text-sm flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada kelas. Tambahkan di menu "Akademik &gt; Kelas".</span>
-                </div>
-            )}
-            <Controller
-                name="classId"
-                control={formInstance.control}
-                render={({ field }) => (
-                    <Select
-                        onValueChange={(value) => { field.onChange(value); formInstance.trigger("classId");}}
-                        value={field.value || undefined}
-                        disabled={isLoading || noClassesAvailable}
-                    >
-                        <SelectTrigger id="classId" className="mt-1">
-                            <SelectValue placeholder={isLoading ? "Memuat kelas..." : (noClassesAvailable ? "Tidak ada kelas." : "Pilih kelas")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {isLoading && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                            {allClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                            {allClasses.length === 0 && !isLoading && <SelectItem value="no-classes" disabled>Tidak ada kelas tersedia.</SelectItem>}
-                        </SelectContent>
-                    </Select>
-                )}
-            />
-            {(formInstance.formState.errors as any).classId && (
-                <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).classId.message}</p>
-            )}
-        </div>
-      );
     }
     return null;
   };
@@ -758,6 +763,40 @@ export default function UserAdministrationPage() {
                             />
                         </div>
                     </>
+                ) : watchAddUserRole === 'orangtua' ? (
+                    <>
+                       <Controller
+                            name="parentProfileId"
+                            control={addUserForm.control}
+                            render={({ field }) => (
+                                <div>
+                                    <Label>Nama Orang Tua <span className="text-destructive">*</span></Label>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih dari profil orang tua" /></SelectTrigger>
+                                        <SelectContent>
+                                            {unlinkedParents.length === 0 ? (
+                                                <SelectItem value="no-parents" disabled>Tidak ada profil orang tua yang belum punya akun.</SelectItem>
+                                            ) : (
+                                                unlinkedParents.map(parent => <SelectItem key={parent.id} value={parent.id}>{parent.name}</SelectItem>)
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                        />
+                        {addUserForm.formState.errors.parentProfileId && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.parentProfileId.message}</p>}
+                        <div>
+                            <Label>Email</Label>
+                            <Input {...addUserForm.register("email")} className="mt-1 bg-muted" readOnly placeholder="Pilih orang tua untuk melihat email"/>
+                        </div>
+                         <div>
+                            <Label>Anak Terhubung</Label>
+                            <Input 
+                                value={unlinkedParents.find(p => p.id === watchAddParentProfileId)?.studentName || 'Pilih orang tua untuk melihat anak'}
+                                className="mt-1 bg-muted" readOnly 
+                            />
+                        </div>
+                    </>
                 ) : (
                     <>
                       <div>
@@ -770,6 +809,13 @@ export default function UserAdministrationPage() {
                         <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
                         {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
                       </div>
+                      {watchAddUserRole === 'admin' && (
+                        <div>
+                            <Label htmlFor="adminSecurityCode">Kode Keamanan <span className="text-destructive">*</span></Label>
+                            <Input id="adminSecurityCode" type="password" {...addUserForm.register("adminSecurityCode")} className="mt-1" />
+                            {addUserForm.formState.errors.adminSecurityCode && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.adminSecurityCode.message}</p>}
+                        </div>
+                      )}
                     </>
                 )}
 
@@ -882,7 +928,7 @@ export default function UserAdministrationPage() {
                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
                       <TableCell className="font-medium truncate" title={user.name}>{user.name}</TableCell>
                       {!isMobile && <TableCell className="truncate" title={user.email}>{user.email}</TableCell>}
-                      <TableCell>{roleDisplayNames[user.role] || user.role}</TableCell>
+                      <TableCell>{roleDisplayNames[user.role as keyof typeof roleDisplayNames] || user.role}</TableCell>
                       {!isMobile && (
                         <TableCell className="truncate" title={user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) : user.role === 'siswa' ? (user.className || user.classId || '-') : "-"}>
                           {user.role === 'guru' ? renderAssignedClassesForTeacher(user.assignedClassIds) :
@@ -981,7 +1027,7 @@ export default function UserAdministrationPage() {
                     <div><Label className="text-muted-foreground">Nama Lengkap:</Label><p className="font-medium">{selectedUser.name}</p></div>
                     <div><Label className="text-muted-foreground">Email:</Label><p className="font-medium">{selectedUser.email}</p></div>
                     <div><Label className="text-muted-foreground">UID:</Label><p className="font-mono text-xs">{selectedUser.uid}</p></div>
-                    <div><Label className="text-muted-foreground">Peran:</Label><p className="font-medium">{roleDisplayNames[selectedUser.role]}</p></div>
+                    <div><Label className="text-muted-foreground">Peran:</Label><p className="font-medium">{roleDisplayNames[selectedUser.role as keyof typeof roleDisplayNames]}</p></div>
                     {selectedUser.role === 'guru' && (
                         <div>
                             <Label className="text-muted-foreground">Kelas Ditugaskan:</Label>
@@ -1065,3 +1111,4 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
