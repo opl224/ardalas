@@ -128,7 +128,7 @@ interface User {
 
 const baseUserSchema = z.object({
   role: z.enum(ROLES, { required_error: "Pilih peran yang valid." }),
-  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
+  name: z.string().min(1, { message: "Nama wajib diisi." }),
   email: z.string().email({ message: "Format email tidak valid." }).optional().or(z.literal("")),
   password: z.string().min(6, { message: "Password minimal 6 karakter." }),
   assignedClassIds: z.array(z.string()).optional(),
@@ -139,9 +139,17 @@ const baseUserSchema = z.object({
 });
 
 const addUserFormSchema = baseUserSchema.refine(data => {
+    if (data.role === 'admin') return z.string().min(1, { message: "Nama wajib diisi." }).safeParse(data.name).success;
+    return true;
+}, { message: "Nama wajib diisi.", path: ["name"] })
+.refine(data => {
+    if (data.role === 'admin') return z.string().min(1, { message: "Email wajib diisi." }).safeParse(data.email).success;
+    return true;
+}, { message: "Email wajib diisi.", path: ["email"] })
+.refine(data => {
     if (data.role === 'guru') return !!data.teacherProfileId;
     return true;
-}, { message: "Pilih profil guru.", path: ["teacherProfileId"] })
+}, { message: "Pilih guru yang valid.", path: ["teacherProfileId"] })
 .refine(data => {
     if (data.role === 'guru') return data.assignedClassIds && data.assignedClassIds.length > 0;
     return true;
@@ -153,7 +161,7 @@ const addUserFormSchema = baseUserSchema.refine(data => {
 .refine(data => {
     if (data.role === 'admin') return data.adminSecurityCode === ADMIN_SECURITY_CODE;
     return true;
-}, { message: "Kode keamanan salah.", path: ["adminSecurityCode"] });
+}, { message: "Kode konfirmasi admin tidak valid.", path: ["adminSecurityCode"] });
 
 
 type AddUserFormValues = z.infer<typeof addUserFormSchema>;
@@ -737,7 +745,7 @@ export default function UserAdministrationPage() {
                                 <div>
                                     <Label>Nama Guru <span className="text-destructive">*</span></Label>
                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih dari profil guru" /></SelectTrigger>
+                                        <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
                                         <SelectContent>
                                             {unlinkedTeachers.length === 0 ? (
                                                 <SelectItem value="no-teachers" disabled>Tidak ada profil guru yang belum punya akun.</SelectItem>
@@ -1111,4 +1119,5 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
 
