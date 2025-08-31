@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -170,7 +171,7 @@ interface FetchedResultData {
 
 
 const assignmentFormSchema = z.object({
-  title: z.string().min(3, { message: "Judul tugas minimal 3 karakter." }),
+  title: z.string().min(1, { message: "Judul tugas wajib diisi." }),
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
   classId: z.string({ required_error: "Pilih kelas." }),
   teacherId: z.string({ required_error: "Pilih guru pemberi tugas." }),
@@ -1623,3 +1624,4 @@ export default function AssignmentsPage() {
     </div>
   );
 }
+

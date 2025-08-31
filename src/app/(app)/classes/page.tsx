@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -111,7 +112,7 @@ interface StudentInClass {
 }
 
 const classFormSchema = z.object({
-  name: z.string().min(3, { message: "Nama kelas minimal 3 karakter." }),
+  name: z.string().min(1, { message: "Nama kelas wajib diisi." }),
   teacherId: z.string().optional(), 
 });
 type ClassFormValues = z.infer<typeof classFormSchema>;
@@ -863,3 +864,4 @@ export default function ClassesPage() {
     </div>
   );
 }
+

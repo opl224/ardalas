@@ -143,7 +143,7 @@ const addUserFormSchema = baseUserSchema.refine(data => {
     return true;
 }, { message: "Nama wajib diisi.", path: ["name"] })
 .refine(data => {
-    if (data.role === 'admin') return z.string().min(1, { message: "Email wajib diisi." }).safeParse(data.email).success;
+    if (data.role === 'admin') return z.string().email({ message: "Email tidak valid." }).min(1, { message: "Email wajib diisi." }).safeParse(data.email).success;
     return true;
 }, { message: "Email wajib diisi.", path: ["email"] })
 .refine(data => {
@@ -168,7 +168,7 @@ type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 const editUserFormSchema = z.object({
   id: z.string(),
-  name: z.string().min(3, { message: "Nama wajib diisi." }),
+  name: z.string().min(1, { message: "Nama wajib diisi." }),
   email: z.string().email({ message: "Format email tidak valid." }),
   role: z.enum(ROLES, { message: "Pilih peran yang valid." }),
   assignedClassIds: z.array(z.string()).optional(),
@@ -1119,5 +1119,6 @@ export default function UserAdministrationPage() {
     </div>
   );
 }
+
 
 

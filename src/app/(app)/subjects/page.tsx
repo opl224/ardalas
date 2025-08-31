@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -121,7 +122,7 @@ const ALL_SUBJECT_OPTIONS = [
 ].sort();
 
 const subjectFormSchema = z.object({
-  name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama mata pelajaran harus dipilih." }),
+  name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama mata pelajaran wajib diisi." }),
   description: z.string().optional(),
   teacherUid: z.string().optional(),
   classIds: z.array(z.string()).optional(),
@@ -840,3 +841,4 @@ export default function SubjectsPage() {
     </div>
   );
 }
+

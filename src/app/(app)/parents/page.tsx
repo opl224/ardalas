@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -132,8 +133,8 @@ const GENDERS = ["laki-laki", "perempuan"] as const;
 const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
 
 const parentFormSchema = z.object({
-  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  email: z.string({ required_error: "Email harus diisi." }).email({ message: "Format email tidak valid." }),
+  name: z.string().min(1, { message: "Nama wajib diisi." }),
+  email: z.string({ required_error: "Email wajib diisi." }).email({ message: "Format email tidak valid." }),
   phone: z.string().min(9, { message: "Nomor telepon minimal 9 digit." }).optional().or(z.literal("")),
   address: z.string().trim().optional(),
   gender: z.enum(GENDERS, { required_error: "Pilih jenis kelamin." }),
@@ -1038,3 +1039,4 @@ export default function ParentsPage() {
 }
 
     
+

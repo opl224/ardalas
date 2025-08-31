@@ -108,7 +108,7 @@ interface EventData {
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
 const _baseEventObjectSchema = z.object({
-  title: z.string().min(3, { message: "Judul acara minimal 3 karakter." }),
+  title: z.string().min(1, { message: "Judul acara wajib diisi." }),
   description: z.string().optional(),
   date: z.date({ required_error: "Tanggal acara harus diisi." }),
   startTime: z.string().regex(timeRegex, { message: "Format JJ:MM." }).optional().or(z.literal("")),
@@ -683,3 +683,4 @@ export default function EventsPage() {
     </div>
   );
 }
+
