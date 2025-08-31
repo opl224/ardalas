@@ -420,7 +420,7 @@ export default function EventsPage() {
            {(formInstance.formState.errors as any).startTime && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).startTime.message}</p>}
         </div>
         <div>
-          <Label htmlFor={`${dialogType}-event-endTime`}>Waktu Selesai<Label>
+          <Label htmlFor={`${dialogType}-event-endTime`}>Waktu Selesai</Label>
           <Input id={`${dialogType}-event-endTime`} type="time" {...formInstance.register("endTime")} className="mt-1" />
           {(formInstance.formState.errors as any).endTime && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).endTime.message}</p>}
         </div>
