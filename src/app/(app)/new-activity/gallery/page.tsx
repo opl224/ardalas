@@ -425,7 +425,7 @@ function GalleryContent() {
                       </div>
                     )}
                      <div>
-                       <Label htmlFor="media-caption">Keterangan (Opsional)</Label>
+                       <Label htmlFor="media-caption">Keterangan ()</Label>
                        <Textarea 
                           id="media-caption"
                           value={newMediaCaption}

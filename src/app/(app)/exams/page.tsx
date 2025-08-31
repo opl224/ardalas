@@ -637,12 +637,12 @@ export default function ExamsPage() {
           </div>
       </div>
       <div>
-        <Label htmlFor={`${dialogType}-exam-examLink`}>Link Ujian (Opsional)</Label>
+        <Label htmlFor={`${dialogType}-exam-examLink`}>Link Ujian ()</Label>
         <Input id={`${dialogType}-exam-examLink`} {...formInstance.register("examLink")} className="mt-1" placeholder="https://contoh.com/link-ujian" />
         {formInstance.formState.errors.examLink && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.examLink.message}</p>}
       </div>
       <div>
-        <Label htmlFor={`${dialogType}-exam-description`}>Deskripsi (Opsional)</Label>
+        <Label htmlFor={`${dialogType}-exam-description`}>Deskripsi ()</Label>
         <Textarea id={`${dialogType}-exam-description`} {...formInstance.register("description")} className="mt-1" />
       </div>
     </>

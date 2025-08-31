@@ -467,7 +467,7 @@ export default function TeachersPage() {
   const renderTeacherFormFields = (formInstance: typeof addTeacherForm | typeof editTeacherForm, formType: 'add' | 'edit') => (
     <>
       <div>
-        <Label htmlFor={`${formType}-name`}>Nama Lengkap<span className="text-destructive">*</span></Label>
+        <Label htmlFor={`${formType}-name`}>Nama Lengkap <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-name`} {...formInstance.register("name")} className="mt-1" />
         {formInstance.formState.errors.name && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.name.message}</p>
@@ -481,7 +481,7 @@ export default function TeachersPage() {
         )}
       </div>
       <div>
-        <Label htmlFor={`${formType}-email`}>Email<span className="text-destructive">*</span></Label>
+        <Label htmlFor={`${formType}-email`}>Email <span className="text-destructive">*</span></Label>
         <Input id={`${formType}-email`} type="email" {...formInstance.register("email")} className="mt-1" />
         {formInstance.formState.errors.email && (
           <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.email.message}</p>

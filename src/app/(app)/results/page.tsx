@@ -1108,7 +1108,7 @@ export default function ResultsPage() {
             </div>
 
             <div>
-                <Label htmlFor={`${dialogType}-result-assignmentId`}>Tugas Terkait (Opsional)</Label>
+                <Label htmlFor={`${dialogType}-result-assignmentId`}>Tugas Terkait ()</Label>
                 <Select
                     onValueChange={(value) => {
                         formInstance.setValue("assignmentId", value === "manual" ? undefined : value, { shouldValidate: true });
@@ -1149,7 +1149,7 @@ export default function ResultsPage() {
                 {formInstance.formState.errors.assessmentTitle && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.assessmentTitle.message}</p>}
             </div>
             <div>
-                <Label htmlFor={`${dialogType}-result-meetingNumber`}>Pertemuan Ke- (Opsional)</Label>
+                <Label htmlFor={`${dialogType}-result-meetingNumber`}>Pertemuan Ke- ()</Label>
                 <Input id={`${dialogType}-result-meetingNumber`} type="number" {...formInstance.register("meetingNumber")} className="mt-1" placeholder="Contoh: 3" disabled={!!currentAssignmentId && currentAssignmentId !== "manual" && assignments.find(a=>a.id === currentAssignmentId)?.meetingNumber !== undefined}/>
                 {formInstance.formState.errors.meetingNumber && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.meetingNumber.message}</p>}
             </div>
@@ -1204,7 +1204,7 @@ export default function ResultsPage() {
               {formInstance.formState.errors.dateOfAssessment && <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.dateOfAssessment.message}</p>}
             </div>
             <div>
-                <Label htmlFor={`${dialogType}-result-feedback`}>Umpan Balik (Opsional)</Label>
+                <Label htmlFor={`${dialogType}-result-feedback`}>Umpan Balik ()</Label>
                 <Textarea id={`${dialogType}-result-feedback`} {...formInstance.register("feedback")} className="mt-1" />
             </div>
         </>
@@ -1575,7 +1575,7 @@ export default function ResultsPage() {
               </Select>
             </div>
              <div>
-              <Label htmlFor="export-studentId">Siswa (Opsional)</Label>
+              <Label htmlFor="export-studentId">Siswa ()</Label>
               <Select 
                 value={exportStudentId || "all_students"} 
                 onValueChange={(value) => setExportStudentId(value === "all_students" ? undefined : value)} 

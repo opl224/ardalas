@@ -487,7 +487,7 @@ export default function SubjectsPage() {
               )}
             </div>
              <div>
-              <Label>Kelas Diajar (Otomatis)</Label>
+              <Label>Kelas Diajar</Label>
               <div className="mt-1 min-h-[40px] w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {selectedTeacher ? selectedTeacher.classNames.join(', ') || 'Guru ini belum mengajar di kelas manapun.' : 'Pilih guru untuk melihat kelas.'}
               </div>

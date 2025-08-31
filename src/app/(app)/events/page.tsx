@@ -415,22 +415,22 @@ export default function EventsPage() {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor={`${dialogType}-event-startTime`}>Waktu Mulai (Opsional)</Label>
+          <Label htmlFor={`${dialogType}-event-startTime`}>Waktu Mulai</Label>
           <Input id={`${dialogType}-event-startTime`} type="time" {...formInstance.register("startTime")} className="mt-1" />
            {(formInstance.formState.errors as any).startTime && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).startTime.message}</p>}
         </div>
         <div>
-          <Label htmlFor={`${dialogType}-event-endTime`}>Waktu Selesai (Opsional)</Label>
+          <Label htmlFor={`${dialogType}-event-endTime`}>Waktu Selesai<Label>
           <Input id={`${dialogType}-event-endTime`} type="time" {...formInstance.register("endTime")} className="mt-1" />
           {(formInstance.formState.errors as any).endTime && <p className="text-sm text-destructive mt-1">{(formInstance.formState.errors as any).endTime.message}</p>}
         </div>
       </div>
       <div>
-        <Label htmlFor={`${dialogType}-event-location`}>Lokasi (Opsional)</Label>
+        <Label htmlFor={`${dialogType}-event-location`}>Lokasi</Label>
         <Input id={`${dialogType}-event-location`} {...formInstance.register("location")} className="mt-1" />
       </div>
        <div>
-        <Label htmlFor={`${dialogType}-event-category`}>Kategori (Opsional)</Label>
+        <Label htmlFor={`${dialogType}-event-category`}>Kategori</Label>
         <Controller
             name="category"
             control={formInstance.control}
@@ -443,7 +443,7 @@ export default function EventsPage() {
         />
       </div>
       <div>
-        <Label>Target Audiens (Opsional)</Label>
+        <Label>Target Audiens ()</Label>
         <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
           {ROLES.map((roleKey) => (
             <FormField
@@ -476,7 +476,7 @@ export default function EventsPage() {
         </div>
       </div>
       <div>
-        <Label htmlFor={`${dialogType}-event-description`}>Deskripsi (Opsional)</Label>
+        <Label htmlFor={`${dialogType}-event-description`}>Deskripsi</Label>
         <Textarea id={`${dialogType}-event-description`} {...formInstance.register("description")} className="mt-1" />
       </div>
     </>
