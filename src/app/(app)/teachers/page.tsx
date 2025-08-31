@@ -116,7 +116,7 @@ const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha
 const MAIN_SUBJECT_OPTIONS = ["Guru Kelas", "PAI", "Penjas"] as const;
 
 const teacherFormSchema = z.object({
-  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
+  name: z.string().min(1, { message: "Nama wajib diisi." }),
   email: z.string().email({ message: "Format email tidak valid." }), 
   nip: z.string().min(5, { message: "NIP minimal 5 karakter." }).optional().or(z.literal('')),
   subject: z.string().min(2, { message: "Mata pelajaran harus dipilih." }),
