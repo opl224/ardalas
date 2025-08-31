@@ -168,7 +168,7 @@ type AddUserFormValues = z.infer<typeof addUserFormSchema>;
 
 const editUserFormSchema = z.object({
   id: z.string(),
-  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
+  name: z.string().min(3, { message: "Nama wajib diisi." }),
   email: z.string().email({ message: "Format email tidak valid." }),
   role: z.enum(ROLES, { message: "Pilih peran yang valid." }),
   assignedClassIds: z.array(z.string()).optional(),

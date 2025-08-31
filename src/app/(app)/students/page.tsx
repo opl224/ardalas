@@ -128,8 +128,8 @@ const GENDERS = ["laki-laki", "perempuan"] as const;
 const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
 
 const baseStudentFormSchema = z.object({
-  name: z.string().min(3, { message: "Nama minimal 3 karakter." }),
-  nis: z.string().min(5, { message: "NIS minimal 5 karakter." }),
+  name: z.string().min(1, { message: "Nama wajib diisi." }),
+  nis: z.string().min(1, { message: "NIS wajib diisi." }),
   nisn: z.string().min(10, { message: "NISN harus 10 digit." }).max(10, { message: "NISN harus 10 digit." }),
   classId: z.string({ required_error: "Pilih kelas." }),
   dateOfBirth: z.date().optional(),
@@ -882,7 +882,8 @@ export default function StudentsPage() {
       }}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
+              {/* Desktop Header */}
+              <div className="hidden md:flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-xl">
                   <Users className="h-6 w-6 text-primary" />
                   <span>Daftar Siswa ({displayedStudents.length})</span>
@@ -897,9 +898,9 @@ export default function StudentsPage() {
                     )}
                      <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size={isMobile ? "icon" : "sm"} disabled={isExporting}>
+                        <Button variant="outline" size="sm" disabled={isExporting}>
                           {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                          {!isMobile && <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>}
+                          <span className="ml-2">{isExporting ? 'Mengekspor...' : 'Ekspor'}</span>
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
@@ -909,13 +910,33 @@ export default function StudentsPage() {
                     </DropdownMenu>
                 </div>
               </div>
-              {authRole === 'admin' && (
-                <div className="md:hidden mt-4">
-                     <DialogTrigger asChild>
+              {/* Mobile Header */}
+              <div className="flex flex-col gap-4 md:hidden">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <Users className="h-6 w-6 text-primary" />
+                    <span>Daftar Siswa ({displayedStudents.length})</span>
+                  </CardTitle>
+                  {authRole === 'admin' && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" disabled={isExporting}>
+                          {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleExport('xlsx')} disabled={isExporting}>Excel (.xlsx)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+                {authRole === 'admin' && (
+                    <DialogTrigger asChild>
                       <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button>
                     </DialogTrigger>
-                </div>
-              )}
+                )}
+              </div>
           </CardHeader>
           <CardContent>
             {(authRole === 'admin' || authRole === 'guru') && (
