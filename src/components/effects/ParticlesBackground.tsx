@@ -39,7 +39,7 @@ const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesArray = useRef<Particle[]>([]);
   const animationFrameId = useRef<number | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null); // Ref for the container div
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const createParticles = useCallback((currentCanvas: HTMLCanvasElement) => {
     particlesArray.current = [];
@@ -117,28 +117,34 @@ const ParticlesBackground: React.FC<ParticlesBackgroundProps> = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const currentContainerRef = containerRef.current;
+    const container = containerRef.current;
 
-    if (!canvas || !currentContainerRef) return;
+    if (!canvas || !container) return;
 
-    const setCanvasSize = () => {
-      // Use containerRef for dimensions
-      canvas.width = currentContainerRef.clientWidth;
-      canvas.height = currentContainerRef.clientHeight;
-      // Re-create particles only if canvas size has actually changed
-      if (particlesArray.current.length === 0 || 
-          (particlesArray.current.length > 0 && 
-           (particlesArray.current[0].x > canvas.width || particlesArray.current[0].y > canvas.height))) {
-        createParticles(canvas);
+    let isInitialized = false;
+
+    const setCanvasSizeAndStart = () => {
+      const { clientWidth, clientHeight } = container;
+      if (clientWidth > 0 && clientHeight > 0) {
+        canvas.width = clientWidth;
+        canvas.height = clientHeight;
+        
+        if (!isInitialized) {
+          createParticles(canvas);
+          animate();
+          isInitialized = true;
+        }
       }
     };
 
-    setCanvasSize();
-    // createParticles is called within setCanvasSize if needed
-    animationFrameId.current = requestAnimationFrame(animate);
+    const resizeObserver = new ResizeObserver(entries => {
+      if (!entries || entries.length === 0) return;
+      // We only need to reset if the size is significant, not on minor reflows
+      // The setCanvasSizeAndStart will handle the initial creation
+      setCanvasSizeAndStart();
+    });
 
-    const resizeObserver = new ResizeObserver(setCanvasSize);
-    resizeObserver.observe(currentContainerRef);
+    resizeObserver.observe(container);
 
     return () => {
       if (animationFrameId.current) {
