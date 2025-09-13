@@ -63,7 +63,9 @@ import {
   where,
   limit,
   documentId,
-  collectionGroup
+  collectionGroup,
+  setDoc,
+  startOfDay,
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -179,6 +181,12 @@ export default function LessonsPage() {
   const { toast } = useToast();
   const { isMobile } = useSidebar();
   const [isSpecialistTeacher, setIsSpecialistTeacher] = useState(false);
+
+  // New state for parent attendance
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+  const [attendanceDay, setAttendanceDay] = useState<string | null>(null);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+  const [attendedDays, setAttendedDays] = useState<Set<string>>(new Set());
 
   const addLessonForm = useForm<LessonFormValues>({
     resolver: zodResolver(lessonFormSchema),
@@ -364,6 +372,29 @@ export default function LessonsPage() {
     }
   }, [selectedLesson, isEditDialogOpen, editLessonForm]);
 
+  // Check for existing daily attendance
+  useEffect(() => {
+    if (role !== 'orangtua' || !authUser?.linkedStudentId) return;
+
+    const todayDate = startOfDay(new Date());
+    const attendanceQuery = query(
+        collection(db, "attendances"),
+        where("studentId", "==", authUser.linkedStudentId),
+        where("date", ">=", Timestamp.fromDate(todayDate))
+    );
+
+    const unsubscribe = onSnapshot(attendanceQuery, (snapshot) => {
+        const newAttendedDays = new Set<string>();
+        snapshot.forEach(doc => {
+            const dateStr = format(doc.data().date.toDate(), 'yyyy-MM-dd');
+            newAttendedDays.add(dateStr);
+        });
+        setAttendedDays(newAttendedDays);
+    });
+
+    return () => unsubscribe();
+  }, [authUser, role]);
+
 
   const getDenormalizedNames = (data: LessonFormValues | EditLessonFormValues) => {
     const aClass = allClasses.find(c => c.id === data.classId);
@@ -461,7 +492,46 @@ export default function LessonsPage() {
       toast({ title: "Gagal Menghapus Pelajaran", variant: "destructive" });
     }
   };
+  
+  const handleParentMarkAttendance = async () => {
+    if (!authUser || role !== 'orangtua' || !authUser.linkedStudentId || !attendanceDay) {
+        toast({ title: "Gagal Absen", description: "Kondisi tidak terpenuhi atau sudah absen.", variant: "destructive"});
+        return;
+    }
 
+    setIsSubmittingAttendance(true);
+    const today = startOfDay(new Date());
+    const attendanceDocId = `${format(today, 'yyyy-MM-dd')}_${authUser.linkedStudentId}`;
+    
+    const attendanceRecord = {
+        studentId: authUser.linkedStudentId,
+        studentName: authUser.linkedStudentName,
+        classId: authUser.linkedStudentClassId,
+        className: authUser.linkedStudentClassName,
+        date: Timestamp.fromDate(today),
+        status: "Hadir",
+        notes: `Kehadiran ditandai oleh orang tua pada hari ${attendanceDay}.`,
+        recordedById: authUser.uid,
+        recordedByName: authUser.displayName,
+        lastUpdatedAt: serverTimestamp(),
+    };
+    
+    try {
+        await setDoc(doc(db, "attendances", attendanceDocId), attendanceRecord, { merge: true });
+        toast({
+            title: "Absensi Berhasil",
+            description: `${authUser.linkedStudentName} telah ditandai Hadir untuk hari ini.`,
+        });
+        setIsAttendanceDialogOpen(false);
+        setAttendanceDay(null);
+        setAttendedDays(prev => new Set(prev).add(format(today, 'yyyy-MM-dd'))); // Manually update state
+    } catch (e) {
+        console.error("Error submitting parent attendance:", e);
+        toast({ title: "Gagal Menyimpan Absensi", variant: "destructive" });
+    } finally {
+        setIsSubmittingAttendance(false);
+    }
+  };
 
   const openEditDialog = (lesson: LessonData) => {
     if(role !== 'admin') return;
@@ -709,40 +779,66 @@ export default function LessonsPage() {
             <Accordion type="multiple" defaultValue={DAYS_OF_WEEK} className="w-full space-y-2">
               {DAYS_OF_WEEK.map((day) => {
                 const lessonsForDay = lessonsByDay[day];
-                if (!lessonsForDay || lessonsForDay.length === 0) return null;
-                
                 const dayIsActive = DAY_NAMES_ID[getDay(currentTime)] === day;
+                const isTodayAttended = attendedDays.has(format(new Date(), 'yyyy-MM-dd'));
 
                 return (
                   <AccordionItem value={day} key={day}>
-                    <AccordionTrigger className={cn("text-lg font-semibold px-4 rounded-md hover:no-underline", dayIsActive ? "bg-primary/10 text-primary" : "bg-muted/50")}>
-                      {day} ({lessonsForDay.length} Pelajaran)
+                    <AccordionTrigger 
+                        className={cn(
+                          "text-lg font-semibold px-4 rounded-md hover:no-underline flex justify-between items-center",
+                          dayIsActive ? "bg-primary/10 text-primary" : "bg-muted/50"
+                        )}
+                    >
+                      <div className="flex items-center">
+                        {day}
+                        <span className="text-sm font-normal text-muted-foreground ml-2">({lessonsForDay.length} Pelajaran)</span>
+                      </div>
+                       {role === 'orangtua' && (
+                        <Button 
+                            size="sm" 
+                            variant={dayIsActive ? 'default' : 'outline'}
+                            disabled={!dayIsActive || lessonsForDay.length === 0 || isTodayAttended}
+                            className={cn("ml-auto mr-2", isMobile && "text-xs px-2 h-7")}
+                            onClick={(e) => {
+                                e.stopPropagation(); 
+                                setAttendanceDay(day);
+                                setIsAttendanceDialogOpen(true);
+                            }}
+                        >
+                            <LogIn className="mr-2 h-4 w-4"/>
+                            {isTodayAttended ? "Sudah Absen" : "Masuk Kelas"}
+                        </Button>
+                      )}
                     </AccordionTrigger>
                     <AccordionContent className="pt-2">
-                      <div className="overflow-x-auto">
-                        <Table className="table-auto w-full">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[120px]">Waktu</TableHead>
-                              <TableHead>Mata Pelajaran</TableHead>
-                              {!isMobile && (isStudentOrParent || role ==='guru') ? null : <TableHead>Kelas</TableHead>}
-                              {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
-                              {!isMobile && (canManageLessons || role === 'guru') && <TableHead>Topik</TableHead>}
-                              <TableHead className="text-right w-[100px]">Aksi</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                             {lessonsForDay.map((lesson) => {
-                               const isActiveNow = isStudentOrParent ? (isLessonCurrentlyActive(lesson) && !!lesson.isLive) : false;
-                               return (
-                                <TableRow key={lesson.id}>
-                                  <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
-                                  <TableCell className="font-medium">{lesson.subjectName}</TableCell>
-                                  {!isMobile && (isStudentOrParent || role ==='guru') ? null : <TableCell>{lesson.className}</TableCell>}
-                                  {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell>{lesson.teacherName}</TableCell>}
-                                  {!isMobile && (canManageLessons || role === 'guru') && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
-                                  <TableCell className="text-right">
-                                     {isStudentOrParent ? (
+                      {lessonsForDay.length === 0 ? (
+                        <div className="text-center text-muted-foreground py-4">Tidak ada jadwal pelajaran.</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table className="table-auto w-full">
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[120px]">Waktu</TableHead>
+                                <TableHead>Mata Pelajaran</TableHead>
+                                {!isMobile && (isStudentOrParent || role ==='guru') ? null : <TableHead>Kelas</TableHead>}
+                                {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
+                                {!isMobile && (canManageLessons || role === 'guru') && <TableHead>Topik</TableHead>}
+                                <TableHead className="text-right w-[100px]">Aksi</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {lessonsForDay.map((lesson) => {
+                                const isActiveNow = isStudentOrParent ? (isLessonCurrentlyActive(lesson) && !!lesson.isLive) : false;
+                                return (
+                                  <TableRow key={lesson.id}>
+                                    <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
+                                    <TableCell className="font-medium">{lesson.subjectName}</TableCell>
+                                    {!isMobile && (isStudentOrParent || role ==='guru') ? null : <TableCell>{lesson.className}</TableCell>}
+                                    {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell>{lesson.teacherName}</TableCell>}
+                                    {!isMobile && (canManageLessons || role === 'guru') && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
+                                    <TableCell className="text-right">
+                                      {isStudentOrParent ? (
                                         role === "orangtua" ? (
                                           <Button asChild size="sm" variant="outline">
                                             <Link href={`/lessons/${lesson.id}`} aria-label="Lihat Detail">Detail</Link>
@@ -779,13 +875,14 @@ export default function LessonsPage() {
                                         </DropdownMenuContent>
                                       </DropdownMenu>
                                     )}
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
                     </AccordionContent>
                   </AccordionItem>
                 );
@@ -904,7 +1001,29 @@ export default function LessonsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {role === 'orangtua' && (
+        <AlertDialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Konfirmasi Kehadiran Harian</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Anda akan menandai {authUser?.linkedStudentName} sebagai **Hadir** untuk hari ini, {format(new Date(), 'dd MMMM yyyy', {locale: indonesiaLocale})}. 
+                        Tindakan ini menggantikan absensi per pelajaran.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setAttendanceDay(null)}>Batal</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleParentMarkAttendance} disabled={isSubmittingAttendance}>
+                        {isSubmittingAttendance && <LottieLoader width={16} height={16} className="mr-2" />}
+                        Konfirmasi Hadir
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
 
+    
