@@ -91,6 +91,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
 import { id as indonesiaLocale } from 'date-fns/locale';
 import { useSidebar } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 
 const ADMIN_SECURITY_CODE = "1234";
 
@@ -136,6 +137,7 @@ const baseUserSchema = z.object({
   teacherProfileId: z.string().optional(),
   parentProfileId: z.string().optional(),
   adminSecurityCode: z.string().optional(),
+  isSpecialistTeacher: z.boolean().optional(),
 });
 
 const addUserFormSchema = baseUserSchema.refine(data => {
@@ -151,7 +153,9 @@ const addUserFormSchema = baseUserSchema.refine(data => {
     return true;
 }, { message: "Pilih guru yang valid.", path: ["teacherProfileId"] })
 .refine(data => {
-    if (data.role === 'guru') return data.assignedClassIds && data.assignedClassIds.length > 0;
+    if (data.role === 'guru' && !data.isSpecialistTeacher) { // Only validate if not a specialist
+        return data.assignedClassIds && data.assignedClassIds.length > 0;
+    }
     return true;
 }, { message: "Guru ini belum ditugaskan ke kelas manapun. Harap tugaskan di menu Guru/Pelajaran.", path: ["teacherProfileId"] })
 .refine(data => {
@@ -227,6 +231,7 @@ export default function UserAdministrationPage() {
       teacherProfileId: undefined,
       parentProfileId: undefined,
       adminSecurityCode: "",
+      isSpecialistTeacher: false,
     },
   });
 
@@ -339,6 +344,7 @@ export default function UserAdministrationPage() {
       teacherProfileId: undefined,
       parentProfileId: undefined,
       adminSecurityCode: "",
+      isSpecialistTeacher: false,
     });
     addUserForm.clearErrors();
   }, [watchAddUserRole, addUserForm]);
@@ -743,9 +749,19 @@ export default function UserAdministrationPage() {
                             control={addUserForm.control}
                             render={({ field }) => (
                                 <div>
-                                    <Label>Nama Guru <span className="text-destructive">*</span></Label>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <Label htmlFor="specialist-teacher-toggle" className="text-destructive">Nama Guru <span className="text-destructive">*</span></Label>
+                                        <div className="flex items-center space-x-2">
+                                            <Label htmlFor="specialist-teacher-toggle" className="text-xs text-muted-foreground">Guru Khusus</Label>
+                                            <Switch
+                                                id="specialist-teacher-toggle"
+                                                checked={addUserForm.watch("isSpecialistTeacher")}
+                                                onCheckedChange={(checked) => addUserForm.setValue("isSpecialistTeacher", checked)}
+                                            />
+                                        </div>
+                                    </div>
                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder="Pilih guru" /></SelectTrigger>
                                         <SelectContent>
                                             {unlinkedTeachers.length === 0 ? (
                                                 <SelectItem value="no-teachers" disabled>Tidak ada profil guru yang belum punya akun.</SelectItem>
@@ -778,7 +794,7 @@ export default function UserAdministrationPage() {
                             control={addUserForm.control}
                             render={({ field }) => (
                                 <div>
-                                    <Label>Nama Orang Tua <span className="text-destructive">*</span></Label>
+                                    <Label className="text-destructive">Nama Orang Tua <span className="text-destructive">*</span></Label>
                                     <Select onValueChange={field.onChange} value={field.value}>
                                         <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih dari profil orang tua" /></SelectTrigger>
                                         <SelectContent>
@@ -808,18 +824,18 @@ export default function UserAdministrationPage() {
                 ) : (
                     <>
                       <div>
-                        <Label htmlFor="name">Nama Lengkap <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="name" className="text-destructive">Nama Lengkap <span className="text-destructive">*</span></Label>
                         <Input id="name" {...addUserForm.register("name")} className="mt-1" />
                         {addUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.name.message}</p>}
                       </div>
                       <div>
-                        <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
+                        <Label htmlFor="email" className="text-destructive">Email <span className="text-destructive">*</span></Label>
                         <Input id="email" type="email" {...addUserForm.register("email")} className="mt-1" />
                         {addUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.email.message}</p>}
                       </div>
                       {watchAddUserRole === 'admin' && (
                         <div>
-                            <Label htmlFor="adminSecurityCode">Kode Keamanan <span className="text-destructive">*</span></Label>
+                            <Label htmlFor="adminSecurityCode" className="text-destructive">Kode Keamanan <span className="text-destructive">*</span></Label>
                             <Input id="adminSecurityCode" type="password" {...addUserForm.register("adminSecurityCode")} className="mt-1" />
                             {addUserForm.formState.errors.adminSecurityCode && <p className="text-sm text-destructive mt-1">{addUserForm.formState.errors.adminSecurityCode.message}</p>}
                         </div>
@@ -829,7 +845,7 @@ export default function UserAdministrationPage() {
 
 
                 <div>
-                  <Label htmlFor="password">Password <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="password" className="text-destructive">Password <span className="text-destructive">*</span></Label>
                   <div className="relative mt-1">
                     <Input id="password" type={showPassword ? "text" : "password"} {...addUserForm.register("password")} className="hide-password-reveal-icon" />
                     <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Sembunyikan password" : "Tampilkan password"}>
@@ -1076,17 +1092,17 @@ export default function UserAdministrationPage() {
             <form onSubmit={editUserForm.handleSubmit(handleEditUserSubmit)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
               <Input type="hidden" {...editUserForm.register("id")} />
               <div>
-                <Label htmlFor="edit-name">Nama Lengkap <span className="text-destructive">*</span></Label>
+                <Label htmlFor="edit-name" className="text-destructive">Nama Lengkap <span className="text-destructive">*</span></Label>
                 <Input id="edit-name" {...editUserForm.register("name")} className="mt-1" />
                 {editUserForm.formState.errors.name && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.name.message}</p>}
               </div>
               <div>
-                <Label htmlFor="edit-email">Email <span className="text-destructive">*</span></Label>
+                <Label htmlFor="edit-email" className="text-destructive">Email <span className="text-destructive">*</span></Label>
                 <Input id="edit-email" type="email" {...editUserForm.register("email")} className="mt-1" />
                 {editUserForm.formState.errors.email && <p className="text-sm text-destructive mt-1">{editUserForm.formState.errors.email.message}</p>}
               </div>
               <div>
-                <Label htmlFor="edit-role">Peran <span className="text-destructive">*</span></Label>
+                <Label htmlFor="edit-role" className="text-destructive">Peran <span className="text-destructive">*</span></Label>
                  <Controller
                     name="role"
                     control={editUserForm.control}
