@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,13 +115,11 @@ interface TeacherWithClasses {
 }
 
 const ALL_SUBJECT_OPTIONS = [
-    "Matematika", "Bahasa Indonesia", "Bahasa Inggris", "Pendidikan Agama Islam", "Pendidikan Kewarganegaraan",
-    "Ilmu Pengetahuan Alam", "Ilmu Pengetahuan Sosial", "Seni Budaya dan Keterampilan",
-    "PJOK", "Bahasa Sunda"
+    "Guru Kelas", "Pendidikan Agama Islam", "Pendidikan Agama Kristen", "PJOK", "Bahasa Inggris"
 ].sort();
 
 const subjectFormSchema = z.object({
-  name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama mata pelajaran wajib diisi." }),
+  name: z.string({ required_error: "Pilih nama mata pelajaran." }).min(1, { message: "Nama wajib diisi" }),
   description: z.string().optional(),
   teacherUid: z.string().optional(),
   classIds: z.array(z.string()).optional(),
@@ -841,4 +838,3 @@ export default function SubjectsPage() {
     </div>
   );
 }
-

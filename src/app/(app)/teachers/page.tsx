@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,7 +113,7 @@ interface Teacher {
 
 const GENDERS = ["laki-laki", "perempuan"] as const;
 const AGAMA_OPTIONS = ["Islam", "Kristen Protestan", "Katolik", "Hindu", "Buddha", "Khonghucu", "Lainnya"] as const;
-const MAIN_SUBJECT_OPTIONS = ["Guru Kelas", "PAI", "Penjas"] as const;
+const MAIN_SUBJECT_OPTIONS = ["Guru Kelas", "Pendidikan Agama Islam", "Pendidikan Agama Kristen", "PJOK", "Bahasa Inggris"] as const;
 
 const teacherFormSchema = z.object({
   name: z.string().min(1, { message: "Nama wajib diisi." }),
@@ -927,4 +926,3 @@ export default function TeachersPage() {
     </div>
   );
 }
-
