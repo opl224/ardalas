@@ -928,4 +928,3 @@ export default function TeachersPage() {
   );
 }
 
-

@@ -863,4 +863,3 @@ export default function SubjectsPage() {
   );
 }
 
-
