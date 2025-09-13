@@ -63,14 +63,13 @@ import {
   where,
   limit,
   documentId,
-  collectionGroup,
   setDoc,
-  startOfDay,
+  onSnapshot
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
-import { format, parse, getDay, isWithinInterval, isValid } from "date-fns"; 
+import { format, parse, getDay, isWithinInterval, isValid, startOfDay } from "date-fns"; 
 import { id as indonesiaLocale } from "date-fns/locale"; 
 import { cn } from "@/lib/utils";
 import {
@@ -1026,4 +1025,3 @@ export default function LessonsPage() {
   );
 }
 
-    
