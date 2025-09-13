@@ -42,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon, FileDown } from "lucide-react";
+import { Users, PlusCircle, Edit, Trash2, Search, Filter as FilterIcon, MoreVertical, Eye, CalendarIcon, FileDown, Move } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect, useMemo, type ReactNode, useCallback } from "react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -94,6 +94,8 @@ import { useSidebar } from "@/components/ui/sidebar";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 interface ClassMin {
@@ -148,6 +150,17 @@ const editStudentFormSchema = baseStudentFormSchema.extend({
 });
 type EditStudentFormValues = z.infer<typeof editStudentFormSchema>;
 
+const moveClassFormSchema = z.object({
+  sourceClassId: z.string({ required_error: "Pilih kelas asal." }),
+  targetClassId: z.string({ required_error: "Pilih kelas tujuan." }),
+  studentIds: z.array(z.string()).min(1, { message: "Pilih minimal satu siswa untuk dipindahkan." }),
+}).refine(data => data.sourceClassId !== data.targetClassId, {
+    message: "Kelas asal dan tujuan tidak boleh sama.",
+    path: ["targetClassId"],
+});
+type MoveClassFormValues = z.infer<typeof moveClassFormSchema>;
+
+
 const ITEMS_PER_PAGE = 10;
 
 export default function StudentsPage() {
@@ -160,6 +173,7 @@ export default function StudentsPage() {
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
   const [isViewStudentDialogOpen, setIsViewStudentDialogOpen] = useState(false);
+  const [isMoveClassDialogOpen, setIsMoveClassDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedStudentForView, setSelectedStudentForView] = useState<Student | null>(null);
   const [teacherResponsibleClassIds, setTeacherResponsibleClassIds] = useState<string[] | null>(null);
@@ -203,6 +217,25 @@ export default function StudentsPage() {
       attendanceNumber: undefined,
     }
   });
+
+  const moveClassForm = useForm<MoveClassFormValues>({
+    resolver: zodResolver(moveClassFormSchema),
+    defaultValues: {
+      sourceClassId: undefined,
+      targetClassId: undefined,
+      studentIds: [],
+    },
+  });
+  
+  const sourceClassIdWatcher = moveClassForm.watch("sourceClassId");
+  const studentsInSourceClass = useMemo(() => {
+    if (!sourceClassIdWatcher) return [];
+    // Use `students` state which contains all students fetched initially if available,
+    // otherwise it will be empty until data is loaded for the main table.
+    return students.filter(s => s.classId === sourceClassIdWatcher)
+                   .sort((a, b) => a.name.localeCompare(b.name));
+  }, [sourceClassIdWatcher, students]);
+
 
   const fetchInitialDropdownAndTeacherData = useCallback(async () => {
     if (authLoading) return;
@@ -586,6 +619,45 @@ export default function StudentsPage() {
       });
     }
   };
+  
+  const handleMoveClassSubmit: SubmitHandler<MoveClassFormValues> = async (data) => {
+    moveClassForm.clearErrors();
+    const { studentIds, targetClassId } = data;
+    
+    const targetClass = allClassesForFilter.find(c => c.id === targetClassId);
+    if (!targetClass) {
+        toast({ title: "Kelas tujuan tidak valid.", variant: "destructive" });
+        return;
+    }
+
+    try {
+        const batch = writeBatch(db);
+        studentIds.forEach(studentId => {
+            const userDocRef = doc(db, "users", studentId);
+            const studentDocRef = doc(db, "students", studentId);
+            const updateData = { classId: targetClass.id, className: targetClass.name };
+            
+            batch.update(userDocRef, updateData);
+            batch.update(studentDocRef, updateData);
+        });
+
+        await batch.commit();
+
+        toast({
+            title: "Siswa Berhasil Dipindahkan",
+            description: `${studentIds.length} siswa telah dipindahkan ke kelas ${targetClass.name}.`
+        });
+        
+        setIsMoveClassDialogOpen(false);
+        moveClassForm.reset();
+        fetchStudents(); // Refresh student list
+        
+    } catch (error) {
+        console.error("Error moving students:", error);
+        toast({ title: "Gagal Memindahkan Siswa", variant: "destructive" });
+    }
+  };
+
 
   const handleExport = async (formatType: 'pdf' | 'xlsx') => {
     if (displayedStudents.length === 0) {
@@ -655,6 +727,11 @@ export default function StudentsPage() {
         return;
     }
     setSelectedStudent(student);
+  };
+  
+  const handleOpenMoveClassDialog = () => {
+    moveClassForm.reset();
+    setIsMoveClassDialogOpen(true);
   };
 
   const renderStudentFormFields = (formInstance: typeof addStudentForm | typeof editStudentForm, formType: 'add' | 'edit') => (
@@ -890,11 +967,10 @@ export default function StudentsPage() {
                 </CardTitle>
                 <div className="flex items-center gap-2">
                     {authRole === 'admin' && (
-                        <div className="hidden md:flex">
-                             <DialogTrigger asChild>
-                                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button>
-                            </DialogTrigger>
-                        </div>
+                        <>
+                            <Button size="sm" variant="outline" onClick={handleOpenMoveClassDialog}><Move className="mr-2 h-4 w-4" />Pindah Kelas</Button>
+                            <DialogTrigger asChild><Button size="sm"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button></DialogTrigger>
+                        </>
                     )}
                      <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -917,7 +993,6 @@ export default function StudentsPage() {
                     <Users className="h-6 w-6 text-primary" />
                     <span>Daftar Siswa ({displayedStudents.length})</span>
                   </CardTitle>
-                  {authRole === 'admin' && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="icon" disabled={isExporting}>
@@ -929,12 +1004,12 @@ export default function StudentsPage() {
                         <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={isExporting}>PDF (.pdf)</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  )}
                 </div>
                 {authRole === 'admin' && (
-                    <DialogTrigger asChild>
-                      <Button size="sm" className="w-full"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button>
-                    </DialogTrigger>
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1" variant="outline" onClick={handleOpenMoveClassDialog}><Move className="mr-2 h-4 w-4" />Pindah Kelas</Button>
+                      <DialogTrigger asChild><Button size="sm" className="flex-1"><PlusCircle className="mr-2 h-4 w-4" />Tambah Siswa</Button></DialogTrigger>
+                    </div>
                 )}
               </div>
           </CardHeader>
@@ -1166,7 +1241,107 @@ export default function StudentsPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {authRole === 'admin' && (
+        <Dialog open={isMoveClassDialogOpen} onOpenChange={setIsMoveClassDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Pindahkan Siswa ke Kelas Lain</DialogTitle>
+              <DialogDescription>
+                Pilih kelas asal dan tujuan, lalu pilih siswa yang akan dipindahkan.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={moveClassForm.handleSubmit(handleMoveClassSubmit)} className="space-y-4 py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Controller
+                    name="sourceClassId"
+                    control={moveClassForm.control}
+                    render={({ field }) => (
+                      <div>
+                        <Label>Dari Kelas</Label>
+                        <Select onValueChange={(value) => {field.onChange(value); moveClassForm.setValue("studentIds", [])}} value={field.value}>
+                          <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih kelas asal" /></SelectTrigger>
+                          <SelectContent>{allClassesForFilter.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                         {moveClassForm.formState.errors.sourceClassId && <p className="text-sm text-destructive mt-1">{moveClassForm.formState.errors.sourceClassId.message}</p>}
+                      </div>
+                    )}
+                  />
+                  <Controller
+                    name="targetClassId"
+                    control={moveClassForm.control}
+                    render={({ field }) => (
+                      <div>
+                        <Label>Ke Kelas</Label>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger className="mt-1"><SelectValue placeholder="Pilih kelas tujuan" /></SelectTrigger>
+                          <SelectContent>{allClassesForFilter.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                        {moveClassForm.formState.errors.targetClassId && <p className="text-sm text-destructive mt-1">{moveClassForm.formState.errors.targetClassId.message}</p>}
+                      </div>
+                    )}
+                  />
+                </div>
+                {sourceClassIdWatcher && (
+                  <div className="space-y-2">
+                    <Label>Pilih Siswa</Label>
+                    <ScrollArea className="h-60 w-full rounded-md border p-4">
+                      {studentsInSourceClass.length > 0 ? (
+                        <div className="space-y-2">
+                           <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="select-all-students"
+                              checked={moveClassForm.watch("studentIds")?.length === studentsInSourceClass.length}
+                              onCheckedChange={(checked) => {
+                                const allStudentIds = studentsInSourceClass.map(s => s.id);
+                                moveClassForm.setValue("studentIds", checked ? allStudentIds : []);
+                              }}
+                            />
+                            <Label htmlFor="select-all-students" className="font-semibold">Pilih Semua</Label>
+                          </div>
+                          <Separator className="my-2"/>
+                          {studentsInSourceClass.map(student => (
+                              <Controller
+                                  key={student.id}
+                                  name="studentIds"
+                                  control={moveClassForm.control}
+                                  render={({ field }) => (
+                                      <div className="flex items-center space-x-2">
+                                          <Checkbox
+                                              checked={field.value?.includes(student.id)}
+                                              onCheckedChange={(checked) => {
+                                                  return checked
+                                                      ? field.onChange([...field.value, student.id])
+                                                      : field.onChange(field.value?.filter(id => id !== student.id))
+                                              }}
+                                          />
+                                          <Label>{student.name}</Label>
+                                      </div>
+                                  )}
+                              />
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-center text-muted-foreground py-4">Tidak ada siswa di kelas ini.</p>
+                      )}
+                    </ScrollArea>
+                     {moveClassForm.formState.errors.studentIds && <p className="text-sm text-destructive mt-1">{moveClassForm.formState.errors.studentIds.message}</p>}
+                  </div>
+                )}
+                <DialogFooter>
+                    <DialogClose asChild><Button type="button" variant="outline">Batal</Button></DialogClose>
+                    <Button type="submit" disabled={moveClassForm.formState.isSubmitting}>
+                        {moveClassForm.formState.isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
+                        {moveClassForm.formState.isSubmitting ? "Memindahkan..." : "Pindahkan Siswa"}
+                    </Button>
+                </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
     </div>
   );
 }
+
 
