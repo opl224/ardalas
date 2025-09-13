@@ -825,11 +825,7 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
     try {
       const attendanceQuery = query(
         collection(db, "attendances"),
-        // This is inefficient. We need to query where studentId is in the array.
-        // Firestore doesn't support this well. We may need to denormalize.
-        // For now, let's fetch all for the class and filter client-side.
-        // THIS IS A SIMPLIFICATION and NOT SCALABLE.
-        // A better approach would require a `studentAttendances` subcollection or different data model.
+        where("studentAttendances", "array-contains", { studentId: targetStudentId }),
         orderBy("date", "desc")
       );
       
@@ -987,3 +983,5 @@ export default function AttendancePageWrapper() {
     );
   }
 }
+
+    
