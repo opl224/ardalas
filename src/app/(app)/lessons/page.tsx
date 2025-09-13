@@ -78,18 +78,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Switch } from "@/components/ui/switch";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 // Minimal interfaces for dropdowns
@@ -165,22 +157,17 @@ const editLessonFormSchema = baseLessonObjectSchema.extend({
 
 type EditLessonFormValues = z.infer<typeof editLessonFormSchema>;
 
-const ITEMS_PER_PAGE = 10;
-
 export default function LessonsPage() {
   const { user: authUser, role, loading: authLoading } = useAuth();
   const [allLessons, setAllLessons] = useState<LessonData[]>([]);
   
-  // For Admin: all subjects, classes, teachers for forms & filters
   const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]);
   const [allClasses, setAllClasses] = useState<ClassMin[]>([]);
   const [allTeachersWithClasses, setAllTeachersWithClasses] = useState<TeacherWithClasses[]>([]);
   
-  // State for form dropdowns that get filtered
   const [classesForForm, setClassesForForm] = useState<ClassMin[]>([]);
   const [teachersForForm, setTeachersForForm] = useState<TeacherMin[]>([]);
 
-  // Teacher-specific data
   const [teacherDocId, setTeacherDocId] = useState<string | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -190,8 +177,7 @@ export default function LessonsPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all"); // Used by admin/guru for table filtering
-  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("all");
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
@@ -396,12 +382,14 @@ export default function LessonsPage() {
     } else {
       setClassesForForm([]);
     }
-    // Only reset class if the currently selected class is not in the new list of available classes
+    
     const currentClassId = addLessonForm.getValues("classId");
-    if (currentClassId && !classesForForm.some(c => c.id === currentClassId)) {
+    const isClassStillValid = classesForForm.some(c => c.id === currentClassId);
+
+    if (currentClassId && !isClassStillValid) {
         addLessonForm.setValue("classId", undefined, { shouldValidate: true });
     }
-  }, [watchTeacherIdForAdd, isSpecialistTeacher, allTeachersWithClasses, allClasses, addLessonForm]);
+  }, [watchTeacherIdForAdd, isSpecialistTeacher, allTeachersWithClasses, allClasses, addLessonForm, classesForForm]);
 
 
   useEffect(() => {
@@ -475,7 +463,7 @@ export default function LessonsPage() {
       setIsAddDialogOpen(false);
       addLessonForm.reset();
       fetchLessons();
-      fetchAdminDropdownData(); // Refresh teacher-class mapping
+      fetchAdminDropdownData(); 
     } catch (error: any) {
       console.error("Error adding lesson:", error);
       toast({ title: "Gagal Menambahkan Pelajaran", variant: "destructive" });
@@ -508,7 +496,7 @@ export default function LessonsPage() {
       setIsEditDialogOpen(false);
       setSelectedLesson(null);
       fetchLessons();
-      fetchAdminDropdownData(); // Refresh teacher-class mapping
+      fetchAdminDropdownData(); 
     } catch (error) {
       console.error("Error editing lesson:", error);
       toast({ title: "Gagal Memperbarui Pelajaran", variant: "destructive" });
@@ -533,7 +521,7 @@ export default function LessonsPage() {
       toast({ title: "Pelajaran Dihapus", description: "Jadwal pelajaran berhasil dihapus." });
       setSelectedLesson(null);
       fetchLessons();
-      fetchAdminDropdownData(); // Refresh teacher-class mapping
+      fetchAdminDropdownData(); 
     } catch (error) {
       console.error("Error deleting lesson:", error);
       toast({ title: "Gagal Menghapus Pelajaran", variant: "destructive" });
@@ -547,7 +535,7 @@ export default function LessonsPage() {
     if (allSubjects.length === 0 || allClasses.length === 0 || allTeachersWithClasses.length === 0) {
         fetchAdminDropdownData(); 
     }
-    setClassesForForm(allClasses); // Initialize with all, will filter on teacher change
+    setClassesForForm(allClasses); 
     setIsEditDialogOpen(true);
   };
 
@@ -556,13 +544,11 @@ export default function LessonsPage() {
     setSelectedLesson(lesson);
   };
   
-  const filteredAndSortedLessons = useMemo(() => {
+  const filteredLessons = useMemo(() => {
     let tempLessons = [...allLessons];
-
     if ((role === "admin") && selectedClassFilter !== "all") {
       tempLessons = tempLessons.filter(lesson => lesson.classId === selectedClassFilter);
     }
-
     if ((role === "admin") && searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       tempLessons = tempLessons.filter(lesson =>
@@ -571,73 +557,24 @@ export default function LessonsPage() {
         (lesson.teacherName && lesson.teacherName.toLowerCase().includes(lowerSearchTerm))
       );
     }
-    
-    return tempLessons.sort((a, b) => {
-      const dayIndexA = DAYS_OF_WEEK.indexOf(a.dayOfWeek as any);
-      const dayIndexB = DAYS_OF_WEEK.indexOf(b.dayOfWeek as any);
-      if (dayIndexA !== dayIndexB) return dayIndexA - dayIndexB;
-      if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
-      return (a.subjectName || "").localeCompare(b.subjectName || "");
-    });
+    return tempLessons;
   }, [allLessons, searchTerm, selectedClassFilter, role]);
 
-  const totalPages = Math.ceil(filteredAndSortedLessons.length / ITEMS_PER_PAGE);
-  const currentTableData = useMemo(() => {
-    const firstPageIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const lastPageIndex = firstPageIndex + ITEMS_PER_PAGE;
-    return filteredAndSortedLessons.slice(firstPageIndex, lastPageIndex);
-  }, [currentPage, filteredAndSortedLessons]);
-
-  const renderPageNumbers = () => {
-    const pageNumbers = [];
-    const maxPagesToShow = 5;
-    let startPage, endPage;
-
-    if (totalPages <= maxPagesToShow) {
-      startPage = 1;
-      endPage = totalPages;
-    } else {
-      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
-        startPage = 1;
-        endPage = maxPagesToShow;
-      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
-        startPage = totalPages - maxPagesToShow + 1;
-        endPage = totalPages;
-      } else {
-        startPage = currentPage - Math.floor(maxPagesToShow / 2);
-        endPage = currentPage + Math.floor(maxPagesToShow / 2);
-      }
-    }
-
-    if (startPage > 1) {
-      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
-      if (startPage > 2) {
-        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(
-        <PaginationItem key={i}>
-          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
-            {i}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
-      }
-      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
-    }
-    return pageNumbers;
-  };
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, selectedClassFilter]);
+  const lessonsByDay = useMemo(() => {
+    const grouped: { [key: string]: LessonData[] } = {};
+    DAYS_OF_WEEK.forEach(day => {
+        grouped[day] = [];
+    });
+    filteredLessons.forEach(lesson => {
+        if (lesson.dayOfWeek && grouped[lesson.dayOfWeek]) {
+            grouped[lesson.dayOfWeek].push(lesson);
+        }
+    });
+    Object.keys(grouped).forEach(day => {
+        grouped[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
+    });
+    return grouped;
+  }, [filteredLessons]);
 
 
   const canManageLessons = role === "admin";
@@ -645,17 +582,12 @@ export default function LessonsPage() {
   
   const isLessonCurrentlyActive = (lesson: LessonData): boolean => {
     if (!lesson.dayOfWeek || !lesson.startTime || !lesson.endTime) return false;
-
     const now = currentTime;
     const currentDayName = DAY_NAMES_ID[getDay(now)];
-    
     if (lesson.dayOfWeek !== currentDayName) return false;
-
     const lessonStartTime = parse(lesson.startTime, "HH:mm", now);
     const lessonEndTime = parse(lesson.endTime, "HH:mm", now);
-
     if (!isValid(lessonStartTime) || !isValid(lessonEndTime)) return false;
-    
     return isWithinInterval(now, { start: lessonStartTime, end: lessonEndTime });
   };
 
@@ -731,7 +663,7 @@ export default function LessonsPage() {
                   </div>
                   <div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="add-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                      <Label htmlFor="add-lesson-teacherId">Guru Pengajar</Label>
                       <div className="flex items-center space-x-2">
                           <Label htmlFor="specialist-teacher-toggle" className="text-xs text-muted-foreground">Guru Khusus</Label>
                           <Switch
@@ -802,7 +734,7 @@ export default function LessonsPage() {
           )}
         </CardHeader>
         <CardContent>
-          {(role === "admin") && ( // Only admin sees these filters
+          {(role === "admin") && ( 
             <div className="my-4 flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -834,142 +766,94 @@ export default function LessonsPage() {
           )}
           {isLoading || authLoading ? (
             <div className="space-y-2 mt-4">
-              {[...Array(ITEMS_PER_PAGE)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
             </div>
-          ) : currentTableData.length > 0 ? (
-            <>
-            <div className="overflow-x-auto mt-4">
-              <Table className="table-fixed w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead>Mata Pelajaran</TableHead>
-                    {!isMobile && !(isStudentOrParent || role ==='guru') && <TableHead>Kelas</TableHead>} 
-                    {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
-                    {!isMobile && <TableHead className="w-[120px]">Hari</TableHead>}
-                    <TableHead className={cn(!isMobile ? "w-[120px]" : "w-auto", "px-4")}>Waktu</TableHead>
-                    {!isMobile && (canManageLessons || role === 'guru') && <TableHead>Topik</TableHead>}
-                    <TableHead className={cn("text-right", !isMobile ? "w-[100px]" : "w-auto")}>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {currentTableData.map((lesson, index) => {
-                    const isActiveNow = isStudentOrParent ? (isLessonCurrentlyActive(lesson) && !!lesson.isLive) : false;
+          ) : filteredLessons.length > 0 ? (
+            <Accordion type="multiple" defaultValue={DAYS_OF_WEEK} className="w-full space-y-2">
+              {DAYS_OF_WEEK.map((day) => {
+                const lessonsForDay = lessonsByDay[day];
+                if (!lessonsForDay || lessonsForDay.length === 0) return null;
+                
+                const dayIsActive = DAY_NAMES_ID[getDay(currentTime)] === day;
 
-                    return (
-                      <TableRow key={lesson.id}>
-                        <TableCell>{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</TableCell>
-                        <TableCell className="font-medium truncate" title={lesson.subjectName || lesson.subjectId}>{lesson.subjectName || lesson.subjectId}</TableCell>
-                        
-                        {!isMobile && !(isStudentOrParent || role === 'guru') && <TableCell className="truncate" title={lesson.className || lesson.classId}>{lesson.className || lesson.classId}</TableCell>}
-                        {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell className="truncate" title={lesson.teacherName || lesson.teacherId}>{lesson.teacherName || lesson.teacherId}</TableCell>}
-                        {!isMobile && <TableCell>{lesson.dayOfWeek}</TableCell>}
-                        
-                        <TableCell className={cn("text-xs", isMobile && "px-4")}>{lesson.startTime} - {lesson.endTime}</TableCell>
-                        
-                        {!isMobile && (canManageLessons || role === 'guru') && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
-                        
-                        <TableCell className={cn("text-right", isMobile ? "px-2" : "")}>
-                          {isStudentOrParent ? (
-                             role === "orangtua" ? (
-                               <Button asChild size={isMobile ? "icon" : "sm"} variant={"outline"} >
-                                    <Link href={`/lessons/${lesson.id}`} aria-label="Lihat Detail Pelajaran">
-                                      {isMobile ? <Eye className="h-4 w-4" /> : <><Eye className="mr-2 h-4 w-4" /> Detail</>}
-                                    </Link>
-                                </Button>
-                            ) : ( // For 'siswa' role
-                                 isActiveNow ? (
-                                  <Button asChild size={isMobile ? "icon" : "sm"} variant={"outline"} className="border-primary text-primary hover:bg-primary/10">
-                                    <Link href={`/lessons/${lesson.id}`} aria-label="Masuk Kelas">
-                                      {isMobile ? <LogIn className="h-4 w-4" /> : <><LogIn className="mr-2 h-4 w-4" /> Masuk Kelas</>}
-                                    </Link>
-                                  </Button>
-                                ) : (
-                                  <Button size={isMobile ? "icon" : "sm"} variant={"outline"} disabled>
-                                    {isMobile ? <span className="text-xs">Tutup</span> : "Belum Mulai"}
-                                  </Button>
-                                )
-                            )
-                          ) : (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" aria-label={`Opsi untuk pelajaran ${lesson.subjectName}`}>
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/lessons/${lesson.id}`}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Lihat Detail
-                                  </Link>
-                                </DropdownMenuItem>
-                                {canManageLessons && (
-                                  <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Edit
-                                    </DropdownMenuItem>
-                                    <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem
-                                          onSelect={(e) => { e.preventDefault(); openDeleteDialog(lesson); }}
-                                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                        >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Hapus
-                                        </DropdownMenuItem>
-                                      </AlertDialogTrigger>
-                                      {selectedLesson && selectedLesson.id === lesson.id && ( 
-                                        <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                            <AlertDialogTitle>Apakah Kamu Yakin?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                              Tindakan ini akan menghapus jadwal pelajaran <span className="font-semibold">{selectedLesson?.subjectName} ({selectedLesson?.className})</span> pada hari {selectedLesson?.dayOfWeek}.
-                                            </AlertDialogDescription>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                            <AlertDialogCancel onClick={() => setSelectedLesson(null)}>Batal</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => handleDeleteLesson(selectedLesson.id)}>Ya, Hapus Jadwal</AlertDialogAction>
-                                          </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                      )}
-                                    </AlertDialog>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            {totalPages > 1 && (
-              <Pagination className="mt-6">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                      aria-disabled={currentPage === 1}
-                      className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
-                    />
-                  </PaginationItem>
-                  {renderPageNumbers()}
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                      aria-disabled={currentPage === totalPages}
-                      className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            )}
-            </>
+                return (
+                  <AccordionItem value={day} key={day}>
+                    <AccordionTrigger className={cn("text-lg font-semibold px-4 rounded-md hover:no-underline", dayIsActive ? "bg-primary/10 text-primary" : "bg-muted/50")}>
+                      {day} ({lessonsForDay.length} Pelajaran)
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2">
+                      <div className="overflow-x-auto">
+                        <Table className="table-auto w-full">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[120px]">Waktu</TableHead>
+                              <TableHead>Mata Pelajaran</TableHead>
+                              {!isMobile && (isStudentOrParent || role ==='guru') ? null : <TableHead>Kelas</TableHead>}
+                              {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableHead>Guru</TableHead>}
+                              {!isMobile && (canManageLessons || role === 'guru') && <TableHead>Topik</TableHead>}
+                              <TableHead className="text-right w-[100px]">Aksi</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                             {lessonsForDay.map((lesson) => {
+                               const isActiveNow = isStudentOrParent ? (isLessonCurrentlyActive(lesson) && !!lesson.isLive) : false;
+                               return (
+                                <TableRow key={lesson.id}>
+                                  <TableCell>{lesson.startTime} - {lesson.endTime}</TableCell>
+                                  <TableCell className="font-medium">{lesson.subjectName}</TableCell>
+                                  {!isMobile && (isStudentOrParent || role ==='guru') ? null : <TableCell>{lesson.className}</TableCell>}
+                                  {!isMobile && (role==='admin' || role ==='siswa' || role==='orangtua') && <TableCell>{lesson.teacherName}</TableCell>}
+                                  {!isMobile && (canManageLessons || role === 'guru') && <TableCell className="truncate max-w-xs" title={lesson.topic || "-"}>{lesson.topic || "-"}</TableCell>}
+                                  <TableCell className="text-right">
+                                     {isStudentOrParent ? (
+                                        role === "orangtua" ? (
+                                          <Button asChild size="sm" variant="outline">
+                                            <Link href={`/lessons/${lesson.id}`} aria-label="Lihat Detail">Detail</Link>
+                                          </Button>
+                                        ) : (
+                                          isActiveNow ? (
+                                            <Button asChild size="sm" variant="outline" className="border-primary text-primary hover:bg-primary/10">
+                                              <Link href={`/lessons/${lesson.id}`} aria-label="Masuk Kelas">Masuk</Link>
+                                            </Button>
+                                          ) : (
+                                            <Button size="sm" variant="outline" disabled>Tutup</Button>
+                                          )
+                                        )
+                                      ) : (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem asChild><Link href={`/lessons/${lesson.id}`}><Eye className="mr-2 h-4 w-4" />Lihat Detail</Link></DropdownMenuItem>
+                                          {canManageLessons && (
+                                            <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onClick={() => openEditDialog(lesson)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                                              <AlertDialog>
+                                                <AlertDialogTrigger asChild><DropdownMenuItem onSelect={(e) => { e.preventDefault(); openDeleteDialog(lesson);}} className="text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" />Hapus</DropdownMenuItem></AlertDialogTrigger>
+                                                {selectedLesson && selectedLesson.id === lesson.id && (
+                                                  <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Konfirmasi Hapus</AlertDialogTitle><AlertDialogDescription>Yakin ingin menghapus jadwal {selectedLesson.subjectName} ({selectedLesson.className})?</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter><AlertDialogCancel onClick={() => setSelectedLesson(null)}>Batal</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteLesson(selectedLesson.id)}>Hapus</AlertDialogAction></AlertDialogFooter>
+                                                  </AlertDialogContent>
+                                                )}
+                                              </AlertDialog>
+                                            </>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
           ) : (
             <div className="mt-4 p-8 border border-dashed border-border rounded-md text-center text-muted-foreground">
                {canManageLessons && (searchTerm || selectedClassFilter !== "all")
@@ -1009,7 +893,7 @@ export default function LessonsPage() {
                 </div>
                  <div>
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                      <Label htmlFor="edit-lesson-teacherId">Guru Pengajar</Label>
                        <div className="flex items-center space-x-2">
                           <Label htmlFor="edit-specialist-teacher-toggle" className="text-xs text-muted-foreground">Guru Khusus</Label>
                           <Switch
@@ -1082,3 +966,5 @@ export default function LessonsPage() {
     </div>
   );
 }
+
+    
