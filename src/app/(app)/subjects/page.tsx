@@ -94,25 +94,21 @@ interface AuthUserMin {
   email: string;
 }
 
+interface TeacherProfile {
+    id: string; // Document ID from 'teachers' collection
+    uid?: string; // Auth UID
+    name: string;
+    email: string;
+    subject: string;
+}
+
 interface Subject {
   id: string;
   name: string;
   description?: string;
   teacherUid?: string; // UID of the responsible teacher from Auth
   teacherName?: string; // Denormalized name of the responsible teacher
-  classIds?: string[]; // Array of class IDs
-  classNames?: string[]; // Denormalized class names
   createdAt?: Timestamp;
-}
-
-interface TeacherWithClasses {
-  id: string; // Teacher's Document ID from 'teachers' collection
-  uid: string; // Teacher's Auth UID
-  name: string;
-  email: string;
-  subject: string; // Main subject from teacher's profile
-  classIds: string[];
-  classNames: string[];
 }
 
 const ALL_SUBJECT_OPTIONS = [
@@ -123,7 +119,6 @@ const subjectFormSchema = z.object({
   name: z.string({ required_error: "Nama wajib diisi." }).min(1, { message: "Nama wajib diisi" }),
   description: z.string().optional(),
   teacherUid: z.string().optional(),
-  classIds: z.array(z.string()).optional(),
 });
 type SubjectFormValues = z.infer<typeof subjectFormSchema>;
 
@@ -137,7 +132,7 @@ const ITEMS_PER_PAGE = 10;
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [teachersWithClasses, setTeachersWithClasses] = useState<TeacherWithClasses[]>([]);
+  const [allTeacherProfiles, setAllTeacherProfiles] = useState<TeacherProfile[]>([]);
   const [isLoadingSubjects, setIsLoadingSubjects] = useState(true);
   const [isLoadingInitialData, setIsLoadingInitialData] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -157,7 +152,6 @@ export default function SubjectsPage() {
       name: undefined,
       description: "",
       teacherUid: undefined,
-      classIds: [],
     },
   });
 
@@ -172,56 +166,21 @@ export default function SubjectsPage() {
     }
     setIsLoadingInitialData(true);
     try {
-      const [teachersSnapshot, classesSnapshot, lessonsSnapshot] = await Promise.all([
-        getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "classes"))),
-        getDocs(query(collection(db, "lessons")))
-      ]);
-      
-      const classesMap = new Map(classesSnapshot.docs.map(doc => [doc.id, doc.data().name]));
-      
-      const teacherClassMap = new Map<string, Set<string>>();
-
-      classesSnapshot.forEach(classDoc => {
-        const classData = classDoc.data();
-        if (classData.teacherId) {
-           if (!teacherClassMap.has(classData.teacherId)) {
-            teacherClassMap.set(classData.teacherId, new Set());
-          }
-          teacherClassMap.get(classData.teacherId)!.add(classDoc.id);
-        }
-      });
-
-      lessonsSnapshot.forEach(lessonDoc => {
-        const lesson = lessonDoc.data();
-        if (lesson.teacherId && lesson.classId) {
-          if (!teacherClassMap.has(lesson.teacherId)) {
-            teacherClassMap.set(lesson.teacherId, new Set());
-          }
-          teacherClassMap.get(lesson.teacherId)!.add(lesson.classId);
-        }
-      });
-
-      const processedTeachers: TeacherWithClasses[] = teachersSnapshot.docs.map(doc => {
-        const teacher = doc.data();
-        const teacherClassesSet = teacherClassMap.get(doc.id) || new Set();
-        const classIds = Array.from(teacherClassesSet);
-        const classNames = classIds.map(id => classesMap.get(id) || "Nama Kelas Tidak Ditemukan").sort();
-        return {
-          id: doc.id,
-          uid: teacher.uid,
-          name: teacher.name,
-          email: teacher.email,
-          subject: teacher.subject,
-          classIds,
-          classNames
-        };
-      });
-      setTeachersWithClasses(processedTeachers);
+      const teachersCollectionRef = collection(db, "teachers");
+      const qTeachers = query(teachersCollectionRef, orderBy("name", "asc"));
+      const teachersSnapshot = await getDocs(qTeachers);
+      const fetchedTeachers: TeacherProfile[] = teachersSnapshot.docs.map(docSnap => ({
+        id: docSnap.id,
+        uid: docSnap.data().uid,
+        name: docSnap.data().name,
+        email: docSnap.data().email,
+        subject: docSnap.data().subject,
+      }));
+      setAllTeacherProfiles(fetchedTeachers);
 
     } catch (error) {
       console.error("Error fetching initial data: ", error);
-      toast({ title: "Gagal Memuat Data Guru & Kelas", variant: "destructive" });
+      toast({ title: "Gagal Memuat Data Guru", variant: "destructive" });
     } finally {
       setIsLoadingInitialData(false);
     }
@@ -251,8 +210,6 @@ export default function SubjectsPage() {
         description: docSnap.data().description,
         teacherUid: docSnap.data().teacherUid,
         teacherName: docSnap.data().teacherName,
-        classIds: docSnap.data().classIds,
-        classNames: docSnap.data().classNames,
         createdAt: docSnap.data().createdAt,
       }));
       setSubjects(fetchedSubjects);
@@ -274,39 +231,6 @@ export default function SubjectsPage() {
     }
   }, [role, user, authLoading]);
 
-  // Auto-fill classes when teacher is selected in the 'Add' form
-  const watchAddTeacherUid = addSubjectForm.watch("teacherUid");
-  useEffect(() => {
-    const selectedSubjectName = addSubjectForm.getValues("name");
-    if (!watchAddTeacherUid || selectedSubjectName !== 'Guru Kelas') {
-      addSubjectForm.setValue("classIds", []);
-      return;
-    }
-    const selectedTeacher = teachersWithClasses.find(t => t.uid === watchAddTeacherUid);
-    if (selectedTeacher) {
-      addSubjectForm.setValue("classIds", selectedTeacher.classIds);
-    } else {
-      addSubjectForm.setValue("classIds", []);
-    }
-  }, [watchAddTeacherUid, teachersWithClasses, addSubjectForm]);
-  
-  // Auto-fill classes when teacher is selected in the 'Edit' form
-  const watchEditTeacherUid = editSubjectForm.watch("teacherUid");
-  useEffect(() => {
-    const selectedSubjectName = editSubjectForm.getValues("name");
-    if (!watchEditTeacherUid || selectedSubjectName !== 'Guru Kelas') {
-      editSubjectForm.setValue("classIds", []);
-      return;
-    }
-    const selectedTeacher = teachersWithClasses.find(t => t.uid === watchEditTeacherUid);
-    if (selectedTeacher) {
-      editSubjectForm.setValue("classIds", selectedTeacher.classIds);
-    } else {
-      editSubjectForm.setValue("classIds", []);
-    }
-  }, [watchEditTeacherUid, teachersWithClasses, editSubjectForm]);
-
-
   useEffect(() => {
     if (selectedSubject && isEditDialogOpen && role === "admin") {
       editSubjectForm.reset({
@@ -314,7 +238,6 @@ export default function SubjectsPage() {
         name: selectedSubject.name,
         description: selectedSubject.description || "",
         teacherUid: selectedSubject.teacherUid || undefined,
-        classIds: selectedSubject.classIds || [],
       });
     }
   }, [selectedSubject, isEditDialogOpen, editSubjectForm, role]);
@@ -322,7 +245,7 @@ export default function SubjectsPage() {
   const handleAddSubjectSubmit: SubmitHandler<SubjectFormValues> = async (data) => {
     if (role !== "admin") return;
     addSubjectForm.clearErrors();
-    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.uid === data.teacherUid);
+    const selectedTeacher = allTeacherProfiles.find(teacher => teacher.uid === data.teacherUid);
     
     if(!user?.uid) {
       toast({title: "Aksi Gagal", description: "Pengguna tidak terautentikasi.", variant: "destructive"});
@@ -336,8 +259,6 @@ export default function SubjectsPage() {
         description: data.description || null,
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
-        classIds: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classIds : [],
-        classNames: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classNames : [],
         createdAt: serverTimestamp(),
       });
 
@@ -357,7 +278,7 @@ export default function SubjectsPage() {
   const handleEditSubjectSubmit: SubmitHandler<EditSubjectFormValues> = async (data) => {
     if (role !== "admin" || !selectedSubject) return;
     editSubjectForm.clearErrors();
-    const selectedTeacher = teachersWithClasses.find(userAuth => userAuth.uid === data.teacherUid);
+    const selectedTeacher = allTeacherProfiles.find(teacher => teacher.uid === data.teacherUid);
 
     try {
       const subjectDocRef = doc(db, "subjects", data.id);
@@ -366,8 +287,6 @@ export default function SubjectsPage() {
         description: data.description || null,
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
-        classIds: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classIds : [],
-        classNames: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classNames : [],
       });
 
       toast({ title: "Mata Pelajaran Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -401,7 +320,7 @@ export default function SubjectsPage() {
 
   const openEditDialog = (subject: Subject) => {
     if (role !== "admin") return;
-    if (teachersWithClasses.length === 0 && !isLoadingInitialData) {
+    if (allTeacherProfiles.length === 0 && !isLoadingInitialData) {
         fetchInitialData();
     }
     setSelectedSubject(subject);
@@ -415,21 +334,19 @@ export default function SubjectsPage() {
   
   const addFormSelectedSubjectName = addSubjectForm.watch("name");
   const filteredTeachersForAdd = useMemo(() => {
-    if (!addFormSelectedSubjectName) return teachersWithClasses;
-    return teachersWithClasses.filter(teacher => teacher.subject === addFormSelectedSubjectName);
-  }, [addFormSelectedSubjectName, teachersWithClasses]);
+    if (!addFormSelectedSubjectName) return allTeacherProfiles;
+    return allTeacherProfiles.filter(teacher => teacher.subject === addFormSelectedSubjectName);
+  }, [addFormSelectedSubjectName, allTeacherProfiles]);
 
   const editFormSelectedSubjectName = editSubjectForm.watch("name");
   const filteredTeachersForEdit = useMemo(() => {
-    if (!editFormSelectedSubjectName) return teachersWithClasses;
-    return teachersWithClasses.filter(teacher => teacher.subject === editFormSelectedSubjectName);
-  }, [editFormSelectedSubjectName, teachersWithClasses]);
+    if (!editFormSelectedSubjectName) return allTeacherProfiles;
+    return allTeacherProfiles.filter(teacher => teacher.subject === editFormSelectedSubjectName);
+  }, [editFormSelectedSubjectName, allTeacherProfiles]);
 
 
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => {
     const selectedSubjectName = formInstance.watch("name");
-    const teacherUid = formInstance.watch("teacherUid");
-    const selectedTeacher = teachersWithClasses.find(t => t.uid === teacherUid);
     const filteredTeachers = formType === 'add' ? filteredTeachersForAdd : filteredTeachersForEdit;
     
     return (
@@ -445,7 +362,7 @@ export default function SubjectsPage() {
                         field.onChange(value);
                         const currentTeacherUid = formInstance.getValues("teacherUid");
                         if (currentTeacherUid) {
-                            const currentTeacher = teachersWithClasses.find(t => t.uid === currentTeacherUid);
+                            const currentTeacher = allTeacherProfiles.find(t => t.uid === currentTeacherUid);
                             if (currentTeacher && currentTeacher.subject !== value) {
                                 formInstance.setValue("teacherUid", undefined);
                             }
@@ -475,51 +392,39 @@ export default function SubjectsPage() {
           <Textarea id={`${formType}-subject-description`} {...formInstance.register("description")} className="mt-1" />
         </div>
         {role === "admin" && (
-          <>
-            <div>
-              <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab</Label>
-              <Controller
-                name="teacherUid"
-                control={formInstance.control}
-                render={({ field }) => (
-                  <Select
-                    onValueChange={(value) => field.onChange(value === NO_RESPONSIBLE_TEACHER ? undefined : value)}
-                    value={field.value || NO_RESPONSIBLE_TEACHER}
-                    disabled={isLoadingInitialData || !selectedSubjectName}
-                  >
-                    <SelectTrigger id={`${formType}-subject-teacherUid`} className="mt-1">
-                      <SelectValue placeholder={!selectedSubjectName ? "Pilih mapel dulu" : (isLoadingInitialData ? "Memuat guru..." : "Pilih guru")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isLoadingInitialData && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
-                      <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
-                      {filteredTeachers.length > 0 ? (
-                        filteredTeachers
-                        .filter(teacher => teacher && typeof teacher.uid === 'string' && teacher.uid.length > 0)
-                        .map((teacher) => (
-                        <SelectItem key={teacher.uid} value={teacher.uid}>
-                          {teacher.name} ({teacher.email})
-                        </SelectItem>
-                      ))) : (
-                         <SelectItem value="no-teachers" disabled>Tidak ada guru untuk mapel ini.</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {formInstance.formState.errors.teacherUid && (
-                <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.teacherUid.message}</p>
+          <div>
+            <Label htmlFor={`${formType}-subject-teacherUid`}>Guru Penanggung Jawab</Label>
+            <Controller
+              name="teacherUid"
+              control={formInstance.control}
+              render={({ field }) => (
+                <Select
+                  onValueChange={(value) => field.onChange(value === NO_RESPONSIBLE_TEACHER ? undefined : value)}
+                  value={field.value || NO_RESPONSIBLE_TEACHER}
+                  disabled={isLoadingInitialData || !selectedSubjectName}
+                >
+                  <SelectTrigger id={`${formType}-subject-teacherUid`} className="mt-1">
+                    <SelectValue placeholder={!selectedSubjectName ? "Pilih mapel dulu" : (isLoadingInitialData ? "Memuat guru..." : "Pilih guru")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingInitialData && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
+                    <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
+                    {filteredTeachers.length > 0 ? (
+                      filteredTeachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.uid}>
+                        {teacher.name} ({teacher.email})
+                      </SelectItem>
+                    ))) : (
+                       <SelectItem value="no-teachers" disabled>Tidak ada guru untuk mapel ini.</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
               )}
-            </div>
-            {selectedSubjectName === 'Guru Kelas' && (
-             <div>
-              <Label>Kelas Diajar (Wali Kelas)</Label>
-              <div className="mt-1 min-h-[40px] w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
-                {selectedTeacher ? selectedTeacher.classNames.join(', ') || 'Guru ini belum menjadi wali kelas manapun.' : 'Pilih guru untuk melihat kelas.'}
-              </div>
-            </div>
+            />
+            {formInstance.formState.errors.teacherUid && (
+              <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.teacherUid.message}</p>
             )}
-          </>
+          </div>
         )}
       </>
     );
@@ -557,12 +462,11 @@ export default function SubjectsPage() {
         "Nama Mata Pelajaran": subject.name,
         "Deskripsi": subject.description || '-',
         "Guru Penanggung Jawab": subject.teacherName || '-',
-        "Diajarkan di Kelas": subject.classNames?.join(', ') || '-',
     }));
 
     try {
         if (formatType === 'pdf') {
-            const doc = new jsPDF({ orientation: 'landscape' });
+            const doc = new jsPDF();
             doc.setFontSize(16);
             doc.text(title, 14, 15);
             autoTable(doc, {
@@ -667,7 +571,7 @@ export default function SubjectsPage() {
                             addSubjectForm.reset();
                             addSubjectForm.clearErrors();
                           } else {
-                            if (teachersWithClasses.length === 0 && !isLoadingInitialData) fetchInitialData();
+                            if (allTeacherProfiles.length === 0 && !isLoadingInitialData) fetchInitialData();
                           }
                         }}>
                           <DialogTrigger asChild>
@@ -737,10 +641,9 @@ export default function SubjectsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[50px]">No.</TableHead>
-                    <TableHead className={cn("w-1/4", isMobile && "w-1/3 px-2")}>Nama Mapel</TableHead>
-                    {!isMobile && <TableHead className="w-1/3">Deskripsi</TableHead>}
-                    <TableHead className={cn("w-1/4", isMobile && "w-1/3 px-2")}>Guru Penanggung Jawab</TableHead>
-                    {!isMobile && <TableHead className="w-1/4">Kelas Diajar</TableHead>}
+                    <TableHead className={cn("w-1/3", isMobile && "w-1/2 px-2")}>Nama Mapel</TableHead>
+                    {!isMobile && <TableHead className="w-1/2">Deskripsi</TableHead>}
+                    <TableHead className={cn("w-1/3", isMobile && "w-1/2 px-2")}>Guru Penanggung Jawab</TableHead>
                     {role === "admin" && <TableHead className={cn("text-right", isMobile ? "w-12 px-1" : "w-16")}>Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -751,7 +654,6 @@ export default function SubjectsPage() {
                       <TableCell className="font-medium truncate" title={subject.name}>{subject.name}</TableCell>
                       {!isMobile && <TableCell className="truncate" title={subject.description || "-"}>{subject.description || "-"}</TableCell>}
                       <TableCell className="truncate" title={subject.teacherName || subject.teacherUid || "-"}>{subject.teacherName || subject.teacherUid || "-"}</TableCell>
-                      {!isMobile && <TableCell className="truncate" title={subject.classNames?.join(', ') || "-"}>{subject.classNames?.join(', ') || "-"}</TableCell>}
                       {role === "admin" && (
                         <TableCell className={cn("text-right", isMobile && "px-1")}>
                            <DropdownMenu>
@@ -867,3 +769,5 @@ export default function SubjectsPage() {
     </div>
   );
 }
+
+    
