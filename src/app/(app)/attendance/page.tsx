@@ -214,7 +214,7 @@ function TeacherAdminAttendanceManagement() {
 
 
   useEffect(() => {
-    if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
+    if (authLoading || !role || !["admin", "guru"].includes(role)) return;
 
     const fetchAttendanceData = async () => {
       if (!selectedClassId || !selectedDate) {
@@ -245,6 +245,8 @@ function TeacherAdminAttendanceManagement() {
         );
         const attendanceSnapshot = await getDocs(attendanceQuery);
         
+        let studentAttendances: TeacherStudentAttendanceRecord[];
+        
         if (!attendanceSnapshot.empty) {
           const attendanceDoc = attendanceSnapshot.docs[0];
           setExistingAttendanceDocId(attendanceDoc.id);
@@ -252,26 +254,24 @@ function TeacherAdminAttendanceManagement() {
           const existingRecordsMap = new Map<string, TeacherStudentAttendanceRecord>(
             data.studentAttendances.map((rec: TeacherStudentAttendanceRecord) => [rec.studentId, rec])
           );
-
-          const mergedStudentAttendances = fetchedStudents.map(student => {
-            const existingRecord = existingRecordsMap.get(student.id);
-            return existingRecord || { 
+          
+          studentAttendances = fetchedStudents.map(student => 
+            existingRecordsMap.get(student.id) || { 
               studentId: student.id, 
               studentName: student.name, 
-              status: "Alpa" as AttendanceStatus, 
+              status: "Alpa", 
               notes: ""
-            };
-          });
-          replace(mergedStudentAttendances);
+            }
+          );
         } else { 
-          const initialAttendanceData = fetchedStudents.map(student => ({
+          studentAttendances = fetchedStudents.map(student => ({
             studentId: student.id,
             studentName: student.name,
-            status: "Alpa" as AttendanceStatus, 
+            status: "Alpa", 
             notes: "",
           }));
-          replace(initialAttendanceData);
         }
+        replace(studentAttendances);
       } catch (error) {
         console.error("Error fetching attendance: ", error);
         toast({ title: "Gagal Memuat Data Kehadiran", variant: "destructive" });
