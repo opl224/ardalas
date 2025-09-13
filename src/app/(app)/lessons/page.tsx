@@ -89,6 +89,7 @@ import {
 } from "@/components/ui/pagination";
 import LottieLoader from "@/components/ui/LottieLoader";
 import { useSidebar } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 
 
 // Minimal interfaces for dropdowns
@@ -130,7 +131,7 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
 
 const baseLessonObjectSchema = z.object({
   subjectId: z.string({ required_error: "Pilih mata pelajaran." }),
-  classId: z.string({ required_error: "" }),
+  classId: z.string({ required_error: "Pilih kelas." }),
   teacherId: z.string({ required_error: "Guru pengajar harus ditentukan." }), 
   dayOfWeek: z.enum(DAYS_OF_WEEK, { required_error: "Pilih hari." }),
   startTime: z.string().regex(timeRegex, { message: "Format waktu mulai JJ:MM (e.g., 07:00)." }),
@@ -177,7 +178,6 @@ export default function LessonsPage() {
   const [allTeachersWithClasses, setAllTeachersWithClasses] = useState<TeacherWithClasses[]>([]);
   
   // State for form dropdowns that get filtered
-  const [subjectsForForm, setSubjectsForForm] = useState<SubjectMin[]>([]);
   const [classesForForm, setClassesForForm] = useState<ClassMin[]>([]);
   const [teachersForForm, setTeachersForForm] = useState<TeacherMin[]>([]);
 
@@ -196,6 +196,7 @@ export default function LessonsPage() {
 
   const { toast } = useToast();
   const { isMobile } = useSidebar();
+  const [isSpecialistTeacher, setIsSpecialistTeacher] = useState(false);
 
   const addLessonForm = useForm<LessonFormValues>({
     resolver: zodResolver(lessonFormSchema),
@@ -235,7 +236,6 @@ export default function LessonsPage() {
 
         const subjectsData = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setAllSubjects(subjectsData);
-        setSubjectsForForm(subjectsData);
         
         const teachersData = teachersSnapshot.docs.map(doc => ({ id: doc.id, uid: doc.data().uid, name: doc.data().name, email: doc.data().email }));
         setTeachersForForm(teachersData);
@@ -382,20 +382,57 @@ export default function LessonsPage() {
 
   const watchTeacherIdForAdd = addLessonForm.watch("teacherId");
   const watchTeacherIdForEdit = editLessonForm.watch("teacherId");
+  const watchSubjectIdForAdd = addLessonForm.watch("subjectId");
 
   useEffect(() => {
-      const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForAdd);
-      if (teacher) {
-          const taughtClasses = allClasses.filter(c => teacher.classIds.includes(c.id));
-          setClassesForForm(taughtClasses);
-          if (!teacher.classIds.includes(addLessonForm.getValues("classId"))) {
-              addLessonForm.setValue("classId", undefined, {shouldValidate: true});
+    const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForAdd);
+    if (isSpecialistTeacher) {
+      setClassesForForm(allClasses);
+    } else if (teacher) {
+      const taughtClasses = allClasses.filter(c => teacher.classIds.includes(c.id));
+      setClassesForForm(taughtClasses);
+    } else {
+      setClassesForForm([]);
+    }
+    // Reset classId if the teacher changes or if the mode changes and the current class is no longer valid
+    if (addLessonForm.getValues("classId")) {
+        addLessonForm.setValue("classId", undefined, { shouldValidate: true });
+    }
+  }, [watchTeacherIdForAdd, isSpecialistTeacher, allTeachersWithClasses, allClasses, addLessonForm]);
+
+
+  useEffect(() => {
+    if (watchTeacherIdForAdd) {
+        const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForAdd);
+        if (teacher) {
+            const subjectsTaughtByTeacherQuery = query(collection(db, "subjects"), where("teacherId", "==", teacher.id));
+            getDocs(subjectsTaughtByTeacherQuery).then(snapshot => {
+                const subjectsTaught = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
+                setAllSubjects(subjectsTaught);
+            });
+        }
+    } else {
+        setAllSubjects([]);
+    }
+    addLessonForm.setValue("subjectId", undefined);
+  }, [watchTeacherIdForAdd, addLessonForm]);
+
+
+  useEffect(() => {
+      if (watchSubjectIdForAdd) {
+          const subject = allSubjects.find(s => s.id === watchSubjectIdForAdd);
+          if (subject && subject.name) {
+              const teachersForSubject = allTeachersWithClasses.filter(t => t.subject === subject.name);
+              setTeachersForForm(teachersForSubject.map(t => ({ id: t.id, name: t.name, uid: t.uid })));
           }
       } else {
-          setClassesForForm([]);
+          setTeachersForForm(allTeachersWithClasses);
       }
-  }, [watchTeacherIdForAdd, allTeachersWithClasses, allClasses, addLessonForm]);
-  
+      if (!teachersForForm.find(t => t.id === addLessonForm.getValues("teacherId"))) {
+          addLessonForm.setValue("teacherId", undefined);
+      }
+  }, [watchSubjectIdForAdd, allSubjects, allTeachersWithClasses, addLessonForm]);
+
   useEffect(() => {
       const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForEdit);
       if (teacher) {
@@ -689,28 +726,38 @@ export default function LessonsPage() {
                   <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                     <Controller name="subjectId" control={addLessonForm.control} render={({ field }) => (
-                            <Select onValueChange={(value) => field.onChange(value)} value={field.value || undefined} >
+                            <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("teacherId", undefined); }} value={field.value || undefined} >
                                 <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
-                                <SelectContent>{subjectsForForm.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
+                                <SelectContent>{allSubjects.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
                             </Select>
                     )} />
                     {addLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.subjectId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="add-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                      <div className="flex items-center space-x-2">
+                          <Label htmlFor="specialist-teacher-toggle" className="text-xs text-muted-foreground">Guru Khusus</Label>
+                          <Switch
+                              id="specialist-teacher-toggle"
+                              checked={isSpecialistTeacher}
+                              onCheckedChange={setIsSpecialistTeacher}
+                          />
+                      </div>
+                    </div>
                     <Controller name="teacherId" control={addLessonForm.control} render={({field}) => (
-                        <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined); }} value={field.value || undefined}>
-                            <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                        <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined); }} value={field.value || undefined} disabled={!watchSubjectIdForAdd}>
+                            <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder={!watchSubjectIdForAdd ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
                             <SelectContent>{teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
                         </Select>
                     )} />
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive"></span></Label>
+                    <Label htmlFor="add-lesson-classId">Kelas <span className="text-destructive">*</span></Label>
                     <Controller name="classId" control={addLessonForm.control} render={({field}) => (
                         <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!watchTeacherIdForAdd}>
-                            <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder={!watchTeacherIdForAdd ? "Pilih guru dulu" : "Pilih kelas"} /></SelectTrigger>
+                            <SelectTrigger id="add-lesson-classId" className="mt-1"><SelectValue placeholder={!watchTeacherIdForAdd ? "Pilih guru dulu" : (classesForForm.length > 0 ? "Pilih kelas" : "Tidak ada kelas untuk guru ini")} /></SelectTrigger>
                             <SelectContent>{classesForForm.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                         </Select>
                     )} />
