@@ -110,6 +110,7 @@ interface TeacherWithClasses {
   uid: string; // Teacher's Auth UID
   name: string;
   email: string;
+  subject: string; // Main subject from teacher's profile
   classIds: string[];
   classNames: string[];
 }
@@ -181,7 +182,6 @@ export default function SubjectsPage() {
       
       const teacherClassMap = new Map<string, Set<string>>();
 
-      // 1. Map classes from being a homeroom teacher (wali kelas)
       classesSnapshot.forEach(classDoc => {
         const classData = classDoc.data();
         if (classData.teacherId) {
@@ -192,7 +192,6 @@ export default function SubjectsPage() {
         }
       });
 
-      // 2. Map classes from lessons taught
       lessonsSnapshot.forEach(lessonDoc => {
         const lesson = lessonDoc.data();
         if (lesson.teacherId && lesson.classId) {
@@ -209,10 +208,11 @@ export default function SubjectsPage() {
         const classIds = Array.from(teacherClassesSet);
         const classNames = classIds.map(id => classesMap.get(id) || "Nama Kelas Tidak Ditemukan").sort();
         return {
-          id: doc.id, // Teacher's Document ID
-          uid: teacher.uid, // Teacher's Auth UID
+          id: doc.id,
+          uid: teacher.uid,
           name: teacher.name,
           email: teacher.email,
+          subject: teacher.subject,
           classIds,
           classNames
         };
@@ -277,11 +277,11 @@ export default function SubjectsPage() {
   // Auto-fill classes when teacher is selected in the 'Add' form
   const watchAddTeacherUid = addSubjectForm.watch("teacherUid");
   useEffect(() => {
-    if (!watchAddTeacherUid) {
+    const selectedSubjectName = addSubjectForm.getValues("name");
+    if (!watchAddTeacherUid || selectedSubjectName !== 'Guru Kelas') {
       addSubjectForm.setValue("classIds", []);
       return;
     }
-    // Find teacher by their Auth UID
     const selectedTeacher = teachersWithClasses.find(t => t.uid === watchAddTeacherUid);
     if (selectedTeacher) {
       addSubjectForm.setValue("classIds", selectedTeacher.classIds);
@@ -293,11 +293,11 @@ export default function SubjectsPage() {
   // Auto-fill classes when teacher is selected in the 'Edit' form
   const watchEditTeacherUid = editSubjectForm.watch("teacherUid");
   useEffect(() => {
-    if (!watchEditTeacherUid) {
+    const selectedSubjectName = editSubjectForm.getValues("name");
+    if (!watchEditTeacherUid || selectedSubjectName !== 'Guru Kelas') {
       editSubjectForm.setValue("classIds", []);
       return;
     }
-     // Find teacher by their Auth UID
     const selectedTeacher = teachersWithClasses.find(t => t.uid === watchEditTeacherUid);
     if (selectedTeacher) {
       editSubjectForm.setValue("classIds", selectedTeacher.classIds);
@@ -336,8 +336,8 @@ export default function SubjectsPage() {
         description: data.description || null,
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
-        classIds: selectedTeacher?.classIds || [],
-        classNames: selectedTeacher?.classNames || [],
+        classIds: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classIds : [],
+        classNames: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classNames : [],
         createdAt: serverTimestamp(),
       });
 
@@ -366,8 +366,8 @@ export default function SubjectsPage() {
         description: data.description || null,
         teacherUid: data.teacherUid === NO_RESPONSIBLE_TEACHER ? null : data.teacherUid || null,
         teacherName: selectedTeacher?.name || null,
-        classIds: selectedTeacher?.classIds || [],
-        classNames: selectedTeacher?.classNames || [],
+        classIds: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classIds : [],
+        classNames: data.name === 'Guru Kelas' && selectedTeacher ? selectedTeacher.classNames : [],
       });
 
       toast({ title: "Mata Pelajaran Diperbarui", description: `${data.name} berhasil diperbarui.` });
@@ -414,8 +414,16 @@ export default function SubjectsPage() {
   };
 
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => {
+    const selectedSubjectName = formInstance.watch("name");
     const teacherUid = formInstance.watch("teacherUid");
     const selectedTeacher = teachersWithClasses.find(t => t.uid === teacherUid);
+
+    const filteredTeachers = useMemo(() => {
+        if (!selectedSubjectName) {
+            return teachersWithClasses;
+        }
+        return teachersWithClasses.filter(teacher => teacher.subject === selectedSubjectName);
+    }, [selectedSubjectName, teachersWithClasses]);
     
     return (
       <>
@@ -426,7 +434,17 @@ export default function SubjectsPage() {
               control={formInstance.control}
               render={({ field }) => (
                   <Select
-                      onValueChange={(value) => field.onChange(value)}
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Reset teacher if the current one is not valid for the new subject
+                        const currentTeacherUid = formInstance.getValues("teacherUid");
+                        if (currentTeacherUid) {
+                            const currentTeacher = teachersWithClasses.find(t => t.uid === currentTeacherUid);
+                            if (currentTeacher && currentTeacher.subject !== value) {
+                                formInstance.setValue("teacherUid", undefined);
+                            }
+                        }
+                      }}
                       value={field.value || undefined}
                   >
                   <SelectTrigger id={`${formType}-subject-name`} className="mt-1">
@@ -461,21 +479,24 @@ export default function SubjectsPage() {
                   <Select
                     onValueChange={(value) => field.onChange(value === NO_RESPONSIBLE_TEACHER ? undefined : value)}
                     value={field.value || NO_RESPONSIBLE_TEACHER}
-                    disabled={isLoadingInitialData}
+                    disabled={isLoadingInitialData || !selectedSubjectName}
                   >
                     <SelectTrigger id={`${formType}-subject-teacherUid`} className="mt-1">
-                      <SelectValue placeholder={isLoadingInitialData ? "Memuat guru..." : "Pilih guru"} />
+                      <SelectValue placeholder={!selectedSubjectName ? "Pilih mapel dulu" : (isLoadingInitialData ? "Memuat guru..." : "Pilih guru")} />
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingInitialData && <SelectItem value="loading-auth" disabled>Memuat...</SelectItem>}
                       <SelectItem value={NO_RESPONSIBLE_TEACHER}>Tidak Ada / Kosongkan</SelectItem>
-                      {teachersWithClasses
+                      {filteredTeachers.length > 0 ? (
+                        filteredTeachers
                         .filter(teacher => teacher && typeof teacher.uid === 'string' && teacher.uid.length > 0)
                         .map((teacher) => (
                         <SelectItem key={teacher.uid} value={teacher.uid}>
                           {teacher.name} ({teacher.email})
                         </SelectItem>
-                      ))}
+                      ))) : (
+                         <SelectItem value="no-teachers" disabled>Tidak ada guru untuk mapel ini.</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 )}
@@ -484,12 +505,14 @@ export default function SubjectsPage() {
                 <p className="text-sm text-destructive mt-1">{formInstance.formState.errors.teacherUid.message}</p>
               )}
             </div>
+            {selectedSubjectName === 'Guru Kelas' && (
              <div>
-              <Label>Kelas Diajar</Label>
+              <Label>Kelas Diajar (Wali Kelas)</Label>
               <div className="mt-1 min-h-[40px] w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
-                {selectedTeacher ? selectedTeacher.classNames.join(', ') || 'Guru ini belum mengajar di kelas manapun.' : 'Pilih guru untuk melihat kelas.'}
+                {selectedTeacher ? selectedTeacher.classNames.join(', ') || 'Guru ini belum menjadi wali kelas manapun.' : 'Pilih guru untuk melihat kelas.'}
               </div>
             </div>
+            )}
           </>
         )}
       </>
