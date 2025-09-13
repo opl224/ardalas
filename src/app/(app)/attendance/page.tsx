@@ -42,7 +42,8 @@ import {
   serverTimestamp,
   orderBy,
   documentId,
-  limit
+  limit,
+  getDoc
 } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
@@ -978,7 +979,3 @@ export default function AttendancePageWrapper() {
     );
   }
 }
-
-    
-
-    
