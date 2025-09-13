@@ -245,12 +245,17 @@ function TeacherAdminAttendanceManagement() {
         if (!attendanceSnapshot.empty) {
           const attendanceDoc = attendanceSnapshot.docs[0];
           setExistingAttendanceDocId(attendanceDoc.id);
-          const data = attendanceDoc.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[] };
-          
+          const data = attendanceDoc.data();
+          const existingRecordsMap = new Map<string, TeacherStudentAttendanceRecord>(
+            data.studentAttendances.map((rec: TeacherStudentAttendanceRecord) => [rec.studentId, rec])
+          );
+
           const mergedStudentAttendances = fetchedStudents.map(student => {
-            const existingRecord = data.studentAttendances.find(sa => sa.studentId === student.id);
-            return existingRecord || { 
-              studentId: student.id, studentName: student.name, status: "Alpa" as AttendanceStatus, notes: ""
+            return existingRecordsMap.get(student.id) || { 
+              studentId: student.id, 
+              studentName: student.name, 
+              status: "Hadir" as AttendanceStatus, 
+              notes: ""
             };
           });
           replace(mergedStudentAttendances);
