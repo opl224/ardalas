@@ -378,15 +378,18 @@ export default function LessonsPage() {
     const todayDate = startOfDay(new Date());
     const attendanceQuery = query(
         collection(db, "attendances"),
-        where("studentId", "==", authUser.linkedStudentId),
-        where("date", ">=", Timestamp.fromDate(todayDate))
+        where("classId", "==", authUser.linkedStudentClassId),
+        where("date", "==", Timestamp.fromDate(todayDate))
     );
 
     const unsubscribe = onSnapshot(attendanceQuery, (snapshot) => {
         const newAttendedDays = new Set<string>();
         snapshot.forEach(doc => {
-            const dateStr = format(doc.data().date.toDate(), 'yyyy-MM-dd');
-            newAttendedDays.add(dateStr);
+             const studentRecord = doc.data().studentAttendances?.find((rec: any) => rec.studentId === authUser.linkedStudentId);
+             if(studentRecord) {
+                const dateStr = format(doc.data().date.toDate(), 'yyyy-MM-dd');
+                newAttendedDays.add(dateStr);
+             }
         });
         setAttendedDays(newAttendedDays);
     });
@@ -493,44 +496,81 @@ export default function LessonsPage() {
   };
   
   const handleParentMarkAttendance = async () => {
-    if (!authUser || role !== 'orangtua' || !authUser.linkedStudentId || !attendanceDay) {
-        toast({ title: "Gagal Absen", description: "Kondisi tidak terpenuhi atau sudah absen.", variant: "destructive"});
+    if (!authUser || role !== 'orangtua' || !authUser.linkedStudentId || !authUser.linkedStudentClassId) {
+        toast({ title: "Gagal Absen", description: "Kondisi tidak terpenuhi atau sudah absen.", variant: "destructive" });
         return;
     }
 
     setIsSubmittingAttendance(true);
     const today = startOfDay(new Date());
-    const attendanceDocId = `${format(today, 'yyyy-MM-dd')}_${authUser.linkedStudentId}`;
-    
-    const attendanceRecord = {
-        studentId: authUser.linkedStudentId,
-        studentName: authUser.linkedStudentName,
-        classId: authUser.linkedStudentClassId,
-        className: authUser.linkedStudentClassName,
-        date: Timestamp.fromDate(today),
-        status: "Hadir",
-        notes: `Kehadiran ditandai oleh orang tua pada hari ${attendanceDay}.`,
-        recordedById: authUser.uid,
-        recordedByName: authUser.displayName,
-        lastUpdatedAt: serverTimestamp(),
-    };
-    
+    const attendanceDocId = `${format(today, 'yyyy-MM-dd')}_${authUser.linkedStudentClassId}`;
+    const attendanceDocRef = doc(db, "attendances", attendanceDocId);
+
     try {
-        await setDoc(doc(db, "attendances", attendanceDocId), attendanceRecord, { merge: true });
+        const attendanceDoc = await getDoc(attendanceDocRef);
+        let studentAttendances = [];
+
+        if (attendanceDoc.exists()) {
+            studentAttendances = attendanceDoc.data().studentAttendances || [];
+        } else {
+            // If doc doesn't exist, create a list of all students for that class
+            const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", authUser.linkedStudentClassId));
+            const studentsSnapshot = await getDocs(studentsQuery);
+            studentAttendances = studentsSnapshot.docs.map(sDoc => ({
+                studentId: sDoc.id,
+                studentName: sDoc.data().name,
+                status: "Hadir", // Default
+                notes: ""
+            }));
+        }
+
+        const studentIndex = studentAttendances.findIndex((rec: any) => rec.studentId === authUser.linkedStudentId);
+        
+        if (studentIndex !== -1) {
+            // Update existing student record
+            studentAttendances[studentIndex] = {
+                ...studentAttendances[studentIndex],
+                status: "Hadir",
+                notes: `Kehadiran ditandai oleh orang tua pada hari ${attendanceDay}.`
+            };
+        } else {
+            // This case should ideally not happen if the logic is correct, but as a fallback:
+            studentAttendances.push({
+                studentId: authUser.linkedStudentId,
+                studentName: authUser.linkedStudentName || "Nama Tidak Ada",
+                status: "Hadir",
+                notes: `Kehadiran ditandai oleh orang tua pada hari ${attendanceDay}.`
+            });
+        }
+
+        const attendanceRecord = {
+            classId: authUser.linkedStudentClassId,
+            className: authUser.linkedStudentClassName,
+            date: Timestamp.fromDate(today),
+            studentAttendances: studentAttendances,
+            recordedById: authUser.uid,
+            recordedByName: authUser.displayName,
+            lastUpdatedAt: serverTimestamp(),
+        };
+
+        await setDoc(attendanceDocRef, attendanceRecord, { merge: true });
+        
         toast({
             title: "Absensi Berhasil",
             description: `${authUser.linkedStudentName} telah ditandai Hadir untuk hari ini.`,
         });
+
         setIsAttendanceDialogOpen(false);
         setAttendanceDay(null);
-        setAttendedDays(prev => new Set(prev).add(format(today, 'yyyy-MM-dd'))); // Manually update state
+        setAttendedDays(prev => new Set(prev).add(format(today, 'yyyy-MM-dd')));
+
     } catch (e) {
         console.error("Error submitting parent attendance:", e);
         toast({ title: "Gagal Menyimpan Absensi", variant: "destructive" });
     } finally {
         setIsSubmittingAttendance(false);
     }
-  };
+};
 
   const openEditDialog = (lesson: LessonData) => {
     if(role !== 'admin') return;
@@ -675,12 +715,15 @@ export default function LessonsPage() {
                           />
                       </div>
                     </div>
-                    <Controller name="teacherId" control={addLessonForm.control} render={({field}) => (
-                        <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined, { shouldValidate: true }); }} value={field.value || undefined} disabled={!addLessonForm.watch("subjectId")}>
-                            <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder={!addLessonForm.watch("subjectId") ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
-                            <SelectContent>{allTeachersWithClasses.filter(t => t.subject === allSubjects.find(s => s.id === addLessonForm.watch("subjectId"))?.name).map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                    )} />
+                    <Controller name="teacherId" control={addLessonForm.control} render={({field}) => {
+                         const filteredTeachers = allTeachersWithClasses.filter(t => t.subject === allSubjects.find(s => s.id === addLessonForm.watch("subjectId"))?.name);
+                        return (
+                            <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined, { shouldValidate: true }); }} value={field.value || undefined} disabled={!addLessonForm.watch("subjectId")}>
+                                <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder={!addLessonForm.watch("subjectId") ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
+                                <SelectContent>{filteredTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                            </Select>
+                        );
+                    }} />
                     {addLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{addLessonForm.formState.errors.teacherId.message}</p>}
                   </div>
                   <div>
@@ -936,12 +979,15 @@ export default function LessonsPage() {
                           />
                       </div>
                     </div>
-                     <Controller name="teacherId" control={editLessonForm.control} render={({field}) => (
-                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined, {shouldValidate: true}); }} value={field.value || undefined} disabled={!editLessonForm.watch("subjectId")}>
-                          <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder={!editLessonForm.watch("subjectId") ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
-                          <SelectContent>{allTeachersWithClasses.filter(t => t.subject === allSubjects.find(s => s.id === editLessonForm.watch("subjectId"))?.name).map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                    )} />
+                     <Controller name="teacherId" control={editLessonForm.control} render={({field}) => {
+                        const filteredTeachers = allTeachersWithClasses.filter(t => t.subject === allSubjects.find(s => s.id === editLessonForm.watch("subjectId"))?.name);
+                        return (
+                          <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined, {shouldValidate: true}); }} value={field.value || undefined} disabled={!editLessonForm.watch("subjectId")}>
+                            <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder={!editLessonForm.watch("subjectId") ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
+                            <SelectContent>{filteredTeachers.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        );
+                    }} />
                     {editLessonForm.formState.errors.teacherId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.teacherId.message}</p>}
                 </div>
                 <div>
@@ -1024,4 +1070,3 @@ export default function LessonsPage() {
     </div>
   );
 }
-

@@ -26,7 +26,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useForm, useFieldArray, type SubmitHandler, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid, getDay, isWithinInterval } from "date-fns";
+import { format, startOfDay, getMonth, getYear, setMonth, setYear, lastDayOfMonth, parse, isValid, getDay, isWithinInterval, isFuture } from "date-fns";
 import { id as indonesiaLocale } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase/config";
@@ -154,6 +154,8 @@ function TeacherAdminAttendanceManagement() {
     name: "studentAttendances",
   });
 
+  const isSelectedDateInFuture = isFuture(selectedDate);
+
   useEffect(() => {
     if (authLoading || !user || !role) return; 
 
@@ -252,7 +254,8 @@ function TeacherAdminAttendanceManagement() {
           );
 
           const mergedStudentAttendances = fetchedStudents.map(student => {
-            return existingRecordsMap.get(student.id) || { 
+            const existingRecord = existingRecordsMap.get(student.id);
+            return existingRecord || { 
               studentId: student.id, 
               studentName: student.name, 
               status: "Hadir" as AttendanceStatus, 
@@ -672,11 +675,16 @@ function TeacherAdminAttendanceManagement() {
                 <div className="space-y-2 mt-4">
                   <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" />
                 </div>
+              ) : isSelectedDateInFuture ? (
+                 <div className="mt-4 p-4 border border-dashed border-border rounded-md text-center text-muted-foreground flex flex-col items-center gap-2">
+                    <AlertCircle className="w-8 h-8 text-primary" />
+                    <span>Anda tidak dapat mencatat atau melihat kehadiran untuk tanggal di masa depan.</span>
+                 </div>
               ) : fields.length === 0 ? (
                  <div className="mt-4 p-4 border border-dashed border-border rounded-md text-center text-muted-foreground">
                     Tidak ada siswa di kelas ini atau data siswa belum termuat.
                  </div>
-              ) : fields.length > 0 && (
+              ) : (
                 <div className="mt-4 space-y-4">
                   <h3 className="text-lg font-medium">Daftar Siswa ({fields.length} siswa)</h3>
                   <div className="overflow-x-auto">
@@ -725,7 +733,7 @@ function TeacherAdminAttendanceManagement() {
                 </div>
               )
             )}
-            {fields.length > 0 && selectedClassId && selectedDate && !isLoadingFormData && (
+            {fields.length > 0 && selectedClassId && selectedDate && !isLoadingFormData && !isSelectedDateInFuture && (
               <div className="flex justify-end mt-6">
                 <Button type="submit" disabled={isSubmitting || isLoadingFormData}>
                   {isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
