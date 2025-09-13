@@ -29,7 +29,6 @@ interface LessonDetails {
   classId?: string; // Need classId for querying attendance
 }
 
-// This interface is no longer used for recording but might be useful for display if needed.
 interface StudentSelfAttendanceRecord {
   id?: string;
   studentId: string;
@@ -44,6 +43,8 @@ interface StudentSelfAttendanceRecord {
   attendedAt: Timestamp;
 }
 
+const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
 
 export default function LessonDetailPage() {
   const paramsFromHook = useParams();
@@ -55,6 +56,11 @@ export default function LessonDetailPage() {
   const [lesson, setLesson] = useState<LessonDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [isAttendanceButtonVisible, setIsAttendanceButtonVisible] = useState(false);
+  const [hasAttendedToday, setHasAttendedToday] = useState(false);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
+
 
   useEffect(() => {
     if (paramsFromHook && typeof paramsFromHook.lessonId === 'string') {
@@ -109,6 +115,92 @@ export default function LessonDetailPage() {
 
     fetchLessonDetails();
   }, [lessonId, authLoading, user, role]);
+  
+  useEffect(() => {
+    if (!lesson || !user || role !== 'orangtua' || !user.linkedStudentId) {
+      setIsAttendanceButtonVisible(false);
+      return;
+    }
+
+    const checkAttendanceStatus = async () => {
+        const now = new Date();
+        const currentDayName = DAY_NAMES_ID[getDay(now)];
+        
+        if (lesson.dayOfWeek !== currentDayName || !lesson.startTime || !lesson.endTime) {
+            setIsAttendanceButtonVisible(false);
+            return;
+        }
+
+        const lessonStartTime = parse(lesson.startTime, "HH:mm", now);
+        const lessonEndTime = parse(lesson.endTime, "HH:mm", now);
+
+        if (!isValid(lessonStartTime) || !isValid(lessonEndTime) || !isWithinInterval(now, { start: lessonStartTime, end: lessonEndTime })) {
+            setIsAttendanceButtonVisible(false);
+            return;
+        }
+
+        const todayStart = startOfDay(now);
+        const attendanceQuery = query(
+            collection(db, "student_attendances"),
+            where("studentId", "==", user.linkedStudentId),
+            where("lessonId", "==", lesson.id),
+            where("date", ">=", Timestamp.fromDate(todayStart))
+        );
+        
+        try {
+            const querySnapshot = await getDocs(attendanceQuery);
+            setHasAttendedToday(!querySnapshot.empty);
+            setIsAttendanceButtonVisible(true);
+        } catch (e) {
+            console.error("Error checking attendance status:", e);
+            // Hide button on error to be safe
+            setIsAttendanceButtonVisible(false);
+        }
+    };
+
+    checkAttendanceStatus();
+    // Re-check every minute
+    const intervalId = setInterval(checkAttendanceStatus, 60000);
+    return () => clearInterval(intervalId);
+
+  }, [lesson, user, role]);
+
+
+  const handleMarkAttendance = async () => {
+    if (!lesson || !user || role !== 'orangtua' || !user.linkedStudentId || !user.linkedStudentName || !user.linkedStudentClassId || !user.linkedStudentClassName || hasAttendedToday) {
+        toast({ title: "Gagal Absen", description: "Kondisi tidak terpenuhi atau sudah absen.", variant: "destructive"});
+        return;
+    }
+
+    setIsSubmittingAttendance(true);
+    try {
+        const attendanceRecord: Omit<StudentSelfAttendanceRecord, 'id'> = {
+            studentId: user.linkedStudentId,
+            studentName: user.linkedStudentName,
+            classId: user.linkedStudentClassId,
+            className: user.linkedStudentClassName,
+            lessonId: lesson.id,
+            subjectName: lesson.subjectName,
+            lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
+            date: Timestamp.fromDate(startOfDay(new Date())),
+            status: "Hadir",
+            attendedAt: serverTimestamp() as Timestamp,
+        };
+        
+        await addDoc(collection(db, "student_attendances"), attendanceRecord);
+
+        setHasAttendedToday(true);
+        toast({
+            title: "Absensi Berhasil",
+            description: `${user.linkedStudentName} telah ditandai hadir pada pelajaran ${lesson.subjectName}.`,
+        });
+    } catch (e) {
+        console.error("Error submitting attendance:", e);
+        toast({ title: "Gagal Menyimpan Absensi", variant: "destructive" });
+    } finally {
+        setIsSubmittingAttendance(false);
+    }
+  };
 
 
   if (isLoading || authLoading) {
@@ -200,13 +292,25 @@ export default function LessonDetailPage() {
               </div>
             </div>
           </div>
-
-          <div className="mt-6 p-4 border border-dashed border-border rounded-md text-center">
-            <Info className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">
-              Kehadiran sekarang dicatat oleh guru wali kelas untuk seluruh hari, bukan per mata pelajaran.
-            </p>
-          </div>
+          
+           {isAttendanceButtonVisible && (
+            <div className="mt-6 p-4 border border-dashed rounded-md text-center">
+              {hasAttendedToday ? (
+                <div className="flex flex-col items-center gap-2 text-green-600">
+                    <CheckCircle className="h-8 w-8" />
+                    <p className="font-semibold">Anak Anda sudah diabsen Hadir untuk pelajaran ini hari ini.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3">
+                    <p className="font-semibold">Pelajaran sedang berlangsung!</p>
+                    <Button onClick={handleMarkAttendance} disabled={isSubmittingAttendance}>
+                        {isSubmittingAttendance && <LottieLoader width={16} height={16} className="mr-2" />}
+                        {isSubmittingAttendance ? "Mengabsen..." : `Absenkan ${user?.linkedStudentName || 'Anak'} Sekarang`}
+                    </Button>
+                </div>
+              )}
+            </div>
+          )}
 
 
           {lesson.topic && (
@@ -243,5 +347,3 @@ export default function LessonDetailPage() {
     </div>
   );
 }
-
-    
