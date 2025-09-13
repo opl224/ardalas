@@ -139,6 +139,7 @@ const baseLessonObjectSchema = z.object({
 });
 
 const lessonTimeRefinement = (data: { startTime: string; endTime: string; }) => {
+  if (!data.startTime || !data.endTime) return true; // Let regex handle empty
   const [startH, startM] = data.startTime.split(':').map(Number);
   const [endH, endM] = data.endTime.split(':').map(Number);
   if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return false; 
@@ -395,7 +396,9 @@ export default function LessonsPage() {
     } else {
       setClassesForForm([]);
     }
-    if (addLessonForm.getValues("classId")) {
+    // Only reset class if the currently selected class is not in the new list of available classes
+    const currentClassId = addLessonForm.getValues("classId");
+    if (currentClassId && !classesForForm.some(c => c.id === currentClassId)) {
         addLessonForm.setValue("classId", undefined, { shouldValidate: true });
     }
   }, [watchTeacherIdForAdd, isSpecialistTeacher, allTeachersWithClasses, allClasses, addLessonForm]);
@@ -410,12 +413,15 @@ export default function LessonsPage() {
       setTeachersForForm([]);
     }
     addLessonForm.setValue("teacherId", undefined, { shouldValidate: true });
+    addLessonForm.setValue("classId", undefined, { shouldValidate: true });
   }, [watchSubjectIdForAdd, allSubjects, allTeachersWithClasses, addLessonForm]);
 
 
   useEffect(() => {
       const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForEdit);
-      if (teacher) {
+      if (isSpecialistTeacher) {
+        setClassesForForm(allClasses);
+      } else if (teacher) {
           const taughtClasses = allClasses.filter(c => teacher.classIds.includes(c.id));
           setClassesForForm(taughtClasses);
           if (!teacher.classIds.includes(editLessonForm.getValues("classId"))) {
@@ -424,7 +430,7 @@ export default function LessonsPage() {
       } else {
           setClassesForForm([]);
       }
-  }, [watchTeacherIdForEdit, allTeachersWithClasses, allClasses, editLessonForm]);
+  }, [watchTeacherIdForEdit, allTeachersWithClasses, allClasses, editLessonForm, isSpecialistTeacher]);
   
   useEffect(() => {
     const subject = allSubjects.find(s => s.id === watchSubjectIdForEdit);
@@ -697,7 +703,7 @@ export default function LessonsPage() {
           {canManageLessons && (
             <Dialog open={isAddDialogOpen} onOpenChange={(isOpen) => {
               setIsAddDialogOpen(isOpen);
-              if (!isOpen) { addLessonForm.reset(); addLessonForm.clearErrors(); }
+              if (!isOpen) { addLessonForm.reset(); addLessonForm.clearErrors(); setIsSpecialistTeacher(false); }
               else if (allSubjects.length === 0 || allClasses.length === 0 || allTeachersWithClasses.length === 0) { fetchAdminDropdownData(); }
             }}>
               <DialogTrigger asChild>
@@ -716,7 +722,7 @@ export default function LessonsPage() {
                   <div>
                     <Label htmlFor="add-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                     <Controller name="subjectId" control={addLessonForm.control} render={({ field }) => (
-                            <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("teacherId", undefined); }} value={field.value || undefined} >
+                            <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("teacherId", undefined, { shouldValidate: true }); }} value={field.value || undefined} >
                                 <SelectTrigger id="add-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                                 <SelectContent>{allSubjects.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
                             </Select>
@@ -736,7 +742,7 @@ export default function LessonsPage() {
                       </div>
                     </div>
                     <Controller name="teacherId" control={addLessonForm.control} render={({field}) => (
-                        <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined); }} value={field.value || undefined} disabled={!watchSubjectIdForAdd}>
+                        <Select onValueChange={(value) => { field.onChange(value); addLessonForm.setValue("classId", undefined, { shouldValidate: true }); }} value={field.value || undefined} disabled={!watchSubjectIdForAdd}>
                             <SelectTrigger id="add-lesson-teacherId" className="mt-1"><SelectValue placeholder={!watchSubjectIdForAdd ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
                             <SelectContent>{teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
                         </Select>
@@ -978,7 +984,7 @@ export default function LessonsPage() {
       {canManageLessons && (
         <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => {
           setIsEditDialogOpen(isOpen);
-            if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); }
+            if (!isOpen) { setSelectedLesson(null); editLessonForm.clearErrors(); setIsSpecialistTeacher(false); }
             else if (selectedLesson) { 
               if (allSubjects.length === 0 || allClasses.length === 0 || allTeachersWithClasses.length === 0) fetchAdminDropdownData();
             }
@@ -994,7 +1000,7 @@ export default function LessonsPage() {
                 <div>
                     <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                     <Controller name="subjectId" control={editLessonForm.control} render={({ field }) => (
-                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("teacherId", undefined); }} value={field.value || undefined}>
+                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("teacherId", undefined, {shouldValidate: true}); }} value={field.value || undefined}>
                             <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                             <SelectContent>{allSubjects.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
                         </Select>
@@ -1002,9 +1008,19 @@ export default function LessonsPage() {
                     {editLessonForm.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{editLessonForm.formState.errors.subjectId.message}</p>}
                 </div>
                  <div>
-                    <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
+                       <div className="flex items-center space-x-2">
+                          <Label htmlFor="edit-specialist-teacher-toggle" className="text-xs text-muted-foreground">Guru Khusus</Label>
+                          <Switch
+                              id="edit-specialist-teacher-toggle"
+                              checked={isSpecialistTeacher}
+                              onCheckedChange={setIsSpecialistTeacher}
+                          />
+                      </div>
+                    </div>
                      <Controller name="teacherId" control={editLessonForm.control} render={({field}) => (
-                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined); }} value={field.value || undefined} disabled={!watchSubjectIdForEdit}>
+                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined, {shouldValidate: true}); }} value={field.value || undefined} disabled={!watchSubjectIdForEdit}>
                           <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder={!watchSubjectIdForEdit ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
                           <SelectContent>{teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
                         </Select>
