@@ -258,7 +258,7 @@ function TeacherAdminAttendanceManagement() {
             return existingRecord || { 
               studentId: student.id, 
               studentName: student.name, 
-              status: "Hadir" as AttendanceStatus, 
+              status: "Alpa" as AttendanceStatus, 
               notes: ""
             };
           });
@@ -267,7 +267,7 @@ function TeacherAdminAttendanceManagement() {
           const initialAttendanceData = fetchedStudents.map(student => ({
             studentId: student.id,
             studentName: student.name,
-            status: "Hadir" as AttendanceStatus, 
+            status: "Alpa" as AttendanceStatus, 
             notes: "",
           }));
           replace(initialAttendanceData);
@@ -335,6 +335,10 @@ function TeacherAdminAttendanceManagement() {
   
   const handleDateChange = (date?: Date) => {
     if (date) {
+      if (getDay(date) === 0) { // 0 is Sunday
+        toast({ title: "Hari Libur", description: "Anda tidak dapat memilih hari Minggu.", variant: "default" });
+        return;
+      }
       const newDate = startOfDay(date);
       setSelectedDate(newDate);
       form.setValue("date", newDate);
@@ -662,7 +666,7 @@ function TeacherAdminAttendanceManagement() {
                       selected={selectedDate}
                       onSelect={handleDateChange}
                       initialFocus
-                      disabled={isLoadingFormData || isSubmitting}
+                      disabled={(date) => getDay(date) === 0 || isFuture(date)}
                     />
                   </PopoverContent>
                 </Popover>
@@ -983,5 +987,3 @@ export default function AttendancePageWrapper() {
     );
   }
 }
-
-    
