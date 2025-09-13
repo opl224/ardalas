@@ -94,6 +94,7 @@ import { format } from "date-fns";
 interface TeacherMin { 
   id: string;
   name: string;
+  subject: string;
 }
 
 interface ClassData {
@@ -112,8 +113,8 @@ interface StudentInClass {
 }
 
 const classFormSchema = z.object({
-  name: z.string().min(1, { message: "Nama kelas wajib diisi." }),
   teacherId: z.string().optional(), 
+  name: z.string().min(1, { message: "Nama kelas wajib diisi." }),
 });
 type ClassFormValues = z.infer<typeof classFormSchema>;
 
@@ -124,6 +125,7 @@ type EditClassFormValues = z.infer<typeof editClassFormSchema>;
 
 const NO_TEACHER_VALUE = "_NONE_";
 const ITEMS_PER_PAGE = 10;
+const SPECIALIST_SUBJECTS = ["PJOK", "Bahasa Inggris", "Pendidikan Agama Islam", "Pendidikan Agama Kristen"];
 
 export default function ClassesPage() {
   const { user, role: authRole, loading: authLoading } = useAuth(); 
@@ -166,6 +168,7 @@ export default function ClassesPage() {
       const fetchedTeachers: TeacherMin[] = querySnapshot.docs.map(docSnap => ({
         id: docSnap.id,
         name: docSnap.data().name,
+        subject: docSnap.data().subject, 
       }));
       setTeachers(fetchedTeachers);
     } catch (error) {
@@ -230,6 +233,26 @@ export default function ClassesPage() {
       setIsLoading(false);
     }
   };
+
+  const addTeacherId = addClassForm.watch("teacherId");
+  const editTeacherId = editClassForm.watch("teacherId");
+
+  useEffect(() => {
+    const selectedTeacher = teachers.find(t => t.id === addTeacherId);
+    if (selectedTeacher && SPECIALIST_SUBJECTS.includes(selectedTeacher.subject)) {
+        addClassForm.setValue("name", `Guru ${selectedTeacher.subject}`);
+    } else {
+        // Clear only if the previous value was auto-filled, or handle as per desired logic
+        // For simplicity, let's not clear it to allow manual override after selecting a specialist teacher
+    }
+  }, [addTeacherId, teachers, addClassForm]);
+
+  useEffect(() => {
+    const selectedTeacher = teachers.find(t => t.id === editTeacherId);
+     if (selectedTeacher && SPECIALIST_SUBJECTS.includes(selectedTeacher.subject)) {
+        editClassForm.setValue("name", `Guru ${selectedTeacher.subject}`);
+    }
+  }, [editTeacherId, teachers, editClassForm]);
 
 
   useEffect(() => {
@@ -523,18 +546,11 @@ export default function ClassesPage() {
                     <DialogHeader>
                     <DialogTitle>Tambah Kelas Baru</DialogTitle>
                     <DialogDescription>
-                        Isi detail kelas dan pilih wali kelas jika ada.
+                        Pilih wali kelas, lalu isi nama kelas jika diperlukan.
                     </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={addClassForm.handleSubmit(handleAddClassSubmit)} className="space-y-4 py-4">
-                    <div>
-                        <Label htmlFor="add-class-name">Nama Kelas <span className="text-destructive">*</span></Label>
-                        <Input id="add-class-name" {...addClassForm.register("name")} className="mt-1" placeholder="Contoh: 10A, XI IPA 1" />
-                        {addClassForm.formState.errors.name && (
-                        <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
-                        )}
-                    </div>
-                    <div>
+                     <div>
                         <Label htmlFor="add-class-teacherId">Wali Kelas</Label>
                         <Select
                         onValueChange={(value) => addClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
@@ -555,6 +571,19 @@ export default function ClassesPage() {
                         </Select>
                         {addClassForm.formState.errors.teacherId && (
                         <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.teacherId.message}</p>
+                        )}
+                    </div>
+                    <div>
+                        <Label htmlFor="add-class-name">Nama Kelas <span className="text-destructive">*</span></Label>
+                        <Input 
+                            id="add-class-name" 
+                            {...addClassForm.register("name")} 
+                            className="mt-1" 
+                            placeholder="Contoh: 1A, XI IPA 1"
+                            readOnly={SPECIALIST_SUBJECTS.includes(teachers.find(t => t.id === addTeacherId)?.subject || '')}
+                            />
+                        {addClassForm.formState.errors.name && (
+                        <p className="text-sm text-destructive mt-1">{addClassForm.formState.errors.name.message}</p>
                         )}
                     </div>
                     <DialogFooter>
@@ -764,14 +793,7 @@ export default function ClassesPage() {
             {selectedClass && (
               <form onSubmit={editClassForm.handleSubmit(handleEditClassSubmit)} className="space-y-4 py-4">
                 <Input type="hidden" {...editClassForm.register("id")} />
-                <div>
-                  <Label htmlFor="edit-class-name">Nama Kelas <span className="text-destructive">*</span></Label>
-                  <Input id="edit-class-name" {...editClassForm.register("name")} className="mt-1" />
-                  {editClassForm.formState.errors.name && (
-                    <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div>
+                  <div>
                     <Label htmlFor="edit-class-teacherId">Wali Kelas</Label>
                     <Select
                       onValueChange={(value) => editClassForm.setValue("teacherId", value === NO_TEACHER_VALUE ? undefined : value, { shouldValidate: true })}
@@ -793,6 +815,18 @@ export default function ClassesPage() {
                       <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.teacherId.message}</p>
                     )}
                   </div>
+                <div>
+                  <Label htmlFor="edit-class-name">Nama Kelas <span className="text-destructive">*</span></Label>
+                   <Input 
+                      id="edit-class-name" 
+                      {...editClassForm.register("name")} 
+                      className="mt-1" 
+                      readOnly={SPECIALIST_SUBJECTS.includes(teachers.find(t => t.id === editTeacherId)?.subject || '')}
+                    />
+                  {editClassForm.formState.errors.name && (
+                    <p className="text-sm text-destructive mt-1">{editClassForm.formState.errors.name.message}</p>
+                  )}
+                </div>
                 <DialogFooter>
                    <DialogClose asChild>
                       <Button type="button" variant="outline" onClick={() => { setIsEditDialogOpen(false); setSelectedClass(null); }}>Batal</Button>
@@ -864,4 +898,5 @@ export default function ClassesPage() {
     </div>
   );
 }
+
 
