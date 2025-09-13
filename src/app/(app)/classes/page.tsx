@@ -242,8 +242,11 @@ export default function ClassesPage() {
     if (selectedTeacher && SPECIALIST_SUBJECTS.includes(selectedTeacher.subject)) {
         addClassForm.setValue("name", `Guru ${selectedTeacher.subject}`);
     } else {
-        // Clear only if the previous value was auto-filled, or handle as per desired logic
-        // For simplicity, let's not clear it to allow manual override after selecting a specialist teacher
+        // If the current value was auto-filled by a previous specialist selection, clear it
+        const currentName = addClassForm.getValues("name");
+        if (SPECIALIST_SUBJECTS.some(s => `Guru ${s}` === currentName)) {
+            addClassForm.setValue("name", "");
+        }
     }
   }, [addTeacherId, teachers, addClassForm]);
 
@@ -251,6 +254,11 @@ export default function ClassesPage() {
     const selectedTeacher = teachers.find(t => t.id === editTeacherId);
      if (selectedTeacher && SPECIALIST_SUBJECTS.includes(selectedTeacher.subject)) {
         editClassForm.setValue("name", `Guru ${selectedTeacher.subject}`);
+    } else {
+        const currentName = editClassForm.getValues("name");
+        if (SPECIALIST_SUBJECTS.some(s => `Guru ${s}` === currentName)) {
+            editClassForm.setValue("name", "");
+        }
     }
   }, [editTeacherId, teachers, editClassForm]);
 
@@ -898,5 +906,6 @@ export default function ClassesPage() {
     </div>
   );
 }
+
 
 
