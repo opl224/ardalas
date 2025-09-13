@@ -95,7 +95,7 @@ import { Switch } from "@/components/ui/switch";
 // Minimal interfaces for dropdowns
 interface SubjectMin { id: string; name: string; }
 interface ClassMin { id: string; name: string; }
-interface TeacherMin { id: string; name: string; uid: string; } // Represents documents from 'teachers' collection
+interface TeacherMin { id: string; name: string; uid?: string; subject: string; } // Represents documents from 'teachers' collection
 interface TeacherWithClasses extends TeacherMin {
     classIds: string[];
     classNames: string[];
@@ -122,9 +122,7 @@ interface LessonData {
 const DAYS_OF_WEEK = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"] as const;
 const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 const ALL_SUBJECT_OPTIONS = [
-    "Matematika", "Bahasa Indonesia", "Bahasa Inggris", "Pendidikan Agama Islam", "Pendidikan Kewarganegaraan",
-    "Ilmu Pengetahuan Alam", "Ilmu Pengetahuan Sosial", "Seni Budaya dan Keterampilan",
-    "PJOK", "Bahasa Sunda"
+    "Guru Kelas", "Pendidikan Agama Islam", "Pendidikan Agama Kristen", "PJOK", "Bahasa Inggris"
 ].sort();
 
 const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/; // HH:MM format
@@ -237,13 +235,16 @@ export default function LessonsPage() {
         const subjectsData = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
         setAllSubjects(subjectsData);
         
-        const teachersData = teachersSnapshot.docs.map(doc => ({ id: doc.id, uid: doc.data().uid, name: doc.data().name, email: doc.data().email }));
-        setTeachersForForm(teachersData);
-
+        const teachersData = teachersSnapshot.docs.map(doc => ({
+            id: doc.id,
+            uid: doc.data().uid,
+            name: doc.data().name,
+            subject: doc.data().subject,
+        }));
+        
         const classesMap = new Map(classesData.map(c => [c.id, c.name]));
         const teacherClassMap = new Map<string, Set<string>>();
 
-        // 1. Map classes from being a homeroom teacher (wali kelas)
         classesSnapshot.forEach(classDoc => {
             const classData = classDoc.data();
             if (classData.teacherId) {
@@ -254,7 +255,6 @@ export default function LessonsPage() {
             }
         });
 
-        // 2. Map classes from lessons taught
         lessonsSnapshot.docs.forEach(lessonDoc => {
             const lesson = lessonDoc.data();
             if (lesson.teacherId && lesson.classId) {
@@ -383,6 +383,7 @@ export default function LessonsPage() {
   const watchTeacherIdForAdd = addLessonForm.watch("teacherId");
   const watchTeacherIdForEdit = editLessonForm.watch("teacherId");
   const watchSubjectIdForAdd = addLessonForm.watch("subjectId");
+  const watchSubjectIdForEdit = editLessonForm.watch("subjectId");
 
   useEffect(() => {
     const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForAdd);
@@ -394,7 +395,6 @@ export default function LessonsPage() {
     } else {
       setClassesForForm([]);
     }
-    // Reset classId if the teacher changes or if the mode changes and the current class is no longer valid
     if (addLessonForm.getValues("classId")) {
         addLessonForm.setValue("classId", undefined, { shouldValidate: true });
     }
@@ -402,36 +402,16 @@ export default function LessonsPage() {
 
 
   useEffect(() => {
-    if (watchTeacherIdForAdd) {
-        const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForAdd);
-        if (teacher) {
-            const subjectsTaughtByTeacherQuery = query(collection(db, "subjects"), where("teacherId", "==", teacher.id));
-            getDocs(subjectsTaughtByTeacherQuery).then(snapshot => {
-                const subjectsTaught = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
-                setAllSubjects(subjectsTaught);
-            });
-        }
+    const subject = allSubjects.find(s => s.id === watchSubjectIdForAdd);
+    if (subject && subject.name) {
+      const teachersForSubject = allTeachersWithClasses.filter(t => t.subject === subject.name);
+      setTeachersForForm(teachersForSubject);
     } else {
-        setAllSubjects([]);
+      setTeachersForForm([]);
     }
-    addLessonForm.setValue("subjectId", undefined);
-  }, [watchTeacherIdForAdd, addLessonForm]);
-
-
-  useEffect(() => {
-      if (watchSubjectIdForAdd) {
-          const subject = allSubjects.find(s => s.id === watchSubjectIdForAdd);
-          if (subject && subject.name) {
-              const teachersForSubject = allTeachersWithClasses.filter(t => t.subject === subject.name);
-              setTeachersForForm(teachersForSubject.map(t => ({ id: t.id, name: t.name, uid: t.uid })));
-          }
-      } else {
-          setTeachersForForm(allTeachersWithClasses);
-      }
-      if (!teachersForForm.find(t => t.id === addLessonForm.getValues("teacherId"))) {
-          addLessonForm.setValue("teacherId", undefined);
-      }
+    addLessonForm.setValue("teacherId", undefined, { shouldValidate: true });
   }, [watchSubjectIdForAdd, allSubjects, allTeachersWithClasses, addLessonForm]);
+
 
   useEffect(() => {
       const teacher = allTeachersWithClasses.find(t => t.id === watchTeacherIdForEdit);
@@ -445,6 +425,16 @@ export default function LessonsPage() {
           setClassesForForm([]);
       }
   }, [watchTeacherIdForEdit, allTeachersWithClasses, allClasses, editLessonForm]);
+  
+  useEffect(() => {
+    const subject = allSubjects.find(s => s.id === watchSubjectIdForEdit);
+    if (subject && subject.name) {
+      const teachersForSubject = allTeachersWithClasses.filter(t => t.subject === subject.name);
+      setTeachersForForm(teachersForSubject);
+    } else {
+      setTeachersForForm([]);
+    }
+  }, [watchSubjectIdForEdit, allSubjects, allTeachersWithClasses]);
 
 
   const handleAddLessonSubmit: SubmitHandler<LessonFormValues> = async (data) => {
@@ -1004,7 +994,7 @@ export default function LessonsPage() {
                 <div>
                     <Label htmlFor="edit-lesson-subjectId">Mata Pelajaran <span className="text-destructive">*</span></Label>
                     <Controller name="subjectId" control={editLessonForm.control} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("teacherId", undefined); }} value={field.value || undefined}>
                             <SelectTrigger id="edit-lesson-subjectId" className="mt-1"><SelectValue placeholder="Pilih mata pelajaran" /></SelectTrigger>
                             <SelectContent>{allSubjects.map((subject) => (<SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>))}</SelectContent>
                         </Select>
@@ -1014,8 +1004,8 @@ export default function LessonsPage() {
                  <div>
                     <Label htmlFor="edit-lesson-teacherId">Guru Pengajar <span className="text-destructive">*</span></Label>
                      <Controller name="teacherId" control={editLessonForm.control} render={({field}) => (
-                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined); }} value={field.value || undefined}>
-                          <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder="Pilih guru" /></SelectTrigger>
+                        <Select onValueChange={(value) => { field.onChange(value); editLessonForm.setValue("classId", undefined); }} value={field.value || undefined} disabled={!watchSubjectIdForEdit}>
+                          <SelectTrigger id="edit-lesson-teacherId" className="mt-1"><SelectValue placeholder={!watchSubjectIdForEdit ? "Pilih Mapel Dulu" : "Pilih guru"} /></SelectTrigger>
                           <SelectContent>{teachersForForm.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
                         </Select>
                     )} />
