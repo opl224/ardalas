@@ -224,7 +224,6 @@ function TeacherAdminAttendanceManagement() {
       const dateToQuery = Timestamp.fromDate(startOfDay(selectedDate));
       
       try {
-        // Fetch students of the class
         const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
@@ -235,11 +234,11 @@ function TeacherAdminAttendanceManagement() {
             return;
         }
 
-        // Check for existing attendance record for that day
         const attendanceQuery = query(
           collection(db, "attendances"),
           where("classId", "==", selectedClassId),
-          where("date", "==", dateToQuery)
+          where("date", "==", dateToQuery),
+          limit(1)
         );
         const attendanceSnapshot = await getDocs(attendanceQuery);
         
@@ -256,7 +255,6 @@ function TeacherAdminAttendanceManagement() {
           });
           replace(mergedStudentAttendances);
         } else { 
-           // Default to "Hadir" for new records
           const initialAttendanceData = fetchedStudents.map(student => ({
             studentId: student.id,
             studentName: student.name,
@@ -306,7 +304,6 @@ function TeacherAdminAttendanceManagement() {
     try {
       let docIdToSave = existingAttendanceDocId;
       if (!docIdToSave) {
-        // Format YYYY-MM-DD_ClassID for a predictable ID
         const dateString = format(data.date, "yyyy-MM-dd");
         docIdToSave = `${dateString}_${data.classId}`;
       }
@@ -976,5 +973,7 @@ export default function AttendancePageWrapper() {
     );
   }
 }
+
+    
 
     
