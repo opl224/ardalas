@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -411,18 +412,25 @@ export default function SubjectsPage() {
      if (role !== "admin") return;
     setSelectedSubject(subject);
   };
+  
+  const addFormSelectedSubjectName = addSubjectForm.watch("name");
+  const filteredTeachersForAdd = useMemo(() => {
+    if (!addFormSelectedSubjectName) return teachersWithClasses;
+    return teachersWithClasses.filter(teacher => teacher.subject === addFormSelectedSubjectName);
+  }, [addFormSelectedSubjectName, teachersWithClasses]);
+
+  const editFormSelectedSubjectName = editSubjectForm.watch("name");
+  const filteredTeachersForEdit = useMemo(() => {
+    if (!editFormSelectedSubjectName) return teachersWithClasses;
+    return teachersWithClasses.filter(teacher => teacher.subject === editFormSelectedSubjectName);
+  }, [editFormSelectedSubjectName, teachersWithClasses]);
+
 
   const renderSubjectFormFields = (formInstance: typeof addSubjectForm | typeof editSubjectForm, formType: 'add' | 'edit') => {
     const selectedSubjectName = formInstance.watch("name");
     const teacherUid = formInstance.watch("teacherUid");
     const selectedTeacher = teachersWithClasses.find(t => t.uid === teacherUid);
-
-    const filteredTeachers = useMemo(() => {
-        if (!selectedSubjectName) {
-            return teachersWithClasses;
-        }
-        return teachersWithClasses.filter(teacher => teacher.subject === selectedSubjectName);
-    }, [selectedSubjectName, teachersWithClasses]);
+    const filteredTeachers = formType === 'add' ? filteredTeachersForAdd : filteredTeachersForEdit;
     
     return (
       <>
@@ -435,7 +443,6 @@ export default function SubjectsPage() {
                   <Select
                       onValueChange={(value) => {
                         field.onChange(value);
-                        // Reset teacher if the current one is not valid for the new subject
                         const currentTeacherUid = formInstance.getValues("teacherUid");
                         if (currentTeacherUid) {
                             const currentTeacher = teachersWithClasses.find(t => t.uid === currentTeacherUid);
