@@ -63,7 +63,6 @@ const ATTENDANCE_STATUSES = ["Hadir", "Sakit", "Izin", "Alpa"] as const;
 type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
 
 interface ClassMin { id: string; name: string; }
-interface SubjectMin { id: string; name: string; } 
 interface StudentMin { id: string; name: string; } 
 
 interface TeacherStudentAttendanceRecord { 
@@ -75,7 +74,6 @@ interface TeacherStudentAttendanceRecord {
 
 const teacherAttendanceFormSchema = z.object({ 
   classId: z.string({ required_error: "Pilih kelas." }),
-  subjectId: z.string({ required_error: "Pilih mata pelajaran." }), 
   date: z.date({ required_error: "Tanggal harus diisi." }),
   studentAttendances: z.array(z.object({
     studentId: z.string(),
@@ -108,12 +106,11 @@ const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sa
 // --- Types for Student View ---
 interface StudentAttendanceHistoryEntry {
   id: string;
-  subjectName?: string;
-  lessonTime?: string;
   date: Timestamp;
-  status: "Hadir";
-  attendedAt: Timestamp;
-  lessonId: string;
+  status: AttendanceStatus;
+  notes?: string;
+  className?: string;
+  recordedByName?: string;
 }
 
 interface StudentAttendanceViewProps {
@@ -125,19 +122,13 @@ interface StudentAttendanceViewProps {
 function TeacherAdminAttendanceManagement() {
   const { user, role, loading: authLoading } = useAuth(); 
   const { isMobile } = useSidebar();
-  const [allClasses, setAllClasses] = useState<ClassMin[]>([]); 
-  const [allSubjects, setAllSubjects] = useState<SubjectMin[]>([]); 
   const [classesForDropdown, setClassesForDropdown] = useState<ClassMin[]>([]);
-  const [subjectsForDropdown, setSubjectsForDropdown] = useState<SubjectMin[]>([]);
-
   const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(true);
   const [isLoadingFormData, setIsLoadingFormData] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>();
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(); 
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [existingAttendanceDocId, setExistingAttendanceDocId] = useState<string | null>(null);
-  const [isLessonScheduled, setIsLessonScheduled] = useState<boolean | null>(null);
 
   const [selectedExportMonth, setSelectedExportMonth] = useState<number>(getMonth(new Date()));
   const [selectedExportYear, setSelectedExportYear] = useState<number>(getYear(new Date()));
@@ -152,7 +143,6 @@ function TeacherAdminAttendanceManagement() {
     resolver: zodResolver(teacherAttendanceFormSchema),
     defaultValues: {
       classId: undefined,
-      subjectId: undefined, 
       date: selectedDate,
       studentAttendances: [],
     },
@@ -169,48 +159,45 @@ function TeacherAdminAttendanceManagement() {
     const fetchInitialDropdownData = async () => {
       setIsLoadingDropdowns(true);
       try {
+        let classesQuery;
         if (role === 'admin') {
-          const classesSnapshot = await getDocs(query(collection(db, "classes"), orderBy("name", "asc")));
-          const adminClasses = classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
-          setAllClasses(adminClasses);
-          setClassesForDropdown(adminClasses);
-          
-          const subjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-          const adminSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
-          setAllSubjects(adminSubjects);
-          setSubjectsForDropdown(adminSubjects); 
+          classesQuery = query(collection(db, "classes"), orderBy("name", "asc"));
         } else if (role === 'guru' && user.uid) {
             const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
             const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
-
             if (teacherProfileSnapshot.empty) {
-                toast({ title: "Profil Guru Tidak Ditemukan", description: "Tidak dapat memuat kelas karena profil guru tidak ditemukan.", variant: "warning" });
-                setAllClasses([]); setClassesForDropdown([]);
+                toast({ title: "Profil Guru Tidak Ditemukan", variant: "warning" });
+                setClassesForDropdown([]);
+                setIsLoadingDropdowns(false);
                 return;
             }
             const teacherProfileId = teacherProfileSnapshot.docs[0].id;
-
+            
             const lessonsQuery = query(collection(db, "lessons"), where("teacherId", "==", teacherProfileId));
             const lessonsSnapshot = await getDocs(lessonsQuery);
-            const taughtLessons = lessonsSnapshot.docs.map(d => d.data());
-
-            const uniqueClassIds = Array.from(new Set(taughtLessons.map(l => l.classId).filter(id => !!id)));
+            const taughtClassIds = Array.from(new Set(lessonsSnapshot.docs.map(d => d.data().classId).filter(id => !!id)));
             
-            let teacherClasses: ClassMin[] = [];
-            if (uniqueClassIds.length > 0) {
-              const classChunks = [];
-              for (let i = 0; i < uniqueClassIds.length; i += 30) { classChunks.push(uniqueClassIds.slice(i, i + 30)); }
-              const classPromises = classChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))));
-              const classSnapshots = await Promise.all(classPromises);
-              classSnapshots.forEach(snap => snap.docs.forEach(d => teacherClasses.push({ id: d.id, name: d.data().name })));
-              teacherClasses.sort((a, b) => a.name.localeCompare(b.name));
+            if (taughtClassIds.length > 0) {
+              const classIdChunks = [];
+              for (let i = 0; i < taughtClassIds.length; i += 30) {
+                classIdChunks.push(taughtClassIds.slice(i, i + 30));
+              }
+              const classSnapshots = await Promise.all(
+                classIdChunks.map(chunk => getDocs(query(collection(db, "classes"), where(documentId(), "in", chunk))))
+              );
+              const fetchedClasses = classSnapshots.flatMap(snap => snap.docs.map(d => ({ id: d.id, name: d.data().name })));
+              fetchedClasses.sort((a, b) => a.name.localeCompare(b.name));
+              setClassesForDropdown(fetchedClasses);
+            } else {
+                setClassesForDropdown([]);
             }
-            setAllClasses(teacherClasses); 
-            setClassesForDropdown(teacherClasses);
-
-            const allSubjectsSnapshot = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
-            setAllSubjects(allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-            setSubjectsForDropdown([]); 
+        } else {
+            setClassesForDropdown([]);
+        }
+        
+        if(classesQuery) {
+            const classesSnapshot = await getDocs(classesQuery);
+            setClassesForDropdown(classesSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
         }
       } catch (error) {
         console.error("Error fetching initial dropdown data:", error);
@@ -224,108 +211,20 @@ function TeacherAdminAttendanceManagement() {
 
 
   useEffect(() => {
-    if (authLoading || !user || !role) return;
-
-    const updateSubjectsForSelectedClass = async () => {
-        if (!selectedClassId) {
-            if (role === 'admin') setSubjectsForDropdown(allSubjects); 
-            else setSubjectsForDropdown([]);
-            return;
-        }
-        
-        try {
-            if (role === 'admin') {
-                const lessonsInClassQuery = query(collection(db, "lessons"), where("classId", "==", selectedClassId));
-                const lessonsSnapshot = await getDocs(lessonsInClassQuery);
-                const subjectIdsInClass = Array.from(new Set(lessonsSnapshot.docs.map(d => d.data().subjectId).filter(id => !!id)));
-                
-                let subjectsInClass: SubjectMin[] = [];
-                if (subjectIdsInClass.length > 0) {
-                    const subjectChunks = [];
-                    for (let i = 0; i < subjectIdsInClass.length; i += 30) { subjectChunks.push(subjectIdsInClass.slice(i, i+30));}
-                    const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db,"subjects"), where(documentId(), "in", chunk))));
-                    const subjectSnapshots = await Promise.all(subjectPromises);
-                    subjectSnapshots.forEach(snap => snap.docs.forEach(d => subjectsInClass.push({id: d.id, name: d.data().name})));
-                    subjectsInClass.sort((a,b) => a.name.localeCompare(b.name));
-                }
-                setSubjectsForDropdown(subjectsInClass);
-
-            } else if (role === 'guru' && user.uid) {
-                const teacherProfileQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
-                const teacherProfileSnapshot = await getDocs(teacherProfileQuery);
-
-                if (teacherProfileSnapshot.empty) {
-                    setSubjectsForDropdown([]); return;
-                }
-                const teacherProfileId = teacherProfileSnapshot.docs[0].id;
-
-                const lessonsQuery = query(collection(db, "lessons"), 
-                    where("teacherId", "==", teacherProfileId),
-                    where("classId", "==", selectedClassId)
-                );
-                const lessonsSnapshot = await getDocs(lessonsQuery);
-                const subjectIds = Array.from(new Set(lessonsSnapshot.docs.map(d => d.data().subjectId).filter(id => !!id)));
-
-                let teacherSubjectsInClass: SubjectMin[] = [];
-                if (subjectIds.length > 0) {
-                    const subjectChunks = [];
-                    for (let i = 0; i < subjectIds.length; i += 30) { subjectChunks.push(subjectIds.slice(i, i+30));}
-                    const subjectPromises = subjectChunks.map(chunk => getDocs(query(collection(db,"subjects"), where(documentId(), "in", chunk))));
-                    const subjectSnapshots = await Promise.all(subjectPromises);
-                    subjectSnapshots.forEach(snap => snap.docs.forEach(d => teacherSubjectsInClass.push({id: d.id, name: d.data().name})));
-                    teacherSubjectsInClass.sort((a,b) => a.name.localeCompare(b.name));
-                }
-                setSubjectsForDropdown(teacherSubjectsInClass);
-                
-                if (selectedSubjectId && !teacherSubjectsInClass.find(s => s.id === selectedSubjectId)) {
-                    setSelectedSubjectId(undefined);
-                    form.setValue("subjectId", undefined);
-                }
-            }
-        } catch (error) {
-            console.error("Error updating subjects for class:", error);
-            toast({title: "Gagal Memuat Mata Pelajaran Kelas", variant: "destructive"});
-        }
-    };
-    updateSubjectsForSelectedClass();
-  }, [selectedClassId, role, user, authLoading, toast, allSubjects]); 
-
-
-  useEffect(() => {
     if (authLoading || (!role || !["admin", "guru"].includes(role))) return;
 
     const fetchAttendanceData = async () => {
-      if (!selectedClassId || !selectedSubjectId || !selectedDate) {
+      if (!selectedClassId || !selectedDate) {
         replace([]);
-        setIsLessonScheduled(null);
         return;
       }
       setIsLoadingFormData(true);
       setExistingAttendanceDocId(null);
-      setIsLessonScheduled(null);
       
       const dateToQuery = Timestamp.fromDate(startOfDay(selectedDate));
-      const currentDayName = DAY_NAMES_ID[getDay(selectedDate)];
       
       try {
-        // Step 1: Check if a lesson is scheduled for the selected day
-        const lessonScheduleQuery = query(collection(db, "lessons"),
-            where("classId", "==", selectedClassId),
-            where("subjectId", "==", selectedSubjectId),
-            where("dayOfWeek", "==", currentDayName),
-            limit(1)
-        );
-        const lessonScheduleSnapshot = await getDocs(lessonScheduleQuery);
-
-        if (lessonScheduleSnapshot.empty) {
-            setIsLessonScheduled(false);
-            replace([]);
-            setIsLoadingFormData(false);
-            return;
-        }
-        setIsLessonScheduled(true);
-
-        // Step 2: Fetch students of the class
+        // Fetch students of the class
         const studentsQuery = query(collection(db, "users"), where("role", "==", "siswa"), where("classId", "==", selectedClassId), orderBy("name", "asc"));
         const studentsSnapshot = await getDocs(studentsQuery);
         const fetchedStudents: StudentMin[] = studentsSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
@@ -336,11 +235,10 @@ function TeacherAdminAttendanceManagement() {
             return;
         }
 
-        // Step 3: Check for existing attendance record for that day
+        // Check for existing attendance record for that day
         const attendanceQuery = query(
           collection(db, "attendances"),
           where("classId", "==", selectedClassId),
-          where("subjectId", "==", selectedSubjectId),
           where("date", "==", dateToQuery)
         );
         const attendanceSnapshot = await getDocs(attendanceQuery);
@@ -348,7 +246,7 @@ function TeacherAdminAttendanceManagement() {
         if (!attendanceSnapshot.empty) {
           const attendanceDoc = attendanceSnapshot.docs[0];
           setExistingAttendanceDocId(attendanceDoc.id);
-          const data = attendanceDoc.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[], subjectId: string };
+          const data = attendanceDoc.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[] };
           
           const mergedStudentAttendances = fetchedStudents.map(student => {
             const existingRecord = data.studentAttendances.find(sa => sa.studentId === student.id);
@@ -358,33 +256,14 @@ function TeacherAdminAttendanceManagement() {
           });
           replace(mergedStudentAttendances);
         } else { 
-          const lessonsQuery = query(collection(db, "lessons"),
-            where("classId", "==", selectedClassId),
-            where("subjectId", "==", selectedSubjectId),
-            where("dayOfWeek", "==", currentDayName)
-          );
-          const lessonsSnapshot = await getDocs(lessonsQuery);
-          const relevantLessonIds = lessonsSnapshot.docs.map(doc => doc.id);
-
-          const studentAttendancePromises = fetchedStudents.map(async (student) => {
-            let studentStatus: AttendanceStatus = "Alpa"; 
-            if (relevantLessonIds.length > 0) {
-              const selfAttendanceQuery = query(
-                collection(db, "studentAttendanceRecords"),
-                where("studentId", "==", student.id),
-                where("date", "==", dateToQuery),
-                where("lessonId", "in", relevantLessonIds) 
-              );
-              const selfAttendanceSnapshot = await getDocs(selfAttendanceQuery);
-              if (!selfAttendanceSnapshot.empty && selfAttendanceSnapshot.docs.some(doc => doc.data().status === "Hadir")) {
-                  studentStatus = "Hadir";
-              }
-            }
-            return { studentId: student.id, studentName: student.name, status: studentStatus, notes: "" };
-          });
-          
-          const initialAttendanceWithSelfCheck = await Promise.all(studentAttendancePromises);
-          replace(initialAttendanceWithSelfCheck);
+           // Default to "Hadir" for new records
+          const initialAttendanceData = fetchedStudents.map(student => ({
+            studentId: student.id,
+            studentName: student.name,
+            status: "Hadir" as AttendanceStatus, 
+            notes: "",
+          }));
+          replace(initialAttendanceData);
         }
       } catch (error) {
         console.error("Error fetching attendance: ", error);
@@ -396,17 +275,16 @@ function TeacherAdminAttendanceManagement() {
     };
     
     fetchAttendanceData();
-  }, [selectedClassId, selectedSubjectId, selectedDate, replace, form, toast, authLoading, role]);
+  }, [selectedClassId, selectedDate, replace, toast, authLoading, role]);
 
 
   const handleSaveAttendance: SubmitHandler<TeacherAttendanceFormValues> = async (data) => {
     setIsSubmitting(true);
     const attendanceDate = Timestamp.fromDate(startOfDay(data.date));
-    const selectedClass = allClasses.find(c => c.id === data.classId); 
-    const selectedSubject = allSubjects.find(s => s.id === data.subjectId); 
+    const selectedClass = classesForDropdown.find(c => c.id === data.classId); 
 
-    if (!user || !selectedClass || !selectedSubject) { 
-        toast({ title: "Data tidak lengkap", description: "Pengguna, kelas, atau mata pelajaran tidak ditemukan.", variant: "destructive"});
+    if (!user || !selectedClass) { 
+        toast({ title: "Data tidak lengkap", description: "Pengguna atau kelas tidak ditemukan.", variant: "destructive"});
         setIsSubmitting(false);
         return;
     }
@@ -414,8 +292,6 @@ function TeacherAdminAttendanceManagement() {
     const attendanceDocumentData = {
       classId: data.classId,
       className: selectedClass.name,
-      subjectId: data.subjectId,       
-      subjectName: selectedSubject.name, 
       date: attendanceDate,
       studentAttendances: data.studentAttendances,
       recordedById: user.uid,
@@ -430,7 +306,9 @@ function TeacherAdminAttendanceManagement() {
     try {
       let docIdToSave = existingAttendanceDocId;
       if (!docIdToSave) {
-        docIdToSave = doc(collection(db, "attendances")).id; 
+        // Format YYYY-MM-DD_ClassID for a predictable ID
+        const dateString = format(data.date, "yyyy-MM-dd");
+        docIdToSave = `${dateString}_${data.classId}`;
       }
       await setDoc(doc(db, "attendances", docIdToSave), attendanceDocumentData, { merge: true }); 
       setExistingAttendanceDocId(docIdToSave); 
@@ -446,17 +324,9 @@ function TeacherAdminAttendanceManagement() {
   const handleClassChange = (classId: string) => {
     setSelectedClassId(classId);
     form.setValue("classId", classId);
-    setSelectedSubjectId(undefined); 
-    form.setValue("subjectId", undefined);
     replace([]); 
   };
   
-  const handleSubjectChange = (subjectId: string) => {
-    setSelectedSubjectId(subjectId);
-    form.setValue("subjectId", subjectId);
-    replace([]);
-  };
-
   const handleDateChange = (date?: Date) => {
     if (date) {
       const newDate = startOfDay(date);
@@ -467,8 +337,8 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportDailyExcel = async () => {
-    if (!selectedClassId || !selectedSubjectId || !selectedDate) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, dan tanggal terlebih dahulu.", variant: "destructive" });
+    if (!selectedClassId || !selectedDate) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas dan tanggal terlebih dahulu.", variant: "destructive" });
       return;
     }
     const studentAttendances = form.getValues('studentAttendances');
@@ -479,12 +349,10 @@ function TeacherAdminAttendanceManagement() {
 
     setIsExporting(true);
     try {
-      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = classesForDropdown.find(c => c.id === selectedClassId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
-      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const formattedDate = format(selectedDate, "yyyy-MM-dd", { locale: indonesiaLocale });
-      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${formattedDate}.xlsx`;
+      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${formattedDate}.xlsx`;
 
       const dataToExport = studentAttendances.map(record => ({
         "Nama Siswa": record.studentName,
@@ -497,7 +365,7 @@ function TeacherAdminAttendanceManagement() {
       XLSX.utils.book_append_sheet(workbook, worksheet, `Kehadiran ${formattedDate}`);
       
       XLSX.utils.sheet_add_aoa(worksheet, [
-        [`Laporan Kehadiran Harian - Kelas: ${className} - Mata Pelajaran: ${subjectName} - Tanggal: ${format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale })}`],
+        [`Laporan Kehadiran Harian - Kelas: ${className} - Tanggal: ${format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale })}`],
         [] 
       ], { origin: "A1" });
 
@@ -515,8 +383,8 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportDailyPdf = async () => {
-    if (!selectedClassId || !selectedSubjectId || !selectedDate) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, dan tanggal terlebih dahulu.", variant: "destructive" });
+    if (!selectedClassId || !selectedDate) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas dan tanggal terlebih dahulu.", variant: "destructive" });
       return;
     }
     const studentAttendances = form.getValues('studentAttendances');
@@ -527,20 +395,17 @@ function TeacherAdminAttendanceManagement() {
 
     setIsExporting(true);
     try {
-      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = classesForDropdown.find(c => c.id === selectedClassId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
-      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const formattedDate = format(selectedDate, "dd MMMM yyyy", { locale: indonesiaLocale });
-      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${format(selectedDate, "yyyy-MM-dd")}.pdf`;
+      const fileName = `Kehadiran_${className.replace(/\s+/g, '_')}_${format(selectedDate, "yyyy-MM-dd")}.pdf`;
 
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text(`Laporan Kehadiran Harian`, 14, 15);
       doc.setFontSize(12);
       doc.text(`Kelas: ${className}`, 14, 22);
-      doc.text(`Mata Pelajaran: ${subjectName}`, 14, 29);
-      doc.text(`Tanggal: ${formattedDate}`, 14, 36);
+      doc.text(`Tanggal: ${formattedDate}`, 14, 29);
 
 
       const tableColumn = ["No", "Nama Siswa", "Status", "Catatan"];
@@ -557,7 +422,7 @@ function TeacherAdminAttendanceManagement() {
       });
 
       autoTable(doc, {
-        startY: 42,
+        startY: 36,
         head: [tableColumn],
         body: tableRows,
         theme: 'grid',
@@ -574,7 +439,7 @@ function TeacherAdminAttendanceManagement() {
     }
   };
   
-  const generateMonthlyAttendanceSummary = async (classId: string, subjectId: string, year: number, month: number): Promise<MonthlyAttendanceSummary[]> => {
+  const generateMonthlyAttendanceSummary = async (classId: string, year: number, month: number): Promise<MonthlyAttendanceSummary[]> => {
     const startDate = startOfDay(setMonth(setYear(new Date(), year), month));
     const endDate = lastDayOfMonth(startDate);
 
@@ -594,24 +459,17 @@ function TeacherAdminAttendanceManagement() {
     const attendanceQuery = query(
         collection(db, "attendances"),
         where("classId", "==", classId),
-        where("subjectId", "==", subjectId),
         where("date", ">=", Timestamp.fromDate(startDate)),
         where("date", "<=", Timestamp.fromDate(endDate))
     );
     const attendanceSnapshot = await getDocs(attendanceQuery);
-    const attendedDaysPerStudent: Record<string, Set<string>> = {};
-
+    
     attendanceSnapshot.docs.forEach(docSnap => {
         const attendanceDayData = docSnap.data() as Omit<TeacherAttendanceFormValues, 'date'> & { date: Timestamp, studentAttendances: TeacherStudentAttendanceRecord[] };
-        const dateStr = format(attendanceDayData.date.toDate(), "yyyy-MM-dd");
-
+        
         attendanceDayData.studentAttendances.forEach(record => {
             if (studentSummaries[record.studentId]) {
-                 if (!attendedDaysPerStudent[record.studentId]) {
-                    attendedDaysPerStudent[record.studentId] = new Set();
-                }
-                attendedDaysPerStudent[record.studentId].add(dateStr);
-
+                studentSummaries[record.studentId].totalDays++;
                 switch (record.status) {
                     case "Hadir": studentSummaries[record.studentId].hadir++; break;
                     case "Sakit": studentSummaries[record.studentId].sakit++; break;
@@ -622,33 +480,27 @@ function TeacherAdminAttendanceManagement() {
         });
     });
 
-    Object.keys(studentSummaries).forEach(studentId => {
-        studentSummaries[studentId].totalDays = attendedDaysPerStudent[studentId] ? attendedDaysPerStudent[studentId].size : 0;
-    });
-
     return Object.values(studentSummaries);
   };
 
   const handleExportMonthlyExcel = async () => {
-     if (!selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
+     if (!selectedClassId || selectedExportMonth === null || !selectedExportYear) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     try {
-      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedSubjectId, selectedExportYear, selectedExportMonth);
+      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
       if (summaryData.length === 0) {
-        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk mata pelajaran, bulan dan kelas yang dipilih.", variant: "info" });
+        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
         setIsExporting(false);
         return;
       }
 
-      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = classesForDropdown.find(c => c.id === selectedClassId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
-      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
-      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.xlsx`;
+      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.xlsx`;
 
       const dataToExport = summaryData.map(record => ({
         "Nama Siswa": record.studentName,
@@ -664,7 +516,7 @@ function TeacherAdminAttendanceManagement() {
       XLSX.utils.book_append_sheet(workbook, worksheet, `${monthName} ${selectedExportYear}`);
       
       XLSX.utils.sheet_add_aoa(worksheet, [
-        [`Laporan Kehadiran Bulanan - Kelas: ${className} - Mata Pelajaran: ${subjectName}`],
+        [`Laporan Kehadiran Bulanan - Kelas: ${className}`],
         [`Bulan: ${monthName} ${selectedExportYear}`],
         [] 
       ], { origin: "A1" });
@@ -684,33 +536,30 @@ function TeacherAdminAttendanceManagement() {
   };
 
   const handleExportMonthlyPdf = async () => {
-    if (!selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear) {
-      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, mata pelajaran, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
+    if (!selectedClassId || selectedExportMonth === null || !selectedExportYear) {
+      toast({ title: "Data Tidak Lengkap", description: "Pilih kelas, bulan, dan tahun untuk ekspor bulanan.", variant: "destructive" });
       return;
     }
     setIsExporting(true);
     try {
-      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedSubjectId, selectedExportYear, selectedExportMonth);
+      const summaryData = await generateMonthlyAttendanceSummary(selectedClassId, selectedExportYear, selectedExportMonth);
        if (summaryData.length === 0) {
-        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk mata pelajaran, bulan dan kelas yang dipilih.", variant: "info" });
+        toast({ title: "Tidak Ada Data", description: "Tidak ada data kehadiran untuk bulan dan kelas yang dipilih.", variant: "info" });
         setIsExporting(false);
         return;
       }
 
-      const selectedClassObj = allClasses.find(c => c.id === selectedClassId);
-      const selectedSubjectObj = allSubjects.find(s => s.id === selectedSubjectId);
+      const selectedClassObj = classesForDropdown.find(c => c.id === selectedClassId);
       const className = selectedClassObj?.name || "Kelas Tidak Diketahui";
-      const subjectName = selectedSubjectObj?.name || "Mapel Tidak Diketahui";
       const monthName = months.find(m => m.value === selectedExportMonth)?.label || "Bulan";
-      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${subjectName.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.pdf`;
+      const fileName = `Rekap_Kehadiran_${className.replace(/\s+/g, '_')}_${monthName}_${selectedExportYear}.pdf`;
 
       const doc = new jsPDF();
       doc.setFontSize(16);
       doc.text(`Laporan Kehadiran Bulanan`, 14, 15);
       doc.setFontSize(12);
       doc.text(`Kelas: ${className}`, 14, 22);
-      doc.text(`Mata Pelajaran: ${subjectName}`, 14, 29);
-      doc.text(`Bulan: ${monthName} ${selectedExportYear}`, 14, 36);
+      doc.text(`Bulan: ${monthName} ${selectedExportYear}`, 14, 29);
 
       const tableColumn = ["No", "Nama Siswa", "Hadir", "Sakit", "Izin", "Alpa", "Total Hari"];
       const tableRows: (string | number)[][] = [];
@@ -729,7 +578,7 @@ function TeacherAdminAttendanceManagement() {
       });
       
       autoTable(doc, {
-        startY: 42,
+        startY: 36,
         head: [tableColumn],
         body: tableRows,
         theme: 'grid',
@@ -758,18 +607,18 @@ function TeacherAdminAttendanceManagement() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold font-headline">Manajemen Kehadiran</h1>
-        <p className="text-muted-foreground">Catat dan pantau kehadiran siswa per mata pelajaran.</p>
+        <p className="text-muted-foreground">Catat dan pantau kehadiran harian siswa per kelas.</p>
       </div>
       <form onSubmit={form.handleSubmit(handleSaveAttendance)}>
         <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarCheck className="h-6 w-6 text-primary" />
-              <span>Catat Kehadiran</span>
+              <span>Catat Kehadiran Harian</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
               <div>
                 <Label htmlFor="classId-teacher">Kelas</Label>
                 <Select
@@ -788,24 +637,6 @@ function TeacherAdminAttendanceManagement() {
                 </Select>
                 {form.formState.errors.classId && <p className="text-sm text-destructive mt-1">{form.formState.errors.classId.message}</p>}
               </div>
-               <div>
-                <Label htmlFor="subjectId-teacher">Mata Pelajaran</Label>
-                <Select
-                  value={selectedSubjectId}
-                  onValueChange={handleSubjectChange}
-                  disabled={isLoadingDropdowns || isSubmitting || !selectedClassId || (subjectsForDropdown.length === 0 && !!selectedClassId)}
-                >
-                  <SelectTrigger id="subjectId-teacher" className="mt-1">
-                    <SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingDropdowns ? "Memuat mapel..." : ((subjectsForDropdown.length === 0 && !!selectedClassId) ? "Tidak ada mapel di kelas ini" : "Pilih mata pelajaran"))} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingDropdowns && <SelectItem value="loading" disabled>Memuat...</SelectItem>}
-                    {subjectsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                    {subjectsForDropdown.length === 0 && !isLoadingDropdowns && selectedClassId && <SelectItem value="no-subjects" disabled>Tidak ada mapel di kelas ini.</SelectItem>}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.subjectId && <p className="text-sm text-destructive mt-1">{form.formState.errors.subjectId.message}</p>}
-              </div>
               <div>
                 <Label htmlFor="date-teacher">Tanggal</Label>
                 <Popover>
@@ -813,7 +644,7 @@ function TeacherAdminAttendanceManagement() {
                     <Button
                       variant={"outline"}
                       className="w-full justify-start text-left font-normal mt-1"
-                      disabled={isLoadingFormData || isSubmitting || !selectedClassId || !selectedSubjectId}
+                      disabled={isLoadingFormData || isSubmitting || !selectedClassId}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {selectedDate ? format(selectedDate, "PPP", { locale: indonesiaLocale }) : <span>Pilih tanggal</span>}
@@ -833,21 +664,16 @@ function TeacherAdminAttendanceManagement() {
               </div>
             </div>
 
-            {selectedClassId && selectedSubjectId && selectedDate && (
+            {selectedClassId && selectedDate && (
               isLoadingFormData ? (
                 <div className="space-y-2 mt-4">
                   <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" /> <Skeleton className="h-8 w-full" />
                 </div>
-              ) : isLessonScheduled === false ? (
-                 <div className="mt-4 p-4 border border-dashed border-destructive rounded-md text-center text-destructive flex items-center justify-center gap-2">
-                    <AlertCircle className="h-5 w-5" />
-                    <span>Tidak ada jadwal pelajaran untuk kelas, mata pelajaran, dan tanggal yang dipilih.</span>
-                 </div>
               ) : fields.length === 0 ? (
                  <div className="mt-4 p-4 border border-dashed border-border rounded-md text-center text-muted-foreground">
                     Tidak ada siswa di kelas ini atau data siswa belum termuat.
                  </div>
-              ) : fields.length > 0 && isLessonScheduled ? (
+              ) : fields.length > 0 && (
                 <div className="mt-4 space-y-4">
                   <h3 className="text-lg font-medium">Daftar Siswa ({fields.length} siswa)</h3>
                   <div className="overflow-x-auto">
@@ -894,9 +720,9 @@ function TeacherAdminAttendanceManagement() {
                   {form.formState.errors.studentAttendances && !form.formState.errors.studentAttendances.message && (<p className="text-sm font-medium text-destructive mt-1">Periksa kembali input kehadiran siswa.</p>)}
                    {form.formState.errors.studentAttendances?.message && (<p className="text-sm font-medium text-destructive mt-1">{form.formState.errors.studentAttendances?.message}</p>)}
                 </div>
-              ) : null
+              )
             )}
-            {fields.length > 0 && selectedClassId && selectedSubjectId && selectedDate && !isLoadingFormData && isLessonScheduled && (
+            {fields.length > 0 && selectedClassId && selectedDate && !isLoadingFormData && (
               <div className="flex justify-end mt-6">
                 <Button type="submit" disabled={isSubmitting || isLoadingFormData}>
                   {isSubmitting && <LottieLoader width={16} height={16} className="mr-2" />}
@@ -913,19 +739,12 @@ function TeacherAdminAttendanceManagement() {
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
         <CardHeader><CardTitle className="flex items-center gap-2"><FileDown className="h-6 w-6 text-primary" /><span>Rekap & Ekspor Kehadiran</span></CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div>
               <Label htmlFor="exportClassId">Kelas</Label>
               <Select value={selectedClassId} onValueChange={(value) => setSelectedClassId(value)} disabled={isLoadingDropdowns || isExporting}>
                 <SelectTrigger id="exportClassId" className="mt-1"><SelectValue placeholder={isLoadingDropdowns ? "Memuat..." : "Pilih kelas"} /></SelectTrigger>
                 <SelectContent>{classesForDropdown.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-             <div>
-              <Label htmlFor="exportSubjectId">Mata Pelajaran</Label>
-              <Select value={selectedSubjectId} onValueChange={(value) => setSelectedSubjectId(value)} disabled={isLoadingDropdowns || isExporting || !selectedClassId}>
-                <SelectTrigger id="exportSubjectId" className="mt-1"><SelectValue placeholder={!selectedClassId ? "Pilih kelas dulu" : (isLoadingDropdowns ? "Memuat..." : "Pilih mapel")} /></SelectTrigger>
-                <SelectContent>{subjectsForDropdown.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div>
@@ -944,10 +763,10 @@ function TeacherAdminAttendanceManagement() {
         <CardFooter className="flex flex-col sm:flex-row sm:justify-end gap-2">
           <DropdownMenu><DropdownMenuTrigger asChild><Button disabled={isExporting || isLoadingFormData} className="w-full sm:w-auto">{isExporting && <LottieLoader width={16} height={16} className="mr-2" />}<FileDown className="mr-2 h-4 w-4" /> Ekspor</Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportMonthlyExcel} disabled={isExporting || !selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportMonthlyPdf} disabled={isExporting || !selectedClassId || !selectedSubjectId || selectedExportMonth === null || !selectedExportYear}><FileDown className="mr-2 h-4 w-4" /> PDF Bulanan</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDailyExcel} disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Harian</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDailyPdf} disabled={isExporting || !selectedClassId || !selectedDate || fields.length === 0}><FileDown className="mr-2 h-4 w-4" /> PDF Harian</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportMonthlyExcel} disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel Bulanan</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportMonthlyPdf} disabled={isExporting || !selectedClassId || selectedExportMonth === null || !selectedExportYear}><FileDown className="mr-2 h-4 w-4" /> PDF Bulanan</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </CardFooter>
@@ -981,17 +800,8 @@ function TeacherAdminAttendanceManagement() {
 
 function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAttendanceViewProps) {
   const { toast } = useToast();
-  const { isMobile } = useSidebar();
   const [attendanceHistory, setAttendanceHistory] = useState<StudentAttendanceHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedRecordForView, setSelectedRecordForView] = useState<StudentAttendanceHistoryEntry | null>(null);
-  const [isViewDetailDialogOpen, setIsViewDetailDialogOpen] = useState(false);
-  
-  const [selectedSubject, setSelectedSubject] = useState<string>('all');
-  const [isExporting, setIsExporting] = useState(false);
-
-  const ITEMS_PER_PAGE = 10;
 
   const fetchStudentHistory = useCallback(async () => {
     if (!targetStudentId) {
@@ -1003,20 +813,30 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
 
     try {
       const attendanceQuery = query(
-        collection(db, "studentAttendanceRecords"),
-        where("studentId", "==", targetStudentId)
+        collection(db, "attendances"),
+        // This is inefficient. We need to query where studentId is in the array.
+        // Firestore doesn't support this well. We may need to denormalize.
+        // For now, let's fetch all for the class and filter client-side.
+        // THIS IS A SIMPLIFICATION and NOT SCALABLE.
+        // A better approach would require a `studentAttendances` subcollection or different data model.
+        orderBy("date", "desc")
       );
+      
       const snapshot = await getDocs(attendanceQuery);
-      let history: StudentAttendanceHistoryEntry[] = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      } as StudentAttendanceHistoryEntry));
-
-      // Sort client-side
-      history.sort((a, b) => {
-        const timeA = a.attendedAt?.toMillis() || 0;
-        const timeB = b.attendedAt?.toMillis() || 0;
-        return timeB - timeA;
+      let history: StudentAttendanceHistoryEntry[] = [];
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const studentRecord = data.studentAttendances?.find((rec: any) => rec.studentId === targetStudentId);
+        if (studentRecord) {
+          history.push({
+            id: docSnap.id + '-' + targetStudentId,
+            date: data.date,
+            status: studentRecord.status,
+            notes: studentRecord.notes,
+            className: data.className,
+            recordedByName: data.recordedByName,
+          });
+        }
       });
       
       setAttendanceHistory(history);
@@ -1032,134 +852,6 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
     fetchStudentHistory();
   }, [fetchStudentHistory]);
   
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedSubject]);
-  
-  const uniqueSubjects = useMemo(() => {
-    const subjects = new Set<string>();
-    attendanceHistory.forEach(record => {
-      if (record.subjectName) {
-        subjects.add(record.subjectName);
-      }
-    });
-    return Array.from(subjects).sort();
-  }, [attendanceHistory]);
-
-  const filteredHistory = useMemo(() => {
-    if (selectedSubject === 'all') {
-      return attendanceHistory;
-    }
-    return attendanceHistory.filter(record => record.subjectName === selectedSubject);
-  }, [attendanceHistory, selectedSubject]);
-
-  const paginatedHistory = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [currentPage, filteredHistory]);
-  
-  const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
-
-  const handleExport = (formatType: 'pdf' | 'xlsx') => {
-    if (filteredHistory.length === 0) {
-      toast({ title: "Tidak ada data untuk diekspor", variant: "info" });
-      return;
-    }
-    setIsExporting(true);
-
-    const studentName = targetStudentName || "Siswa";
-    const subjectName = selectedSubject === 'all' ? 'Semua_Mapel' : selectedSubject.replace(/\s+/g, '_');
-    const fileName = `Riwayat_Absen_${studentName.replace(/\s+/g, '_')}_${subjectName}`;
-
-    const dataToExport = filteredHistory.map(record => ({
-      "Tanggal": format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale }),
-      "Mata Pelajaran": record.subjectName || "N/A",
-      "Waktu Pelajaran": record.lessonTime || "N/A",
-      "Jam Absen": format(record.attendedAt.toDate(), "HH:mm:ss", { locale: indonesiaLocale }),
-      "Status": record.status,
-    }));
-
-    if (formatType === 'pdf') {
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text(`Riwayat Absensi: ${studentName}`, 14, 20);
-      doc.setFontSize(12);
-      doc.text(`Mata Pelajaran: ${selectedSubject === 'all' ? 'Semua' : selectedSubject}`, 14, 28);
-      autoTable(doc, {
-        startY: 35,
-        head: [Object.keys(dataToExport[0])],
-        body: dataToExport.map(Object.values),
-        theme: 'grid',
-        headStyles: { fillColor: [64, 149, 237] },
-      });
-      doc.save(`${fileName}.pdf`);
-    } else if (formatType === 'xlsx') {
-      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Riwayat Absensi");
-       XLSX.utils.sheet_add_aoa(worksheet, [
-        [`Riwayat Absensi - ${studentName}`],
-        [`Mata Pelajaran: ${selectedSubject === 'all' ? 'Semua' : selectedSubject}`],
-      ], { origin: "A1" });
-      XLSX.writeFile(workbook, `${fileName}.xlsx`);
-    }
-
-    toast({ title: "Ekspor Berhasil", description: `${fileName}.${formatType} telah diunduh.` });
-    setIsExporting(false);
-  };
-
-
-  const renderPageNumbers = () => {
-    const pageNumbers = [];
-    const maxPagesToShow = 3;
-    let startPage, endPage;
-
-    if (totalPages <= maxPagesToShow) {
-      startPage = 1;
-      endPage = totalPages;
-    } else {
-      if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
-        startPage = 1;
-        endPage = maxPagesToShow;
-      } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
-        startPage = totalPages - maxPagesToShow + 1;
-        endPage = totalPages;
-      } else {
-        startPage = currentPage - Math.floor(maxPagesToShow / 2);
-        endPage = currentPage + Math.floor(maxPagesToShow / 2);
-      }
-    }
-
-    if (startPage > 1) {
-      pageNumbers.push(<PaginationItem key="1"><PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink></PaginationItem>);
-      if (startPage > 2) {
-        pageNumbers.push(<PaginationItem key="start-ellipsis"><PaginationEllipsis /></PaginationItem>);
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(
-        <PaginationItem key={i}>
-          <PaginationLink onClick={() => setCurrentPage(i)} isActive={currentPage === i}>
-            {i}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pageNumbers.push(<PaginationItem key="end-ellipsis"><PaginationEllipsis /></PaginationItem>);
-      }
-      pageNumbers.push(<PaginationItem key={totalPages}><PaginationLink onClick={() => setCurrentPage(totalPages)}>{totalPages}</PaginationLink></PaginationItem>);
-    }
-    return pageNumbers;
-  };
-  
-  const handleViewDetails = (record: StudentAttendanceHistoryEntry) => {
-    setSelectedRecordForView(record);
-    setIsViewDetailDialogOpen(true);
-  };
 
   if (isLoading) {
     return (
@@ -1175,193 +867,67 @@ function StudentAttendanceView({ targetStudentId, targetStudentName }: StudentAt
   
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <div>
+       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+         <div>
             <h1 className="text-3xl font-bold font-headline">Rekap Kehadiran {targetStudentName ? `Anak (${targetStudentName})` : 'Saya'}</h1>
-            <p className="text-muted-foreground">Riwayat absensi mandiri yang telah tercatat.</p>
+            <p className="text-muted-foreground">Riwayat kehadiran harian yang telah dicatat oleh guru.</p>
         </div>
-        <Button onClick={fetchStudentHistory} variant="outline" size="sm">
+         <Button onClick={fetchStudentHistory} variant="outline" size="sm">
             <RefreshCw className="mr-2 h-4 w-4" /> Refresh Data
         </Button>
       </div>
       
       <Card className="bg-card/70 backdrop-blur-sm border-border shadow-md">
          <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <CardTitle className="flex items-center gap-2">
               <CalendarCheck className="h-6 w-6 text-primary" />
-              <span>Riwayat Absensi</span>
+              <span>Riwayat Kehadiran Harian</span>
             </CardTitle>
-            <div className="flex w-full sm:w-auto gap-2">
-              <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={uniqueSubjects.length === 0}>
-                <SelectTrigger className="w-full sm:w-auto min-w-[180px]">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <SelectValue placeholder="Filter Mata Pelajaran" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Mata Pelajaran</SelectItem>
-                  {uniqueSubjects.map(subject => (
-                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" disabled={isExporting || filteredHistory.length === 0} aria-label="Ekspor Data">
-                    {isExporting ? <LottieLoader width={16} height={16} /> : <FileDown className="h-4 w-4" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    <span>Unduh sebagai PDF</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExport('xlsx')}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    <span>Unduh sebagai Excel</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
-          {filteredHistory.length === 0 ? (
+          {attendanceHistory.length === 0 ? (
             <div className="pt-6 text-center text-muted-foreground flex flex-col items-center gap-4">
                 <Info className="mx-auto h-12 w-12 text-primary" />
-                 <p>
-                  {attendanceHistory.length > 0
-                    ? `Tidak ada riwayat absensi untuk mata pelajaran "${selectedSubject}".`
-                    : "Belum ada riwayat absensi yang tercatat."}
-                </p>
-                {attendanceHistory.length === 0 && <Button asChild variant="outline"><Link href="/lessons">Lihat Jadwal Pelajaran</Link></Button>}
+                 <p>Belum ada riwayat kehadiran yang tercatat.</p>
             </div>
           ) : (
-            <>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto mt-4">
                 <Table className="w-full">
                   <TableHeader>
                     <TableRow>
-                       {isMobile ? (
-                        <>
-                          <TableHead>Tanggal</TableHead>
-                          <TableHead>Mata Pelajaran</TableHead>
-                          <TableHead className="text-right">Aksi</TableHead>
-                        </>
-                       ) : (
-                        <>
-                            <TableHead>Tanggal</TableHead>
-                            <TableHead>Mata Pelajaran</TableHead>
-                            <TableHead>Waktu Pelajaran</TableHead>
-                            <TableHead>Jam Absen</TableHead>
-                            <TableHead>Status</TableHead>
-                        </>
-                       )}
+                        <TableHead>Tanggal</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Catatan</TableHead>
+                        <TableHead>Dicatat Oleh</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedHistory.map(record => (
+                    {attendanceHistory.map(record => (
                       <TableRow key={record.id}>
-                        {isMobile ? (
-                           <>
-                             <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
-                             <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
-                             <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" onClick={() => handleViewDetails(record)}>
-                                <Eye className="h-4 w-4" />
-                                <span className="sr-only">Lihat Detail</span>
-                                </Button>
-                             </TableCell>
-                           </>
-                        ) : (
-                           <>
-                             <TableCell>{format(record.date.toDate(), "dd MMM yyyy", { locale: indonesiaLocale })}</TableCell>
-                             <TableCell className="font-medium truncate" title={record.subjectName || "N/A"}>{record.subjectName || "N/A"}</TableCell>
-                             <TableCell>{record.lessonTime || "N/A"}</TableCell>
-                             <TableCell>{format(record.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })}</TableCell>
-                             <TableCell>
-                               <span className="flex items-center gap-1.5 font-medium text-green-600">
-                                 <CheckCircle className="h-4 w-4" />
-                                 {record.status}
-                               </span>
-                             </TableCell>
-                           </>
-                        )}
+                         <TableCell>{format(record.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</TableCell>
+                         <TableCell>
+                            <span className={cn(
+                                "flex items-center gap-1.5 font-medium",
+                                record.status === 'Hadir' && 'text-green-600',
+                                record.status === 'Sakit' && 'text-yellow-600',
+                                record.status === 'Izin' && 'text-blue-600',
+                                record.status === 'Alpa' && 'text-red-600',
+                            )}>
+                                {record.status === 'Hadir' && <CheckCircle className="h-4 w-4" />}
+                                {record.status !== 'Hadir' && <AlertCircle className="h-4 w-4" />}
+                                {record.status}
+                            </span>
+                         </TableCell>
+                         <TableCell className="text-xs max-w-xs truncate" title={record.notes || undefined}>{record.notes || '-'}</TableCell>
+                         <TableCell className="text-xs text-muted-foreground">{record.recordedByName || 'Sistem'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-              {totalPages > 1 && (
-                <Pagination className="mt-6">
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        aria-disabled={currentPage === 1}
-                        className={cn("cursor-pointer", currentPage === 1 ? "pointer-events-none opacity-50" : undefined)}
-                      />
-                    </PaginationItem>
-                    {renderPageNumbers()}
-                    <PaginationItem>
-                      <PaginationNext
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        aria-disabled={currentPage === totalPages}
-                        className={cn("cursor-pointer", currentPage === totalPages ? "pointer-events-none opacity-50" : undefined)}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
-            </>
           )}
         </CardContent>
       </Card>
-      
-      <Dialog open={isViewDetailDialogOpen} onOpenChange={setIsViewDetailDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detail Riwayat Absensi</DialogTitle>
-            <DialogDescription>
-              Informasi lengkap untuk absensi yang dipilih.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedRecordForView && (
-            <div className="grid gap-4 py-4 text-sm">
-                <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-                  <Label>Tanggal</Label>
-                  <p>{format(selectedRecordForView.date.toDate(), "dd MMMM yyyy", { locale: indonesiaLocale })}</p>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-                  <Label>Mata Pelajaran</Label>
-                  <p>{selectedRecordForView.subjectName || "N/A"}</p>
-                </div>
-                 <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-                  <Label>Waktu Pelajaran</Label>
-                  <p>{selectedRecordForView.lessonTime || "N/A"}</p>
-                </div>
-                 <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-                  <Label>Jam Absen</Label>
-                  <p>{format(selectedRecordForView.attendedAt.toDate(), "HH:mm:ss", { locale: indonesiaLocale })}</p>
-                </div>
-                <div className="grid grid-cols-[120px_1fr] items-center gap-4">
-                  <Label>Status</Label>
-                  <p className="flex items-center gap-1.5 font-medium text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    {selectedRecordForView.status}
-                  </p>
-                </div>
-            </div>
-          )}
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Tutup
-              </Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

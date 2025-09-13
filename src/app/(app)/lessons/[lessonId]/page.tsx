@@ -29,6 +29,7 @@ interface LessonDetails {
   classId?: string; // Need classId for querying attendance
 }
 
+// This interface is no longer used for recording but might be useful for display if needed.
 interface StudentSelfAttendanceRecord {
   id?: string;
   studentId: string;
@@ -55,48 +56,28 @@ export default function LessonDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [attendanceRecord, setAttendanceRecord] = useState<StudentSelfAttendanceRecord | null>(null);
-  const [isEligibleToAttend, setIsEligibleToAttend] = useState(false);
-  const [attendanceStatusMessage, setAttendanceStatusMessage] = useState<string | null>(null);
-  const [isCheckingAttendance, setIsCheckingAttendance] = useState(true);
-  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 30000); // Update time every 30s
-    return () => clearInterval(timer);
-  }, []);
-
   useEffect(() => {
     if (paramsFromHook && typeof paramsFromHook.lessonId === 'string') {
       setLessonId(paramsFromHook.lessonId);
     } else if (paramsFromHook && paramsFromHook.lessonId !== undefined) {
       setError("ID Pelajaran tidak valid.");
       setIsLoading(false);
-      setIsCheckingAttendance(false);
       setLessonId(null);
     }
-    // If paramsFromHook is null or lessonId is not present, lessonId remains null
-    // The main data fetching effect will handle the null lessonId state.
   }, [paramsFromHook]);
 
 
   useEffect(() => {
     if (!lessonId || authLoading) {
-      // If lessonId is explicitly null after paramsFromHook has been processed, and we are not loading auth
       if (lessonId === null && paramsFromHook && !authLoading) {
         setError("ID Pelajaran tidak ditemukan di URL.");
         setIsLoading(false);
-        setIsCheckingAttendance(false);
       }
       return;
     }
 
     const fetchLessonDetails = async () => {
       setIsLoading(true);
-      setIsCheckingAttendance(true);
       setError(null);
       try {
         const lessonDocRef = doc(db, "lessons", lessonId);
@@ -112,23 +93,15 @@ export default function LessonDetailPage() {
             setLesson(null);
           } else {
             setLesson(lessonData);
-            const studentIdToCheck = role === "siswa" ? user?.uid : user?.linkedStudentId;
-            if (studentIdToCheck && lessonData.id) {
-              fetchAttendanceStatus(studentIdToCheck, lessonData.id);
-            } else {
-              setIsCheckingAttendance(false);
-            }
           }
         } else {
           setError("Detail pelajaran tidak ditemukan.");
           setLesson(null);
-          setIsCheckingAttendance(false);
         }
       } catch (e) {
         console.error("Error fetching lesson details:", e);
         setError("Gagal memuat detail pelajaran.");
         setLesson(null);
-        setIsCheckingAttendance(false);
       } finally {
         setIsLoading(false);
       }
@@ -136,109 +109,6 @@ export default function LessonDetailPage() {
 
     fetchLessonDetails();
   }, [lessonId, authLoading, user, role]);
-
-
-  const fetchAttendanceStatus = async (studentUid: string, currentLessonId: string) => {
-    setIsCheckingAttendance(true);
-    try {
-      const todayStart = startOfDay(new Date());
-      const attendanceQuery = query(
-        collection(db, "studentAttendanceRecords"),
-        where("studentId", "==", studentUid),
-        where("lessonId", "==", currentLessonId),
-        where("date", "==", Timestamp.fromDate(todayStart))
-      );
-      const attendanceSnapshot = await getDocs(attendanceQuery);
-      if (!attendanceSnapshot.empty) {
-        const record = attendanceSnapshot.docs[0].data() as StudentSelfAttendanceRecord;
-        setAttendanceRecord(record);
-      } else {
-        setAttendanceRecord(null);
-      }
-    } catch (e) {
-      console.error("Error fetching attendance status:", e);
-      toast({ title: "Gagal Cek Status Absen", variant: "destructive" });
-    } finally {
-      setIsCheckingAttendance(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!lesson || role !== "orangtua" || isCheckingAttendance) {
-      setIsEligibleToAttend(false);
-      setAttendanceStatusMessage(null);
-      return;
-    }
-
-    if (attendanceRecord) {
-      setIsEligibleToAttend(false);
-      setAttendanceStatusMessage(`Hadir (Absen pukul ${format(attendanceRecord.attendedAt.toDate(), "HH:mm", { locale: indonesiaLocale })})`);
-      return;
-    }
-
-    const now = currentTime;
-    const today = startOfDay(now);
-    const lessonStart = lesson.startTime ? parse(lesson.startTime, "HH:mm", today) : null;
-    const lessonEnd = lesson.endTime ? parse(lesson.endTime, "HH:mm", today) : null;
-    
-    const currentDayName = DAY_NAMES_ID[getDay(now)];
-    const isTodayTheLessonDay = lesson.dayOfWeek === currentDayName;
-
-    if (lessonStart && lessonEnd && isValid(lessonStart) && isValid(lessonEnd)) {
-        if (isTodayTheLessonDay) {
-            if (isWithinInterval(now, { start: lessonStart, end: lessonEnd })) {
-                setIsEligibleToAttend(true);
-                setAttendanceStatusMessage("Sesi absen sedang berlangsung.");
-            } else if (now < lessonStart) {
-                setIsEligibleToAttend(false);
-                setAttendanceStatusMessage(`Pelajaran hari ini akan dimulai pukul ${lesson.startTime}.`);
-            } else {
-                setIsEligibleToAttend(false);
-                setAttendanceStatusMessage("Sesi absen hari ini telah berakhir.");
-            }
-        } else {
-            setIsEligibleToAttend(false);
-            setAttendanceStatusMessage(`Jadwal pelajaran ini adalah hari ${lesson.dayOfWeek || 'tidak diketahui'}.`);
-        }
-    } else {
-      setIsEligibleToAttend(false);
-      setAttendanceStatusMessage("Jadwal pelajaran tidak valid untuk absen.");
-    }
-  }, [lesson, attendanceRecord, currentTime, role, isCheckingAttendance, DAY_NAMES_ID]);
-
-
-  const handleSelfAttend = async () => {
-    if (!user || role !== 'orangtua' || !user.linkedStudentId || !user.linkedStudentName || !user.linkedStudentClassName || !lesson || !lesson.classId || !lesson.subjectName || !lesson.startTime || !lesson.endTime) {
-      toast({ title: "Aksi Gagal", description: "Data orang tua, anak, atau pelajaran tidak lengkap.", variant: "destructive" });
-      return;
-    }
-    if (!isEligibleToAttend || attendanceRecord) return;
-
-    setIsSubmittingAttendance(true);
-    const attendanceData: Omit<StudentSelfAttendanceRecord, 'id' | 'attendedAt'> & {attendedAt: any, date: any} = {
-      studentId: user.linkedStudentId,
-      studentName: user.linkedStudentName,
-      classId: lesson.classId,
-      className: user.linkedStudentClassName, 
-      lessonId: lesson.id,
-      subjectName: lesson.subjectName,
-      lessonTime: `${lesson.startTime} - ${lesson.endTime}`,
-      date: Timestamp.fromDate(startOfDay(new Date())),
-      status: "Hadir",
-      attendedAt: serverTimestamp(),
-    };
-
-    try {
-      const docRef = await addDoc(collection(db, "studentAttendanceRecords"), attendanceData);
-      setAttendanceRecord({ ...attendanceData, id: docRef.id, attendedAt: Timestamp.now() }); 
-      toast({ title: "Kehadiran Tercatat", description: `Anak Anda, ${user.linkedStudentName}, berhasil absen untuk pelajaran ${lesson.subjectName}.` });
-    } catch (error) {
-      console.error("Error recording self-attendance:", error);
-      toast({ title: "Gagal Absen", description: "Terjadi kesalahan. Coba lagi.", variant: "destructive" });
-    } finally {
-      setIsSubmittingAttendance(false);
-    }
-  };
 
 
   if (isLoading || authLoading) {
@@ -331,32 +201,12 @@ export default function LessonDetailPage() {
             </div>
           </div>
 
-          {role === "orangtua" && !isCheckingAttendance && (
-            <div className="mt-6 p-4 border border-border rounded-md bg-background shadow">
-              <h3 className="text-lg font-semibold mb-2 flex items-center">
-                {attendanceRecord ? <CheckCircle className="h-5 w-5 text-green-500 mr-2" /> : 
-                 isEligibleToAttend ? <Clock className="h-5 w-5 text-blue-500 mr-2" /> :
-                 <XCircle className="h-5 w-5 text-red-500 mr-2" />}
-                Status Kehadiran Anak Hari Ini
-              </h3>
-              <p className="text-sm text-muted-foreground mb-3">{attendanceStatusMessage || "Memeriksa status..."}</p>
-              {isEligibleToAttend && !attendanceRecord && (
-                <Button 
-                  onClick={handleSelfAttend} 
-                  disabled={isSubmittingAttendance}
-                  className="w-full sm:w-auto"
-                >
-                  {isSubmittingAttendance && <LottieLoader width={16} height={16} className="mr-2" />}
-                  {isSubmittingAttendance ? "Memproses..." : "Absenkan Anak Sekarang"}
-                </Button>
-              )}
-            </div>
-          )}
-           {(role === "orangtua" || role === "siswa") && isCheckingAttendance && (
-             <div className="mt-6 p-4 border border-border rounded-md bg-background shadow flex items-center justify-center">
-                <LottieLoader width={24} height={24} className="mr-2" /> Memuat status kehadiran...
-             </div>
-           )}
+          <div className="mt-6 p-4 border border-dashed border-border rounded-md text-center">
+            <Info className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Kehadiran sekarang dicatat oleh guru wali kelas untuk seluruh hari, bukan per mata pelajaran.
+            </p>
+          </div>
 
 
           {lesson.topic && (
